@@ -1,0 +1,38 @@
+# Build output and the frozen Swift reference's Xcode leftovers
+build/
+DerivedData/
+*.xcuserdata
+*.xcworkspacedata
+xcuserdata/
+*.xcresult
+*.log
+
+# Untracked local scratch from earlier workflows; not a record
+.claude/
+
+# Secrets
+Secrets.plist
+
+# macOS
+.DS_Store
+.AppleDouble
+._*
+.LSOverride
+
+# Swift Package Manager
+.build/
+Packages/
+
+# Local MPVKit binaries and frameworks. Binary provenance and corresponding
+# source must be established independently before any binary distribution.
+Vendor/
+MarqueePatches/Libmpv.xcframework/
+
+# Superseded local research retained outside the publishable source tree
+Marquee-Remote-Navigation-Dossier-5-11-2026
+
+# Local release artifacts of the frozen Swift reference
+dist/
+
+# Untracked local scratch from earlier workflows; not a record
+.review/

@@ -1,0 +1,13 @@
+[
+  {
+    "filePath": "/synthetic/legacy-import/Movies/Fixture Movie (2024).mkv",
+    "fileName": "Fixture Movie (2024).mkv",
+    "title": "Fixture Movie",
+    "year": 2024,
+    "fileExtension": "mkv",
+    "fileSize": 123456,
+    "dateAdded": 0,
+    "genre": "Drama",
+    "posterImagePath": "/synthetic/legacy-import/artwork/fixture-movie-poster.jpg"
+  }
+]

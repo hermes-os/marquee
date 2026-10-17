@@ -1,0 +1,250 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import Marquee 3.0
+
+ApplicationWindow {
+    id: window
+    objectName: "marqueeWindow"
+
+    width: 1920
+    height: 1080
+    minimumWidth: 1100
+    minimumHeight: 700
+    visible: true
+    color: Theme.background
+    title: qsTr("Marquee")
+
+    Component.onCompleted: {
+        if (appController.startFullscreen) {
+            showFullScreen()
+        } else {
+            showNormal()
+        }
+        // ContentView.swift:30 and :117: the remote starts on the picker
+        // when it is up, otherwise on the sidebar.
+        if (profilePickerLoader.item) {
+            profilePickerLoader.item.forceActiveFocus()
+        } else {
+            sidebar.forceActiveFocus()
+        }
+    }
+
+    Shortcut {
+        sequence: "F11"
+        onActivated: {
+            if (window.visibility === Window.FullScreen)
+                window.showNormal()
+            else
+                window.showFullScreen()
+        }
+    }
+
+    // ContentView.swift:29-40 and :41-43: the profile picker is a layer over
+    // the whole window with no sidebar, kept up through its own exit fade
+    // while the shell is already composed beneath it. The shell only takes
+    // input once the picker is gone (:83-87).
+    readonly property bool pickerShowing: appController.navigation.route === NavigationController.ProfilePicker
+        || appController.profileExitInFlight
+    readonly property bool shellShowing: appController.navigation.route !== NavigationController.ProfilePicker
+
+    RowLayout {
+        anchors.fill: parent
+        spacing: 0
+        visible: window.shellShowing
+        enabled: window.shellShowing && !appController.profileExitInFlight
+
+        // Window-attached Keys never enter Qt Quick key delivery; back keys
+        // must sit on an Item above both focus scopes in the bubble chain.
+        Keys.onPressed: event => {
+            if (event.key === Qt.Key_Escape
+                || event.key === Qt.Key_Back
+                || event.key === Qt.Key_Backspace) {
+                appController.navigation.goBack()
+                event.accepted = true
+            }
+        }
+
+        Sidebar {
+            id: sidebar
+            objectName: "sidebar"
+            Layout.fillHeight: true
+            Layout.preferredWidth: implicitWidth
+            // TVShowsDetailView.swift:110-116 presents a show over the TV
+            // Shows tab, so the tab stays lit while a show detail is up.
+            selectedRoute: appController.navigation.route === NavigationController.ShowDetail
+                ? NavigationController.Shows
+                : appController.navigation.route
+            activeProfileName: appController.activeProfileName
+            activeProfileAvatarIcon: appController.activeProfileAvatarIcon
+            activeProfileAvatarColor: appController.activeProfileAvatarColor
+            kidsMode: appController.kidsMode
+            onRouteActivated: route => appController.navigation.openRoute(route)
+            onPlaySomethingActivated: appController.playSomething()
+            onProfileActivated: appController.navigation.showProfilePicker()
+            onRequestContentFocus: contentFocus.forceActiveFocus()
+        }
+
+        FocusScope {
+            id: contentFocus
+            objectName: "contentFocus"
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            focus: true
+            Keys.onLeftPressed: event => {
+                sidebar.forceActiveFocus()
+                event.accepted = true
+            }
+
+            Loader {
+                id: screenLoader
+                objectName: "screenLoader"
+                anchors.fill: parent
+                focus: true
+                activeFocusOnTab: false
+                sourceComponent: {
+                    switch (appController.navigation.route) {
+                    case NavigationController.Player: return playerComponent
+                    case NavigationController.Details: return detailsComponent
+                    case NavigationController.ShowDetail: return showDetailComponent
+                    case NavigationController.Movies: return moviesComponent
+                    case NavigationController.Shows: return showsComponent
+                    case NavigationController.Search: return searchComponent
+                    case NavigationController.Settings: return settingsComponent
+                    case NavigationController.Home: return homeComponent
+                    default: return welcomeComponent
+                    }
+                }
+            }
+        }
+    }
+
+    Component {
+        id: homeComponent
+        HomeScreen {
+            // HomeDetailView.swift:329 and :1008 run the same `playSomething()`
+            // the sidebar's control does (ContentView.swift:207).
+            onPlaySomethingActivated: appController.playSomething()
+        }
+    }
+
+    Component {
+        id: moviesComponent
+        MoviesScreen {
+            onRequestSidebarFocus: sidebar.forceActiveFocus()
+        }
+    }
+
+    Component {
+        id: showsComponent
+        ShowsScreen {
+            onRequestSidebarFocus: sidebar.forceActiveFocus()
+        }
+    }
+    Component {
+        id: showDetailComponent
+        ShowDetailScreen {
+            showName: appController.navigation.selectedMediaId
+            onRequestSidebarFocus: sidebar.forceActiveFocus()
+        }
+    }
+    Component {
+        id: searchComponent
+        SearchScreen {
+            onRequestSidebarFocus: sidebar.forceActiveFocus()
+        }
+    }
+
+    Component {
+        id: settingsComponent
+        SettingsScreen {
+            onRequestSidebarFocus: sidebar.forceActiveFocus()
+        }
+    }
+
+    Component {
+        id: welcomeComponent
+        WelcomeScreen {
+            title: routeTitle(appController.navigation.route)
+        }
+    }
+
+    Component {
+        id: detailsComponent
+        DetailsScreen { }
+    }
+
+    Component {
+        id: playerComponent
+        PlayerScreen {
+            title: appController.player.title
+            subtitle: appController.player.subtitle
+        }
+    }
+
+    // ContentView.swift:30-39: the picker layer, z above the shell, present
+    // for the route and through the exit fade that follows a choice.
+    Loader {
+        id: profilePickerLoader
+        objectName: "profilePickerLoader"
+        anchors.fill: parent
+        active: window.pickerShowing
+        z: 4
+        sourceComponent: ProfilePickerScreen { }
+        onLoaded: item.forceActiveFocus()
+    }
+
+    Connections {
+        target: appController
+        // Once the exit fade has ended the shell owns the remote again, on
+        // the sidebar as ContentView.swift:117 restores it.
+        function onProfileExitInFlightChanged() {
+            if (!appController.profileExitInFlight && window.shellShowing) {
+                sidebar.forceActiveFocus()
+            }
+        }
+    }
+
+    Connections {
+        target: appController.navigation
+        function onRouteChanged() {
+            if (appController.navigation.route === NavigationController.ProfilePicker) {
+                if (profilePickerLoader.item) {
+                    profilePickerLoader.item.forceActiveFocus()
+                }
+            } else if (!appController.profileExitInFlight && !sidebar.activeFocus
+                       && !contentFocus.activeFocus) {
+                // The shell composes under a route change that skipped the
+                // picker's exit fade; the remote starts on the sidebar as
+                // ContentView.swift:117 has it.
+                sidebar.forceActiveFocus()
+            }
+        }
+    }
+
+    ErrorToast {
+        anchors.top: parent.top
+        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: 24
+        visible: appController.hasError
+        title: appController.errorTitle
+        message: appController.errorMessage
+        onDismissed: appController.dismissError()
+        z: 100
+    }
+
+    function routeTitle(route) {
+        switch (route) {
+        case NavigationController.ProfilePicker: return qsTr("Profiles")
+        case NavigationController.Home: return qsTr("Home")
+        case NavigationController.Search: return qsTr("Search")
+        case NavigationController.Movies: return qsTr("Movies")
+        case NavigationController.Shows: return qsTr("TV Shows")
+        case NavigationController.Settings: return qsTr("Settings")
+        case NavigationController.Details: return qsTr("Details")
+        case NavigationController.ShowDetail: return appController.navigation.selectedMediaId
+        case NavigationController.Player: return qsTr("Player")
+        default: return qsTr("Home")
+        }
+    }
+}

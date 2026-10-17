@@ -1,0 +1,1095 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		03923C112FA017FB00FE6B1B /* MPVKit in Frameworks */ = {isa = PBXBuildFile; productRef = 03923C102FA017FB00FE6B1B /* MPVKit */; };
+		AA0000000000000000000001 /* MarqueeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001 /* MarqueeApp.swift */; };
+		AA0000000000000000000E01 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000E01 /* AppState.swift */; };
+		AA0000000000000000000002 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000002 /* ContentView.swift */; };
+		AA0000000000000000000003 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000003 /* Assets.xcassets */; };
+		AA0000000000000000000004 /* Preview Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000006 /* Preview Assets.xcassets */; };
+		AA0000000000000000000008 /* MarqueeTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000007 /* MarqueeTheme.swift */; };
+		AA0000000000000000000009 /* PlayerServiceProtocol.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000008 /* PlayerServiceProtocol.swift */; };
+		AA000000000000000000000D /* VideoSurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000000C /* VideoSurfaceView.swift */; };
+		AA000000000000000000000E /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000000D /* PlayerView.swift */; };
+		AA000000000000000000000F /* PlayerControlsOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000000E /* PlayerControlsOverlay.swift */; };
+		AA0000000000000000000010 /* AVPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB000000000000000000000F /* AVPlayerService.swift */; };
+		AA0000000000000000000011 /* WindowAccessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000010 /* WindowAccessor.swift */; };
+		AA0000000000000000000012 /* ObservableScrollView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000011 /* ObservableScrollView.swift */; };
+		AA0000000000000000000013 /* MPVPlayerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000013 /* MPVPlayerService.swift */; };
+		AA0000000000000000000014 /* MPVOGLView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000014 /* MPVOGLView.swift */; };
+		AA0000000000000000000020 /* MediaItem.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000020 /* MediaItem.swift */; };
+		AA0000000000000000000021 /* FilenameParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000021 /* FilenameParser.swift */; };
+		AA0000000000000000000023 /* DirectoryWatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000023 /* DirectoryWatcher.swift */; };
+		AA0000000000000000000024 /* ScanRequestGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000024 /* ScanRequestGate.swift */; };
+		AA0000000000000000000025 /* VerifyScanRequestGateHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000025 /* VerifyScanRequestGateHarness.swift */; };
+		AA0000000000000000000026 /* VerifyFilenameParserHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000026 /* VerifyFilenameParserHarness.swift */; };
+		AA0000000000000000000030 /* WatchProgressStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000030 /* WatchProgressStore.swift */; };
+		AA0000000000000000000100 /* HomeDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000100 /* HomeDetailView.swift */; };
+		AA0000000000000000000101 /* HeroCarousel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000101 /* HeroCarousel.swift */; };
+		AA0000000000000000000110 /* MoviesDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000110 /* MoviesDetailView.swift */; };
+		AA0000000000000000000111 /* TVShowsDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000111 /* TVShowsDetailView.swift */; };
+		AA0000000000000000000120 /* SettingsDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000120 /* SettingsDetailView.swift */; };
+		AA0000000000000000000130 /* TransitionLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000130 /* TransitionLoadingView.swift */; };
+		AA0000000000000000000131 /* MarqueeSidebar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000131 /* MarqueeSidebar.swift */; };
+		AA0000000000000000000132 /* MovieCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000132 /* MovieCard.swift */; };
+		AA0000000000000000000133 /* MarqueeLogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000133 /* MarqueeLogoView.swift */; };
+		AA0000000000000000000140 /* AppError.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000140 /* AppError.swift */; };
+		AA0000000000000000000201 /* ShowCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000201 /* ShowCard.swift */; };
+		AA0000000000000000000202 /* ShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000202 /* ShowDetailView.swift */; };
+		AA0000000000000000000203 /* EpisodeRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000203 /* EpisodeRow.swift */; };
+		AA0000000000000000000204 /* ShowCardRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000204 /* ShowCardRow.swift */; };
+		AA0000000000000000000205 /* ArrowedScrollRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000205 /* ArrowedScrollRow.swift */; };
+		AA0000000000000000000300 /* TMDBService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000300 /* TMDBService.swift */; };
+		AA0000000000000000000301 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000301 /* UserProfile.swift */; };
+		AA0000000000000000000302 /* ProfilePickerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000302 /* ProfilePickerView.swift */; };
+		AA0000000000000000000303 /* AvatarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000303 /* AvatarService.swift */; };
+		AA0000000000000000000400 /* TMDBMetadata.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000400 /* TMDBMetadata.swift */; };
+		AA0000000000000000000401 /* ImageCacheService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000401 /* ImageCacheService.swift */; };
+		AA0000000000000000000403 /* EpisodeFrameCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000403 /* EpisodeFrameCache.swift */; };
+		AA0000000000000000000402 /* CachedImageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000402 /* CachedImageView.swift */; };
+		AA0000000000000000000500 /* SearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000500 /* SearchView.swift */; };
+		AA0000000000000000000502 /* RemoteSearchKeyboardPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000502 /* RemoteSearchKeyboardPolicy.swift */; };
+		AA0000000000000000000503 /* RemoteSearchKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000503 /* RemoteSearchKeyboardView.swift */; };
+		AA0000000000000000000C1B /* SearchTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1B /* SearchTextField.swift */; };
+		AA0000000000000000000C1C /* SearchViewPolicies.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1C /* SearchViewPolicies.swift */; };
+		AA0000000000000000000C1D /* SearchRemoteKeyboardProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1D /* SearchRemoteKeyboardProbe.swift */; };
+		AA0000000000000000000C1E /* SearchResultCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1E /* SearchResultCardView.swift */; };
+		AA0000000000000000000501 /* MovieDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000501 /* MovieDetailView.swift */; };
+		AA0000000000000000000600 /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000600 /* Configuration.swift */; };
+		AA0000000000000000000601 /* Logger.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000601 /* Logger.swift */; };
+		AA0000000000000000000640 /* KeyCatcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000640 /* KeyCatcher.swift */; };
+		AA0000000000000000000641 /* MarqueeMode.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000641 /* MarqueeMode.swift */; };
+		AA0000000000000000000642 /* RemoteGridFocus.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000642 /* RemoteGridFocus.swift */; };
+		AA0000000000000000000D00 /* FocusEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000D00 /* FocusEngine.swift */; };
+		AA0000000000000000000D01 /* DetailFocusEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000D01 /* DetailFocusEngine.swift */; };
+		AA0000000000000000000D02 /* AudioIdentityService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000D02 /* AudioIdentityService.swift */; };
+		AA0000000000000000000D03 /* VerifyAudioIdentityHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000D03 /* VerifyAudioIdentityHarness.swift */; };
+		AA0000000000000000000D04 /* Sounds in Resources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000D04 /* Sounds */; };
+		AA0000000000000000000643 /* SearchInputBuffer.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000643 /* SearchInputBuffer.swift */; };
+		AA0000000000000000000C18 /* FocusCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C18 /* FocusCoordinator.swift */; };
+		AA0000000000000000000C23 /* MarqueeSignpost.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C23 /* MarqueeSignpost.swift */; };
+		AA0000000000000000000C24 /* SearchSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C24 /* SearchSession.swift */; };
+		AA0000000000000000000C1F /* AppRouter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1F /* AppRouter.swift */; };
+		AA0000000000000000000C19 /* RemoteScrollCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C19 /* RemoteScrollCoordinator.swift */; };
+		AA0000000000000000000644 /* NativeVisualQATour.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000644 /* NativeVisualQATour.swift */; };
+		AA0000000000000000000630 /* DiagnosticsCollector.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000630 /* DiagnosticsCollector.swift */; };
+		AA0000000000000000000631 /* VerifyDiagnosticsHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000631 /* VerifyDiagnosticsHarness.swift */; };
+		AA0000000000000000000632 /* VerifyProfilePickerHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000632 /* VerifyProfilePickerHarness.swift */; };
+		AA0000000000000000000633 /* VerifyProfilePickerFocusTreeHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000633 /* VerifyProfilePickerFocusTreeHarness.swift */; };
+		AA0000000000000000000610 /* UserSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000610 /* UserSettings.swift */; };
+		AA0000000000000000000620 /* PlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000620 /* PlayerController.swift */; };
+		AA0000000000000000000C20 /* PlaybackSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C20 /* PlaybackSession.swift */; };
+		AA0000000000000000000700 /* SubtitleDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000700 /* SubtitleDiscovery.swift */; };
+		AA0000000000000000000701 /* SRTParser.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000701 /* SRTParser.swift */; };
+		AA0000000000000000000702 /* SubtitleOverlayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000702 /* SubtitleOverlayView.swift */; };
+		AA0000000000000000000703 /* PlaybackStateMachine.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000703 /* PlaybackStateMachine.swift */; };
+		AA0000000000000000000704 /* VerifyPlaybackHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000704 /* VerifyPlaybackHarness.swift */; };
+		AA0000000000000000000705 /* PlaybackCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000705 /* PlaybackCache.swift */; };
+		AA0000000000000000000706 /* EmbeddedPlaybackPresenter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000706 /* EmbeddedPlaybackPresenter.swift */; };
+		AA0000000000000000000707 /* VerifySubtitleHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000707 /* VerifySubtitleHarness.swift */; };
+		AA0000000000000000000800 /* CardHoverModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000800 /* CardHoverModifier.swift */; };
+		AA0000000000000000000807 /* DetailFocusSurfaceModifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000807 /* DetailFocusSurfaceModifier.swift */; };
+		AA0000000000000000000801 /* BottomFadeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000801 /* BottomFadeView.swift */; };
+		AA0000000000000000000802 /* SectionHeader.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000802 /* SectionHeader.swift */; };
+		AA0000000000000000000803 /* MaturityLevel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000803 /* MaturityLevel.swift */; };
+		AA0000000000000000000804 /* Color+Marquee.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000804 /* Color+Marquee.swift */; };
+		AA0000000000000000000805 /* String+Marquee.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000805 /* String+Marquee.swift */; };
+		AA0000000000000000000806 /* TimeInterval+Marquee.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000806 /* TimeInterval+Marquee.swift */; };
+		AA0000000000000000000810 /* KidsThemeOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000810 /* KidsThemeOverlay.swift */; };
+		AA0000000000000000000900 /* ArtworkCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000900 /* ArtworkCache.swift */; };
+		AA0000000000000000000C21 /* ProfileSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C21 /* ProfileSession.swift */; };
+		AA0000000000000000000B00 /* BrowseSnapshotStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000B00 /* BrowseSnapshotStore.swift */; };
+		AA0000000000000000000C1A /* BrowseGridController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C1A /* BrowseGridController.swift */; };
+		AA0000000000000000000B01 /* VerifyBrowseSnapshotHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000B01 /* VerifyBrowseSnapshotHarness.swift */; };
+		AA0000000000000000000B02 /* VerifyImagePipelineHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000B02 /* VerifyImagePipelineHarness.swift */; };
+		AA0000000000000000000C00 /* CatalogTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C00 /* CatalogTypes.swift */; };
+		AA0000000000000000000C01 /* CatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C01 /* CatalogStore.swift */; };
+		AA0000000000000000000C02 /* InMemoryCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C02 /* InMemoryCatalogStore.swift */; };
+		AA0000000000000000000C03 /* MediaIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C03 /* MediaIdentity.swift */; };
+		AA0000000000000000000C04 /* LegacyJSONImporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C04 /* LegacyJSONImporter.swift */; };
+			AA0000000000000000000C05 /* SQLiteConnection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C05 /* SQLiteConnection.swift */; };
+			AA0000000000000000000C06 /* SQLiteCatalogStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C06 /* SQLiteCatalogStore.swift */; };
+		AA0000000000000000000C22 /* LibraryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C22 /* LibraryState.swift */; };
+			AA0000000000000000000C07 /* VerifyImportHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C07 /* VerifyImportHarness.swift */; };
+			AA0000000000000000000C08 /* VerifyTransactionHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C08 /* VerifyTransactionHarness.swift */; };
+			AA0000000000000000000C09 /* VolumeRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C09 /* VolumeRegistry.swift */; };
+			AA0000000000000000000C0A /* SystemVolumeRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C0A /* SystemVolumeRegistry.swift */; };
+			AA0000000000000000000C0B /* VerifyVolumeRegistryHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C0B /* VerifyVolumeRegistryHarness.swift */; };
+			AA0000000000000000000C0C /* DiffScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C0C /* DiffScanner.swift */; };
+			AA0000000000000000000C0D /* VerifyScannerHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C0D /* VerifyScannerHarness.swift */; };
+			AA0000000000000000000C0E /* CatalogProjection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C0E /* CatalogProjection.swift */; };
+			AA0000000000000000000C0F /* VerifyProjectionHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C0F /* VerifyProjectionHarness.swift */; };
+			AA0000000000000000000C10 /* CatalogContentPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C10 /* CatalogContentPolicy.swift */; };
+			AA0000000000000000000C12 /* EnrichmentProtocols.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C12 /* EnrichmentProtocols.swift */; };
+			AA0000000000000000000C13 /* VerifyEnrichmentHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C13 /* VerifyEnrichmentHarness.swift */; };
+			AA0000000000000000000C14 /* TMDBEnrichmentService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C14 /* TMDBEnrichmentService.swift */; };
+			AA0000000000000000000C15 /* VerifyEnrichmentActorHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C15 /* VerifyEnrichmentActorHarness.swift */; };
+			AA0000000000000000000C16 /* DurationProbe.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C16 /* DurationProbe.swift */; };
+			AA0000000000000000000C17 /* VerifyDurationProbeHarness.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000C17 /* VerifyDurationProbeHarness.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		03121B862F9FC6020069C8E1 /* MPVKit-local */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "MPVKit-local"; path = "Vendor/MPVKit-local"; sourceTree = "<group>"; };
+		0369D08A2FA01887001A8B7A /* MPVKit-local */ = {isa = PBXFileReference; lastKnownFileType = wrapper; name = "MPVKit-local"; path = "Vendor/MPVKit-local"; sourceTree = "<group>"; };
+		03923C122FA0181700FE6B1B /* Marquee */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Marquee; sourceTree = "<group>"; };
+		BB0000000000000000000001 /* MarqueeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeApp.swift; sourceTree = "<group>"; };
+		BB0000000000000000000E01 /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		BB0000000000000000000002 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB0000000000000000000004 /* Marquee.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Marquee.entitlements; sourceTree = "<group>"; };
+		BB0000000000000000000005 /* Marquee.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Marquee.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000000000000000000006 /* Preview Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = "Preview Assets.xcassets"; sourceTree = "<group>"; };
+		BB0000000000000000000007 /* MarqueeTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeTheme.swift; sourceTree = "<group>"; };
+		BB0000000000000000000008 /* PlayerServiceProtocol.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerServiceProtocol.swift; sourceTree = "<group>"; };
+		BB000000000000000000000C /* VideoSurfaceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoSurfaceView.swift; sourceTree = "<group>"; };
+		BB000000000000000000000D /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		BB000000000000000000000E /* PlayerControlsOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControlsOverlay.swift; sourceTree = "<group>"; };
+		BB000000000000000000000F /* AVPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AVPlayerService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000010 /* WindowAccessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowAccessor.swift; sourceTree = "<group>"; };
+		BB0000000000000000000011 /* ObservableScrollView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ObservableScrollView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000013 /* MPVPlayerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVPlayerService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000014 /* MPVOGLView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVOGLView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000020 /* MediaItem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaItem.swift; sourceTree = "<group>"; };
+		BB0000000000000000000021 /* FilenameParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilenameParser.swift; sourceTree = "<group>"; };
+		BB0000000000000000000023 /* DirectoryWatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectoryWatcher.swift; sourceTree = "<group>"; };
+		BB0000000000000000000024 /* ScanRequestGate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanRequestGate.swift; sourceTree = "<group>"; };
+		BB0000000000000000000025 /* VerifyScanRequestGateHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyScanRequestGateHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000026 /* VerifyFilenameParserHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyFilenameParserHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000030 /* WatchProgressStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WatchProgressStore.swift; sourceTree = "<group>"; };
+		BB0000000000000000000100 /* HomeDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeDetailView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000101 /* HeroCarousel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeroCarousel.swift; sourceTree = "<group>"; };
+		BB0000000000000000000110 /* MoviesDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoviesDetailView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000111 /* TVShowsDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVShowsDetailView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000120 /* SettingsDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsDetailView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000130 /* TransitionLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransitionLoadingView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000131 /* MarqueeSidebar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeSidebar.swift; sourceTree = "<group>"; };
+		BB0000000000000000000132 /* MovieCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieCard.swift; sourceTree = "<group>"; };
+		BB0000000000000000000133 /* MarqueeLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeLogoView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000140 /* AppError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppError.swift; sourceTree = "<group>"; };
+		BB0000000000000000000201 /* ShowCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowCard.swift; sourceTree = "<group>"; };
+		BB0000000000000000000202 /* ShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowDetailView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000203 /* EpisodeRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeRow.swift; sourceTree = "<group>"; };
+		BB0000000000000000000204 /* ShowCardRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowCardRow.swift; sourceTree = "<group>"; };
+		BB0000000000000000000205 /* ArrowedScrollRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArrowedScrollRow.swift; sourceTree = "<group>"; };
+		BB0000000000000000000300 /* TMDBService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMDBService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000301 /* UserProfile.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserProfile.swift; sourceTree = "<group>"; };
+		BB0000000000000000000302 /* ProfilePickerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfilePickerView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000303 /* AvatarService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000400 /* TMDBMetadata.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMDBMetadata.swift; sourceTree = "<group>"; };
+		BB0000000000000000000401 /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000403 /* EpisodeFrameCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EpisodeFrameCache.swift; sourceTree = "<group>"; };
+		BB0000000000000000000402 /* CachedImageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CachedImageView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000500 /* SearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000502 /* RemoteSearchKeyboardPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSearchKeyboardPolicy.swift; sourceTree = "<group>"; };
+		BB0000000000000000000503 /* RemoteSearchKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteSearchKeyboardView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C1B /* SearchTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchTextField.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C1C /* SearchViewPolicies.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchViewPolicies.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C1D /* SearchRemoteKeyboardProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchRemoteKeyboardProbe.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C1E /* SearchResultCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchResultCardView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000501 /* MovieDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000600 /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
+		BB0000000000000000000601 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
+		BB0000000000000000000640 /* KeyCatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeyCatcher.swift; sourceTree = "<group>"; };
+		BB0000000000000000000641 /* MarqueeMode.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeMode.swift; sourceTree = "<group>"; };
+		BB0000000000000000000642 /* RemoteGridFocus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteGridFocus.swift; sourceTree = "<group>"; };
+		BB0000000000000000000D00 /* FocusEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusEngine.swift; sourceTree = "<group>"; };
+		BB0000000000000000000D01 /* DetailFocusEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailFocusEngine.swift; sourceTree = "<group>"; };
+		BB0000000000000000000D02 /* AudioIdentityService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioIdentityService.swift; sourceTree = "<group>"; };
+		BB0000000000000000000D03 /* VerifyAudioIdentityHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyAudioIdentityHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000D04 /* Sounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Sounds; path = Resources/Sounds; sourceTree = "<group>"; };
+		BB0000000000000000000643 /* SearchInputBuffer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchInputBuffer.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C18 /* FocusCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FocusCoordinator.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C23 /* MarqueeSignpost.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarqueeSignpost.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C24 /* SearchSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSession.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C1F /* AppRouter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouter.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C19 /* RemoteScrollCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteScrollCoordinator.swift; sourceTree = "<group>"; };
+		BB0000000000000000000644 /* NativeVisualQATour.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeVisualQATour.swift; sourceTree = "<group>"; };
+		BB0000000000000000000630 /* DiagnosticsCollector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticsCollector.swift; sourceTree = "<group>"; };
+		BB0000000000000000000631 /* VerifyDiagnosticsHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyDiagnosticsHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000632 /* VerifyProfilePickerHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyProfilePickerHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000633 /* VerifyProfilePickerFocusTreeHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyProfilePickerFocusTreeHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000610 /* UserSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UserSettings.swift; sourceTree = "<group>"; };
+		BB0000000000000000000620 /* PlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerController.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C20 /* PlaybackSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSession.swift; sourceTree = "<group>"; };
+		BB0000000000000000000700 /* SubtitleDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleDiscovery.swift; sourceTree = "<group>"; };
+		BB0000000000000000000701 /* SRTParser.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SRTParser.swift; sourceTree = "<group>"; };
+		BB0000000000000000000702 /* SubtitleOverlayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleOverlayView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000703 /* PlaybackStateMachine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackStateMachine.swift; sourceTree = "<group>"; };
+		BB0000000000000000000704 /* VerifyPlaybackHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyPlaybackHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000705 /* PlaybackCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackCache.swift; sourceTree = "<group>"; };
+		BB0000000000000000000706 /* EmbeddedPlaybackPresenter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmbeddedPlaybackPresenter.swift; sourceTree = "<group>"; };
+		BB0000000000000000000707 /* VerifySubtitleHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifySubtitleHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000800 /* CardHoverModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardHoverModifier.swift; sourceTree = "<group>"; };
+		BB0000000000000000000807 /* DetailFocusSurfaceModifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailFocusSurfaceModifier.swift; sourceTree = "<group>"; };
+		BB0000000000000000000801 /* BottomFadeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BottomFadeView.swift; sourceTree = "<group>"; };
+		BB0000000000000000000802 /* SectionHeader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SectionHeader.swift; sourceTree = "<group>"; };
+		BB0000000000000000000803 /* MaturityLevel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaturityLevel.swift; sourceTree = "<group>"; };
+		BB0000000000000000000804 /* Color+Marquee.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Color+Marquee.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000805 /* String+Marquee.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Marquee.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000806 /* TimeInterval+Marquee.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TimeInterval+Marquee.swift"; sourceTree = "<group>"; };
+		BB0000000000000000000810 /* KidsThemeOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KidsThemeOverlay.swift; sourceTree = "<group>"; };
+		BB0000000000000000000900 /* ArtworkCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArtworkCache.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C21 /* ProfileSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileSession.swift; sourceTree = "<group>"; };
+		BB0000000000000000000B00 /* BrowseSnapshotStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseSnapshotStore.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C1A /* BrowseGridController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrowseGridController.swift; sourceTree = "<group>"; };
+		BB0000000000000000000B01 /* VerifyBrowseSnapshotHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyBrowseSnapshotHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000B02 /* VerifyImagePipelineHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyImagePipelineHarness.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C00 /* CatalogTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogTypes.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C01 /* CatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogStore.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C02 /* InMemoryCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemoryCatalogStore.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C03 /* MediaIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaIdentity.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C04 /* LegacyJSONImporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyJSONImporter.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C05 /* SQLiteConnection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteConnection.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C06 /* SQLiteCatalogStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SQLiteCatalogStore.swift; sourceTree = "<group>"; };
+		BB0000000000000000000C22 /* LibraryState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryState.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C07 /* VerifyImportHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyImportHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C08 /* VerifyTransactionHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyTransactionHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C09 /* VolumeRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VolumeRegistry.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C0A /* SystemVolumeRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemVolumeRegistry.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C0B /* VerifyVolumeRegistryHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyVolumeRegistryHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C0C /* DiffScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiffScanner.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C0D /* VerifyScannerHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyScannerHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C0E /* CatalogProjection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogProjection.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C0F /* VerifyProjectionHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyProjectionHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C10 /* CatalogContentPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogContentPolicy.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C12 /* EnrichmentProtocols.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentProtocols.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C13 /* VerifyEnrichmentHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyEnrichmentHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C14 /* TMDBEnrichmentService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TMDBEnrichmentService.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C15 /* VerifyEnrichmentActorHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyEnrichmentActorHarness.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C16 /* DurationProbe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DurationProbe.swift; sourceTree = "<group>"; };
+			BB0000000000000000000C17 /* VerifyDurationProbeHarness.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifyDurationProbeHarness.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		CC0000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				03923C112FA017FB00FE6B1B /* MPVKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		03121B852F9FC6020069C8E1 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				03121B862F9FC6020069C8E1 /* MPVKit-local */,
+				03923C122FA0181700FE6B1B /* Marquee */,
+				0369D08A2FA01887001A8B7A /* MPVKit-local */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				03121B852F9FC6020069C8E1 /* Packages */,
+				DD0000000000000000000002 /* Marquee */,
+				DD0000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000002 /* Marquee */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000001 /* MarqueeApp.swift */,
+				BB0000000000000000000E01 /* AppState.swift */,
+				BB0000000000000000000002 /* ContentView.swift */,
+				DD0000000000000000000C00 /* Catalog */,
+				DD0000000000000000000006 /* Features */,
+				DD0000000000000000000009 /* Services */,
+				DD0000000000000000000020 /* Models */,
+				DD0000000000000000000070 /* SharedViews */,
+				DD0000000000000000000005 /* Theme */,
+				DD000000000000000000000D /* Utilities */,
+				BB0000000000000000000003 /* Assets.xcassets */,
+				BB0000000000000000000D04 /* Sounds */,
+				BB0000000000000000000004 /* Marquee.entitlements */,
+				DD0000000000000000000004 /* Preview Content */,
+			);
+			path = Marquee;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000C00 /* Catalog */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000C00 /* CatalogTypes.swift */,
+				BB0000000000000000000C01 /* CatalogStore.swift */,
+				BB0000000000000000000C02 /* InMemoryCatalogStore.swift */,
+				BB0000000000000000000C03 /* MediaIdentity.swift */,
+				BB0000000000000000000C04 /* LegacyJSONImporter.swift */,
+					BB0000000000000000000C05 /* SQLiteConnection.swift */,
+					BB0000000000000000000C06 /* SQLiteCatalogStore.swift */,
+				BB0000000000000000000C22 /* LibraryState.swift */,
+					BB0000000000000000000C07 /* VerifyImportHarness.swift */,
+					BB0000000000000000000C08 /* VerifyTransactionHarness.swift */,
+					BB0000000000000000000C09 /* VolumeRegistry.swift */,
+					BB0000000000000000000C0A /* SystemVolumeRegistry.swift */,
+					BB0000000000000000000C0B /* VerifyVolumeRegistryHarness.swift */,
+					BB0000000000000000000C0C /* DiffScanner.swift */,
+					BB0000000000000000000C0D /* VerifyScannerHarness.swift */,
+					BB0000000000000000000C0E /* CatalogProjection.swift */,
+					BB0000000000000000000C0F /* VerifyProjectionHarness.swift */,
+					BB0000000000000000000C10 /* CatalogContentPolicy.swift */,
+					BB0000000000000000000C12 /* EnrichmentProtocols.swift */,
+					BB0000000000000000000C13 /* VerifyEnrichmentHarness.swift */,
+					BB0000000000000000000C14 /* TMDBEnrichmentService.swift */,
+					BB0000000000000000000C15 /* VerifyEnrichmentActorHarness.swift */,
+					BB0000000000000000000C16 /* DurationProbe.swift */,
+					BB0000000000000000000C17 /* VerifyDurationProbeHarness.swift */,
+			);
+			path = Catalog;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000005 /* Marquee.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000004 /* Preview Content */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000006 /* Preview Assets.xcassets */,
+			);
+			path = "Preview Content";
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000005 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000007 /* MarqueeTheme.swift */,
+				DD0000000000000000000800 /* ViewModifiers */,
+			);
+			path = Theme;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000006 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				DD00000000000000000000C0 /* Browse */,
+				DD00000000000000000000B0 /* Detail */,
+				DD0000000000000000000040 /* Home */,
+				DD0000000000000000000050 /* Library */,
+				DD0000000000000000000007 /* Player */,
+				DD00000000000000000000A0 /* Search */,
+				DD0000000000000000000060 /* Settings */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		DD00000000000000000000C0 /* Browse */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000B00 /* BrowseSnapshotStore.swift */,
+				BB0000000000000000000C1A /* BrowseGridController.swift */,
+				BB0000000000000000000B01 /* VerifyBrowseSnapshotHarness.swift */,
+			);
+			path = Browse;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000007 /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				DD0000000000000000000008 /* Views */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000008 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000000C /* VideoSurfaceView.swift */,
+				BB000000000000000000000D /* PlayerView.swift */,
+				BB000000000000000000000E /* PlayerControlsOverlay.swift */,
+				BB0000000000000000000702 /* SubtitleOverlayView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000009 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				DD000000000000000000000A /* Protocols */,
+				DD000000000000000000000B /* Player */,
+				DD0000000000000000000021 /* Scanner */,
+				DD0000000000000000000030 /* Persistence */,
+				DD0000000000000000000080 /* Metadata */,
+				DD0000000000000000000090 /* ImageCache */,
+				BB0000000000000000000900 /* ArtworkCache.swift */,
+				BB0000000000000000000C21 /* ProfileSession.swift */,
+				BB0000000000000000000D02 /* AudioIdentityService.swift */,
+				BB0000000000000000000D03 /* VerifyAudioIdentityHarness.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000000A /* Protocols */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000008 /* PlayerServiceProtocol.swift */,
+			);
+			path = Protocols;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000000B /* Player */ = {
+			isa = PBXGroup;
+			children = (
+				BB000000000000000000000F /* AVPlayerService.swift */,
+				BB0000000000000000000013 /* MPVPlayerService.swift */,
+				BB0000000000000000000014 /* MPVOGLView.swift */,
+				BB0000000000000000000620 /* PlayerController.swift */,
+				BB0000000000000000000C20 /* PlaybackSession.swift */,
+				BB0000000000000000000703 /* PlaybackStateMachine.swift */,
+				BB0000000000000000000705 /* PlaybackCache.swift */,
+				BB0000000000000000000706 /* EmbeddedPlaybackPresenter.swift */,
+				BB0000000000000000000704 /* VerifyPlaybackHarness.swift */,
+				BB0000000000000000000700 /* SubtitleDiscovery.swift */,
+				BB0000000000000000000701 /* SRTParser.swift */,
+				BB0000000000000000000707 /* VerifySubtitleHarness.swift */,
+			);
+			path = Player;
+			sourceTree = "<group>";
+		};
+		DD000000000000000000000D /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000600 /* Configuration.swift */,
+				BB0000000000000000000601 /* Logger.swift */,
+				BB0000000000000000000640 /* KeyCatcher.swift */,
+				BB0000000000000000000641 /* MarqueeMode.swift */,
+				BB0000000000000000000642 /* RemoteGridFocus.swift */,
+				BB0000000000000000000D00 /* FocusEngine.swift */,
+				BB0000000000000000000D01 /* DetailFocusEngine.swift */,
+				BB0000000000000000000643 /* SearchInputBuffer.swift */,
+				BB0000000000000000000C18 /* FocusCoordinator.swift */,
+				BB0000000000000000000C23 /* MarqueeSignpost.swift */,
+				BB0000000000000000000C1F /* AppRouter.swift */,
+				BB0000000000000000000C19 /* RemoteScrollCoordinator.swift */,
+				BB0000000000000000000644 /* NativeVisualQATour.swift */,
+				BB0000000000000000000630 /* DiagnosticsCollector.swift */,
+				BB0000000000000000000631 /* VerifyDiagnosticsHarness.swift */,
+				BB0000000000000000000632 /* VerifyProfilePickerHarness.swift */,
+				BB0000000000000000000633 /* VerifyProfilePickerFocusTreeHarness.swift */,
+				BB0000000000000000000010 /* WindowAccessor.swift */,
+				BB0000000000000000000011 /* ObservableScrollView.swift */,
+				DD0000000000000000000801 /* Extensions */,
+			);
+			path = Utilities;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000020 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000020 /* MediaItem.swift */,
+				BB0000000000000000000140 /* AppError.swift */,
+				BB0000000000000000000301 /* UserProfile.swift */,
+				BB0000000000000000000400 /* TMDBMetadata.swift */,
+				BB0000000000000000000610 /* UserSettings.swift */,
+				BB0000000000000000000803 /* MaturityLevel.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000021 /* Scanner */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000021 /* FilenameParser.swift */,
+				BB0000000000000000000023 /* DirectoryWatcher.swift */,
+				BB0000000000000000000024 /* ScanRequestGate.swift */,
+				BB0000000000000000000025 /* VerifyScanRequestGateHarness.swift */,
+				BB0000000000000000000026 /* VerifyFilenameParserHarness.swift */,
+			);
+			path = Scanner;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000030 /* Persistence */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000030 /* WatchProgressStore.swift */,
+			);
+			path = Persistence;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000040 /* Home */ = {
+			isa = PBXGroup;
+			children = (
+				DD0000000000000000000041 /* Views */,
+				DD0000000000000000000042 /* ViewModels */,
+			);
+			path = Home;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000041 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000100 /* HomeDetailView.swift */,
+				BB0000000000000000000101 /* HeroCarousel.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000042 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000050 /* Library */ = {
+			isa = PBXGroup;
+			children = (
+				DD0000000000000000000051 /* Views */,
+				DD0000000000000000000052 /* ViewModels */,
+			);
+			path = Library;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000051 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000110 /* MoviesDetailView.swift */,
+				BB0000000000000000000111 /* TVShowsDetailView.swift */,
+				BB0000000000000000000202 /* ShowDetailView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000052 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000060 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				DD0000000000000000000061 /* Views */,
+			);
+			path = Settings;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000061 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000120 /* SettingsDetailView.swift */,
+				BB0000000000000000000302 /* ProfilePickerView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000070 /* SharedViews */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000130 /* TransitionLoadingView.swift */,
+				BB0000000000000000000131 /* MarqueeSidebar.swift */,
+				BB0000000000000000000132 /* MovieCard.swift */,
+				BB0000000000000000000133 /* MarqueeLogoView.swift */,
+				BB0000000000000000000201 /* ShowCard.swift */,
+				BB0000000000000000000203 /* EpisodeRow.swift */,
+				BB0000000000000000000204 /* ShowCardRow.swift */,
+				BB0000000000000000000205 /* ArrowedScrollRow.swift */,
+				BB0000000000000000000402 /* CachedImageView.swift */,
+				BB0000000000000000000B02 /* VerifyImagePipelineHarness.swift */,
+				BB0000000000000000000801 /* BottomFadeView.swift */,
+				BB0000000000000000000802 /* SectionHeader.swift */,
+			);
+			path = SharedViews;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000080 /* Metadata */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000300 /* TMDBService.swift */,
+				BB0000000000000000000303 /* AvatarService.swift */,
+			);
+			path = Metadata;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000090 /* ImageCache */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000401 /* ImageCacheService.swift */,
+				BB0000000000000000000403 /* EpisodeFrameCache.swift */,
+			);
+			path = ImageCache;
+			sourceTree = "<group>";
+		};
+		DD00000000000000000000A0 /* Search */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000C24 /* SearchSession.swift */,
+				BB0000000000000000000502 /* RemoteSearchKeyboardPolicy.swift */,
+				DD00000000000000000000A1 /* Views */,
+			);
+			path = Search;
+			sourceTree = "<group>";
+		};
+		DD00000000000000000000A1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000500 /* SearchView.swift */,
+				BB0000000000000000000503 /* RemoteSearchKeyboardView.swift */,
+				BB0000000000000000000C1B /* SearchTextField.swift */,
+				BB0000000000000000000C1C /* SearchViewPolicies.swift */,
+				BB0000000000000000000C1D /* SearchRemoteKeyboardProbe.swift */,
+				BB0000000000000000000C1E /* SearchResultCardView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD00000000000000000000B0 /* Detail */ = {
+			isa = PBXGroup;
+			children = (
+				DD00000000000000000000B1 /* Views */,
+			);
+			path = Detail;
+			sourceTree = "<group>";
+		};
+		DD00000000000000000000B1 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000501 /* MovieDetailView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000800 /* ViewModifiers */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000800 /* CardHoverModifier.swift */,
+				BB0000000000000000000807 /* DetailFocusSurfaceModifier.swift */,
+				BB0000000000000000000810 /* KidsThemeOverlay.swift */,
+			);
+			path = ViewModifiers;
+			sourceTree = "<group>";
+		};
+		DD0000000000000000000801 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				BB0000000000000000000804 /* Color+Marquee.swift */,
+				BB0000000000000000000805 /* String+Marquee.swift */,
+				BB0000000000000000000806 /* TimeInterval+Marquee.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		EE0000000000000000000001 /* Marquee */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AC0000000000000000000002 /* Build configuration list for PBXNativeTarget "Marquee" */;
+			buildPhases = (
+				CC0000000000000000000003 /* Sources */,
+				CC0000000000000000000001 /* Frameworks */,
+				CC0000000000000000000002 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Marquee;
+			packageProductDependencies = (
+				03923C102FA017FB00FE6B1B /* MPVKit */,
+			);
+			productName = Marquee;
+			productReference = BB0000000000000000000005 /* Marquee.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		FF0000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1420;
+				LastUpgradeCheck = 1420;
+				TargetAttributes = {
+					EE0000000000000000000001 = {
+						CreatedOnToolsVersion = 14.2;
+					};
+				};
+			};
+			buildConfigurationList = AC0000000000000000000001 /* Build configuration list for PBXProject "Marquee" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = DD0000000000000000000001;
+			packageReferences = (
+				03923C0F2FA017FB00FE6B1B /* XCLocalSwiftPackageReference "MPVKit-local" */,
+			);
+			productRefGroup = DD0000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				EE0000000000000000000001 /* Marquee */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		CC0000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000004 /* Preview Assets.xcassets in Resources */,
+				AA0000000000000000000003 /* Assets.xcassets in Resources */,
+				AA0000000000000000000D04 /* Sounds in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CC0000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				AA0000000000000000000002 /* ContentView.swift in Sources */,
+				AA0000000000000000000001 /* MarqueeApp.swift in Sources */,
+				AA0000000000000000000E01 /* AppState.swift in Sources */,
+				AA0000000000000000000008 /* MarqueeTheme.swift in Sources */,
+				AA0000000000000000000009 /* PlayerServiceProtocol.swift in Sources */,
+				AA0000000000000000000010 /* AVPlayerService.swift in Sources */,
+				AA0000000000000000000013 /* MPVPlayerService.swift in Sources */,
+				AA0000000000000000000014 /* MPVOGLView.swift in Sources */,
+				AA000000000000000000000D /* VideoSurfaceView.swift in Sources */,
+				AA000000000000000000000E /* PlayerView.swift in Sources */,
+				AA000000000000000000000F /* PlayerControlsOverlay.swift in Sources */,
+				AA0000000000000000000011 /* WindowAccessor.swift in Sources */,
+				AA0000000000000000000012 /* ObservableScrollView.swift in Sources */,
+				AA0000000000000000000020 /* MediaItem.swift in Sources */,
+				AA0000000000000000000021 /* FilenameParser.swift in Sources */,
+				AA0000000000000000000023 /* DirectoryWatcher.swift in Sources */,
+				AA0000000000000000000024 /* ScanRequestGate.swift in Sources */,
+				AA0000000000000000000025 /* VerifyScanRequestGateHarness.swift in Sources */,
+				AA0000000000000000000026 /* VerifyFilenameParserHarness.swift in Sources */,
+				AA0000000000000000000030 /* WatchProgressStore.swift in Sources */,
+				AA0000000000000000000100 /* HomeDetailView.swift in Sources */,
+				AA0000000000000000000101 /* HeroCarousel.swift in Sources */,
+				AA0000000000000000000110 /* MoviesDetailView.swift in Sources */,
+				AA0000000000000000000111 /* TVShowsDetailView.swift in Sources */,
+				AA0000000000000000000120 /* SettingsDetailView.swift in Sources */,
+				AA0000000000000000000130 /* TransitionLoadingView.swift in Sources */,
+				AA0000000000000000000131 /* MarqueeSidebar.swift in Sources */,
+				AA0000000000000000000132 /* MovieCard.swift in Sources */,
+				AA0000000000000000000133 /* MarqueeLogoView.swift in Sources */,
+				AA0000000000000000000140 /* AppError.swift in Sources */,
+				AA0000000000000000000201 /* ShowCard.swift in Sources */,
+				AA0000000000000000000202 /* ShowDetailView.swift in Sources */,
+				AA0000000000000000000203 /* EpisodeRow.swift in Sources */,
+				AA0000000000000000000204 /* ShowCardRow.swift in Sources */,
+				AA0000000000000000000205 /* ArrowedScrollRow.swift in Sources */,
+				AA0000000000000000000300 /* TMDBService.swift in Sources */,
+				AA0000000000000000000301 /* UserProfile.swift in Sources */,
+				AA0000000000000000000302 /* ProfilePickerView.swift in Sources */,
+				AA0000000000000000000303 /* AvatarService.swift in Sources */,
+				AA0000000000000000000400 /* TMDBMetadata.swift in Sources */,
+				AA0000000000000000000401 /* ImageCacheService.swift in Sources */,
+				AA0000000000000000000403 /* EpisodeFrameCache.swift in Sources */,
+				AA0000000000000000000402 /* CachedImageView.swift in Sources */,
+				AA0000000000000000000500 /* SearchView.swift in Sources */,
+				AA0000000000000000000502 /* RemoteSearchKeyboardPolicy.swift in Sources */,
+				AA0000000000000000000503 /* RemoteSearchKeyboardView.swift in Sources */,
+				AA0000000000000000000C1B /* SearchTextField.swift in Sources */,
+				AA0000000000000000000C1C /* SearchViewPolicies.swift in Sources */,
+				AA0000000000000000000C1D /* SearchRemoteKeyboardProbe.swift in Sources */,
+				AA0000000000000000000C1E /* SearchResultCardView.swift in Sources */,
+				AA0000000000000000000C24 /* SearchSession.swift in Sources */,
+				AA0000000000000000000501 /* MovieDetailView.swift in Sources */,
+				AA0000000000000000000610 /* UserSettings.swift in Sources */,
+				AA0000000000000000000600 /* Configuration.swift in Sources */,
+				AA0000000000000000000601 /* Logger.swift in Sources */,
+				AA0000000000000000000640 /* KeyCatcher.swift in Sources */,
+				AA0000000000000000000641 /* MarqueeMode.swift in Sources */,
+				AA0000000000000000000642 /* RemoteGridFocus.swift in Sources */,
+				AA0000000000000000000D00 /* FocusEngine.swift in Sources */,
+				AA0000000000000000000D01 /* DetailFocusEngine.swift in Sources */,
+				AA0000000000000000000D02 /* AudioIdentityService.swift in Sources */,
+				AA0000000000000000000D03 /* VerifyAudioIdentityHarness.swift in Sources */,
+				AA0000000000000000000643 /* SearchInputBuffer.swift in Sources */,
+				AA0000000000000000000C18 /* FocusCoordinator.swift in Sources */,
+				AA0000000000000000000C23 /* MarqueeSignpost.swift in Sources */,
+				AA0000000000000000000C1F /* AppRouter.swift in Sources */,
+				AA0000000000000000000C19 /* RemoteScrollCoordinator.swift in Sources */,
+				AA0000000000000000000644 /* NativeVisualQATour.swift in Sources */,
+				AA0000000000000000000630 /* DiagnosticsCollector.swift in Sources */,
+				AA0000000000000000000631 /* VerifyDiagnosticsHarness.swift in Sources */,
+				AA0000000000000000000632 /* VerifyProfilePickerHarness.swift in Sources */,
+				AA0000000000000000000633 /* VerifyProfilePickerFocusTreeHarness.swift in Sources */,
+				AA0000000000000000000700 /* SubtitleDiscovery.swift in Sources */,
+				AA0000000000000000000701 /* SRTParser.swift in Sources */,
+				AA0000000000000000000702 /* SubtitleOverlayView.swift in Sources */,
+				AA0000000000000000000703 /* PlaybackStateMachine.swift in Sources */,
+				AA0000000000000000000705 /* PlaybackCache.swift in Sources */,
+				AA0000000000000000000706 /* EmbeddedPlaybackPresenter.swift in Sources */,
+				AA0000000000000000000704 /* VerifyPlaybackHarness.swift in Sources */,
+				AA0000000000000000000707 /* VerifySubtitleHarness.swift in Sources */,
+				AA0000000000000000000620 /* PlayerController.swift in Sources */,
+				AA0000000000000000000C20 /* PlaybackSession.swift in Sources */,
+				AA0000000000000000000800 /* CardHoverModifier.swift in Sources */,
+				AA0000000000000000000807 /* DetailFocusSurfaceModifier.swift in Sources */,
+				AA0000000000000000000810 /* KidsThemeOverlay.swift in Sources */,
+				AA0000000000000000000801 /* BottomFadeView.swift in Sources */,
+				AA0000000000000000000802 /* SectionHeader.swift in Sources */,
+				AA0000000000000000000803 /* MaturityLevel.swift in Sources */,
+				AA0000000000000000000804 /* Color+Marquee.swift in Sources */,
+				AA0000000000000000000805 /* String+Marquee.swift in Sources */,
+				AA0000000000000000000806 /* TimeInterval+Marquee.swift in Sources */,
+				AA0000000000000000000900 /* ArtworkCache.swift in Sources */,
+				AA0000000000000000000C21 /* ProfileSession.swift in Sources */,
+				AA0000000000000000000B00 /* BrowseSnapshotStore.swift in Sources */,
+				AA0000000000000000000C1A /* BrowseGridController.swift in Sources */,
+				AA0000000000000000000B01 /* VerifyBrowseSnapshotHarness.swift in Sources */,
+				AA0000000000000000000B02 /* VerifyImagePipelineHarness.swift in Sources */,
+				AA0000000000000000000C00 /* CatalogTypes.swift in Sources */,
+				AA0000000000000000000C01 /* CatalogStore.swift in Sources */,
+				AA0000000000000000000C02 /* InMemoryCatalogStore.swift in Sources */,
+				AA0000000000000000000C03 /* MediaIdentity.swift in Sources */,
+				AA0000000000000000000C04 /* LegacyJSONImporter.swift in Sources */,
+					AA0000000000000000000C05 /* SQLiteConnection.swift in Sources */,
+					AA0000000000000000000C06 /* SQLiteCatalogStore.swift in Sources */,
+				AA0000000000000000000C22 /* LibraryState.swift in Sources */,
+					AA0000000000000000000C07 /* VerifyImportHarness.swift in Sources */,
+					AA0000000000000000000C08 /* VerifyTransactionHarness.swift in Sources */,
+					AA0000000000000000000C09 /* VolumeRegistry.swift in Sources */,
+					AA0000000000000000000C0A /* SystemVolumeRegistry.swift in Sources */,
+					AA0000000000000000000C0B /* VerifyVolumeRegistryHarness.swift in Sources */,
+					AA0000000000000000000C0C /* DiffScanner.swift in Sources */,
+					AA0000000000000000000C0D /* VerifyScannerHarness.swift in Sources */,
+					AA0000000000000000000C0E /* CatalogProjection.swift in Sources */,
+					AA0000000000000000000C0F /* VerifyProjectionHarness.swift in Sources */,
+					AA0000000000000000000C10 /* CatalogContentPolicy.swift in Sources */,
+					AA0000000000000000000C12 /* EnrichmentProtocols.swift in Sources */,
+					AA0000000000000000000C13 /* VerifyEnrichmentHarness.swift in Sources */,
+					AA0000000000000000000C14 /* TMDBEnrichmentService.swift in Sources */,
+					AA0000000000000000000C15 /* VerifyEnrichmentActorHarness.swift in Sources */,
+					AA0000000000000000000C16 /* DurationProbe.swift in Sources */,
+					AA0000000000000000000C17 /* VerifyDurationProbeHarness.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AB0000000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		AB0000000000000000000002 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		AB0000000000000000000003 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Marquee/Marquee.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 440;
+				DEVELOPMENT_ASSET_PATHS = "\"Marquee/Preview Content\"";
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.marquee.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		AB0000000000000000000004 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Marquee/Marquee.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 440;
+				DEVELOPMENT_ASSET_PATHS = "\"Marquee/Preview Content\"";
+				ENABLE_HARDENED_RUNTIME = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MARKETING_VERSION = 2.0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.marquee.app;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AC0000000000000000000001 /* Build configuration list for PBXProject "Marquee" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB0000000000000000000001 /* Debug */,
+				AB0000000000000000000002 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		AC0000000000000000000002 /* Build configuration list for PBXNativeTarget "Marquee" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				AB0000000000000000000003 /* Debug */,
+				AB0000000000000000000004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		03923C0F2FA017FB00FE6B1B /* XCLocalSwiftPackageReference "MPVKit-local" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = "Vendor/MPVKit-local";
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		03923C102FA017FB00FE6B1B /* MPVKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 03923C0F2FA017FB00FE6B1B /* XCLocalSwiftPackageReference "MPVKit-local" */;
+			productName = MPVKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = FF0000000000000000000001 /* Project object */;
+}

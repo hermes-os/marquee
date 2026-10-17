@@ -1,0 +1,17 @@
+[
+  {
+    "filePath": "/synthetic/legacy-import/TV/Fixture Show/Season 1/Fixture Show - S01E01.m4v",
+    "fileName": "Fixture Show - S01E01.m4v",
+    "title": "Fixture Show - S01E01",
+    "year": 2023,
+    "fileExtension": "m4v",
+    "fileSize": 234567,
+    "dateAdded": 0,
+    "showName": "Fixture Show",
+    "seasonNumber": 1,
+    "episodeNumber": 1,
+    "episodeTitle": "Synthetic Premiere",
+    "showPosterPath": "/synthetic/legacy-import/artwork/fixture-show-poster.jpg",
+    "seasonPosterPath": "/synthetic/legacy-import/artwork/fixture-season-poster.jpg"
+  }
+]

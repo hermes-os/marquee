@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        Export method for unsigned / sign-to-run-locally Marquee builds.
+        "mac-application" produces a plain .app bundle suitable for direct
+        installation to /Applications. No Developer ID, no notarization.
+
+        When you enroll in the Apple Developer Program, switch to:
+            <key>method</key><string>developer-id</string>
+            <key>signingStyle</key><string>automatic</string>
+            <key>teamID</key><string>YOUR_TEAM_ID</string>
+        and add a notarytool submit step to scripts/release.sh.
+    -->
+    <key>method</key>
+    <string>mac-application</string>
+</dict>
+</plist>
