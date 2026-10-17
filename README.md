@@ -63,4 +63,4 @@ historical v2.0.1 binary's exact dependency source and build flags weren't
 retained, so that binary isn't suitable for public redistribution. A future
 binary release must be rebuilt from recorded corresponding source. See the
 [source-publication boundary](docs/operations/source-publication.md) before
-creating a public repository or release.
+publishing a release.

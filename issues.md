@@ -3,6 +3,9 @@
 Open bugs and gaps. Each entry names where it is, what happens, and how it was
 found. The commit that fixes an entry removes it.
 
+Commit hashes in entries written before 6eb1590 refer to the private development
+history and do not resolve in this repository.
+
 Entries below were carried over from the retired v3 plan, its parity inventory,
 and the retired issue queue, and each was re-checked against the source at
 `81c8fa8`. The released Swift app in `Marquee/` is the behavior oracle for
@@ -367,8 +370,3 @@ Found: round 3 review of 4da0105..9cc342b.
 Where: libmpv 0.41's default `scale`/`cscale` (separable lanczos), reached through `MpvVideoItem`'s render context; `MpvVideoItem` has asked for bilinear since 13a940f, so Marquee no longer shows it.
 What happens: with the lanczos defaults on llvmpipe (and on softpipe), about 1 render context in 3 draws a black or banded picture for its whole life. Reading mpv's offscreen textures back after the render shows NaN in alternate rows of the 80x120 chroma pass and in every 9th row of the 160x1080 luma pass, while the decoded frame (`screenshot-raw video`), the 2x256 weights texture (all 256 rows sum to 1) and the framebuffer state are intact. Not isolated: the cause inside mpv or Mesa is unknown. Facts: `mpv --vo=gpu` under the same xvfb never failed in 30 runs; `MALLOC_PERTURB_` set to 1, 85 or 128 made it vanish (36 of 36 phases fine against about 1 in 3); `dither-depth=no`, `LP_NUM_THREADS=0`, `hwdec=no` and an exposed window before the first grab did not help; scale and cscale both bilinear gave 0 of 45 phases. Any scaler that goes through the weights texture (spline36, ewa_lanczos) may show it if a later change selects one.
 Found: investigation of the playbackSurvivesLosingAndRegainingItsRenderSurface flake, 2026-10-16.
-
-## Authorship and licence of the app icon, logo, and cue sounds are not recorded
-Where: `Marquee-app-icon.png`, `Marquee/Assets.xcassets/AppIcon.appiconset/`, `play-button-logo.jpg` and `Marquee/Assets.xcassets/MarqueeLogo.imageset/play-button-logo.jpg` (both are PNG data under a `.jpg` name), `Marquee/Resources/Sounds/*-tick.wav`, `Marquee/Resources/Sounds/launch-ident.m4a`.
-What happens: nothing in the history or the docs says who drew the icon and logo or which tool made them, and no licence is stated for them. The history shows no third-party source (the logo is in the baseline commit; the film-reel icon came in one commit with a changelog line). The sound cues are described as placeholders and carry only an ffmpeg encoder tag. `THIRD_PARTY_NOTICES.md` therefore lists none of them, and `LICENSE` is the only grant that would cover them once the source is public.
-Found: provenance audit of every tracked binary for the first public commit, `git log --follow` on each asset.

@@ -35,3 +35,14 @@ Re-enable binary publishing only when the build itself can produce and verify:
   bundle;
 - checksums binding the source, manifest, frameworks, app, and release assets;
 - a release upload that publishes the complete verified set together.
+
+## Cutting a new public root
+
+Before the first publication of a new root, run these checks against the
+candidate clone:
+
+- Verify the clone has exactly one root commit.
+- Run the repository gate.
+- Run a secret scan.
+- Run a binary-aware private-marker scan.
+- Run a forbidden-path scan.
