@@ -28,10 +28,12 @@ corresponding-source revision and build configuration. They are intentionally
 excluded from source publication. Do not publish a Marquee binary made from
 those frameworks.
 
-A future binary release must record every dependency revision and build flag,
-include all required license and copyright notices, and provide the complete
-corresponding source for the exact distributed dependency binaries. This
-requirement applies even when those binaries were built without local changes.
+Any other binary release (the macOS 2.0.2 download below is covered by
+`docs/operations/source-publication.md`) must record every dependency revision
+and build flag, include all required license and copyright notices, and provide
+the complete corresponding source for the exact distributed dependency
+binaries. This requirement applies even when those binaries were built without
+local changes.
 
 The small bridge source in `MarqueePatches/standalone-mac-bridge-stub.c` is part
 of Marquee and is covered by Marquee's GPL-3.0 license. It isn't a substitute

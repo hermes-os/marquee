@@ -66,9 +66,10 @@ Marquee is free software licensed under the
 [GNU General Public License version 3 only](LICENSE). Third-party dependencies
 keep their own licenses; see [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
 
-The repository doesn't distribute MPVKit, libmpv, FFmpeg, or Qt binaries. The
-historical v2.0.1 binary's exact dependency source and build flags weren't
-retained, so that binary isn't suitable for public redistribution. A future
-binary release must be rebuilt from recorded corresponding source. See the
+The repository itself doesn't contain MPVKit, libmpv, FFmpeg, or Qt binaries.
+The historical v2.0.1 binary's exact dependency source and build flags weren't
+retained, so that binary isn't suitable for public redistribution. Apart from
+the macOS 2.0.2 download above, any other binary release must be rebuilt from
+recorded corresponding source. See the
 [source-publication boundary](docs/operations/source-publication.md) before
 publishing a release.
