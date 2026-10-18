@@ -13,6 +13,16 @@ import Foundation
 enum VerifyBrowseSnapshotHarness {
     static let launchArgument = "--verify-browse-snapshots"
 
+    // Seasonal home rows depend on the calendar month, so row-list assertions pin a
+    // mid-March noon (no seasonal row) built in the same local calendar the policy reads.
+    private static let nonSeasonalDate = DateComponents(
+        calendar: Calendar(identifier: .gregorian),
+        year: 2026,
+        month: 3,
+        day: 15,
+        hour: 12
+    ).date!
+
     static func runIfRequested() {
         guard CommandLine.arguments.contains(launchArgument) else { return }
 
@@ -87,7 +97,8 @@ enum VerifyBrowseSnapshotHarness {
 
         let snapshot = BrowseSnapshotBuilder.build(
             movies: [movieA, movieB, movieC],
-            tvEpisodes: [episode1, episode2]
+            tvEpisodes: [episode1, episode2],
+            seasonalDate: nonSeasonalDate
         )
 
         try assert(snapshot.homeRows.map(\.id) == [
@@ -124,7 +135,8 @@ enum VerifyBrowseSnapshotHarness {
         let refreshed = BrowseSnapshotBuilder.refreshProgressRows(
             movies: [movieA, movieB, movieC],
             tvEpisodes: [episode1, episode2],
-            existing: snapshot
+            existing: snapshot,
+            seasonalDate: nonSeasonalDate
         )
         try assert(refreshed.movieRows.map(\.id) == snapshot.movieRows.map(\.id),
                "progress refresh should preserve movie row structure")
@@ -140,7 +152,8 @@ enum VerifyBrowseSnapshotHarness {
                "progress refresh should keep Continue Watching leading the hero carousel")
         let rebuilt = BrowseSnapshotBuilder.build(
             movies: [movieA, movieB, movieC],
-            tvEpisodes: [episode1, episode2]
+            tvEpisodes: [episode1, episode2],
+            seasonalDate: nonSeasonalDate
         )
         try assert(refreshed.heroSpotlights.first?.category == rebuilt.heroSpotlights.first?.category,
                "progress refresh and full rebuild should agree on the leading hero spotlight")
