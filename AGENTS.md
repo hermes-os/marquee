@@ -9,8 +9,10 @@ libmpv, SQLite, built with CMake and Ninja for Omarchy/Arch Linux.
 The Swift v2 macOS app (`Marquee/`, `MarqueePatches/`, `Marquee.xcodeproj`,
 `Package.swift`, and the Xcode/Mac scripts in `scripts/`) is a frozen read-only
 behavior oracle. No fixes, builds, tests, or Mac gates; read it to match
-appearance and interaction. Do not mix in the separate streaming-platform
-checkout.
+appearance and interaction. One exception: the public 2.0.2 macOS download is
+built on GitHub's macOS runners (`.github/workflows/`); changes that build
+needs are allowed, product behavior changes are not. Do not mix in the separate
+streaming-platform checkout.
 
 ## Gate
 
