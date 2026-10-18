@@ -43,11 +43,12 @@ cannot prove are in [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md).
 
 The macOS download is the frozen Swift app, built by the manual
 `.github/workflows/macos-release.yml` workflow against the official MPVKit
-`1.1.0-n9.0.2` release. It is a universal (Apple silicon and Intel) disk image,
-ad-hoc signed and not notarized: open `Marquee.app` once; when macOS blocks it,
-go to System Settings, Privacy & Security, and choose Open Anyway (on macOS 14
-and earlier, right-click and choose Open). If macOS still refuses, run
-`xattr -dr com.apple.quarantine /Applications/Marquee.app`.
+`1.1.0-n9.0.2` release. The disk image and its checksum are on this
+repository's GitHub Releases page. It is a universal (Apple silicon and Intel)
+disk image, ad-hoc signed and not notarized: open `Marquee.app` once; when
+macOS blocks it, go to System Settings, Privacy & Security, and choose Open
+Anyway (on macOS 14 and earlier, right-click and choose Open). If macOS still
+refuses, run `xattr -dr com.apple.quarantine /Applications/Marquee.app`.
 
 ## Product constraints
 

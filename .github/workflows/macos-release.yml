@@ -10,6 +10,7 @@ permissions:
 
 env:
   MARQUEE_VERSION: "2.0.2"
+  MARQUEE_BUILD: "441"
   # Official MPVKit release: its Package.swift downloads the prebuilt
   # xcframeworks attached to this tag's GitHub release.
   MPVKIT_TAG: "1.1.0-n9.0.2"
@@ -29,7 +30,9 @@ jobs:
     timeout-minutes: 90
     steps:
       - name: Check out
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
 
       - name: Record Xcode version
         run: |
@@ -53,8 +56,10 @@ jobs:
 
       - name: Swift self-tests
         # The SwiftPM harness target needs no app bundle and no display. The
-        # full Xcode gate (scripts/quality-gate.sh without --toolchain) launches
-        # the app and drives AppKit windows, which a plain runner cannot do.
+        # full Xcode gate (scripts/quality-gate.sh without --toolchain) stops
+        # early here: it fingerprints Vendor/MPVKit-local/Frameworks, the
+        # historical local framework payload, which the official MPVKit
+        # checkout does not have.
         run: |
           mkdir -p artifact
           ./scripts/quality-gate.sh --toolchain --full 2>&1 | tee artifact/toolchain-gate.log
@@ -62,6 +67,7 @@ jobs:
       - name: Build universal Release app
         run: |
           mkdir -p artifact
+          xcodebuild -list -project Marquee.xcodeproj
           xcodebuild \
             -project Marquee.xcodeproj \
             -scheme Marquee \
@@ -98,6 +104,9 @@ jobs:
           version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${app}/Contents/Info.plist")"
           echo "bundle version: ${version}"
           test "${version}" = "${MARQUEE_VERSION}"
+          build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${app}/Contents/Info.plist")"
+          echo "bundle build: ${build_number}"
+          test "${build_number}" = "${MARQUEE_BUILD}"
 
           # Every Mach-O file in the bundle may load only system libraries or
           # files that ship inside the bundle. MPVKit's frameworks are static,
@@ -229,17 +238,28 @@ jobs:
           lists each of them with its version, its source and its license text.
           EOF
 
-          hdiutil create \
-            -volname "Marquee ${MARQUEE_VERSION}" \
-            -srcfolder "${stage}" \
-            -ov \
-            -format UDZO \
-            "artifact/${dmg}"
+          # hdiutil create sometimes fails on hosted runners with "Resource
+          # busy"; retry before failing the build.
+          for attempt in 1 2 3; do
+            if hdiutil create \
+              -volname "Marquee ${MARQUEE_VERSION}" \
+              -srcfolder "${stage}" \
+              -ov \
+              -format UDZO \
+              "artifact/${dmg}"; then
+              break
+            fi
+            if [ "${attempt}" -eq 3 ]; then
+              echo "hdiutil create failed 3 times" >&2
+              exit 1
+            fi
+            sleep 10
+          done
 
           (cd artifact && shasum -a 256 "${dmg}" > "${dmg}.sha256" && cat "${dmg}.sha256")
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: Marquee-${{ env.MARQUEE_VERSION }}-macos
           path: |
@@ -249,3 +269,4 @@ jobs:
             artifact/xcodebuild.log
             artifact/toolchain-gate.log
           if-no-files-found: error
+          retention-days: 30
