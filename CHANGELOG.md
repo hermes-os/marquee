@@ -10,8 +10,11 @@ intermediate version bump.
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the
   official MPVKit `1.1.0-n9.0.2` release instead of the earlier hand-patched
-  frameworks. It is ad-hoc signed, not notarized: right-click and choose Open
-  the first time. The app's behavior is unchanged from 2.0.1; only the version
+  frameworks. It is ad-hoc signed, not notarized: open it once; when macOS
+  blocks it, go to System Settings, Privacy & Security, and choose Open Anyway
+  (on macOS 14 and earlier, right-click and choose Open). If macOS still
+  refuses, run `xattr -dr com.apple.quarantine /Applications/Marquee.app`.
+  The app's behavior is unchanged from 2.0.1; only the version
   and build number change. The disk image carries `THIRD_PARTY_LICENSES.md`
   with the version, source and license text of every bundled library.
 - The picture no longer comes up black now and then. Marquee scaled video with

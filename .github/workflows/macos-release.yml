@@ -130,8 +130,9 @@ jobs:
           notarized, so macOS will refuse to open it the first time.
 
           1. Drag Marquee.app to the Applications folder.
-          2. Right-click (or Control-click) Marquee in Applications and choose
-             Open, then choose Open again in the dialog.
+          2. Open Marquee once. When macOS blocks it, go to System Settings,
+             Privacy & Security, and choose Open Anyway. (On macOS 14 and
+             earlier, right-click Marquee and choose Open instead.)
 
           If macOS still says the app is damaged or cannot be checked, remove
           the quarantine flag in Terminal and open it again:
