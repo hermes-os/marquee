@@ -192,7 +192,18 @@ jobs:
           rm -rf "${stage}"
           mkdir -p "${stage}" artifact
           ditto "${app}" "${stage}/Marquee.app"
-          cp LICENSE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.md "${stage}/"
+
+          plist="${app}/Contents/Info.plist"
+          {
+            echo "Marquee $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${plist}")" \
+              "(build $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "${plist}"))"
+            echo "Marquee commit: ${GITHUB_SHA}"
+            echo "MPVKit: tag ${MPVKIT_TAG}, commit $(git -C Vendor/MPVKit-local rev-parse HEAD)"
+            xcodebuild -version
+          } > artifact/BUILD-INFO.txt
+          cat artifact/BUILD-INFO.txt
+
+          cp LICENSE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.md artifact/BUILD-INFO.txt "${stage}/"
           ln -s /Applications "${stage}/Applications"
           cat > "${stage}/READ ME FIRST.txt" <<'EOF'
           Marquee for macOS
@@ -209,6 +220,9 @@ jobs:
           the quarantine flag in Terminal and open it again:
 
               xattr -dr com.apple.quarantine /Applications/Marquee.app
+
+          BUILD-INFO.txt records the Marquee and MPVKit commits, the Xcode
+          version and the build number.
 
           LICENSE is Marquee's license. THIRD_PARTY_NOTICES.md says where the
           libraries bundled in the app come from. THIRD_PARTY_LICENSES.md
@@ -231,6 +245,7 @@ jobs:
           path: |
             artifact/Marquee-${{ env.MARQUEE_VERSION }}.dmg
             artifact/Marquee-${{ env.MARQUEE_VERSION }}.dmg.sha256
+            artifact/BUILD-INFO.txt
             artifact/xcodebuild.log
             artifact/toolchain-gate.log
           if-no-files-found: error
