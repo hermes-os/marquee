@@ -11,8 +11,8 @@ the prebuilt binary comes from, the upstream source at the version used, and the
 upstream license text, copied unchanged from that source except that spaces at
 line ends are dropped; each SHA-256 is of the upstream file as published. Where
 a library's license file carries no copyright line, the copyright lines are
-quoted from the named upstream file. A text that is byte-identical to one given earlier is
-referenced by its SHA-256 instead of repeated.
+quoted from the named upstream file. A text that is byte-identical to one given
+earlier is referenced by its SHA-256 instead of repeated.
 
 `MPVKit` itself is LGPL-3.0 (see its `LICENSE` at that commit). The binary
 release zips carry no license files of their own. The `Libsmbclient` target

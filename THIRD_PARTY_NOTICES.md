@@ -47,14 +47,35 @@ official MPVKit release `1.1.0-n9.0.2`, the `MPVKit` product (the LGPL one, not
 `MPVKit-GPL`), instead of the historical local frameworks above.
 
 - Build scripts and source recipe:
-  [MPVKit tag `1.1.0-n9.0.2`](https://github.com/mpvkit/MPVKit/tree/1.1.0-n9.0.2).
-- Prebuilt binaries:
-  [MPVKit release `1.1.0-n9.0.2`](https://github.com/mpvkit/MPVKit/releases/tag/1.1.0-n9.0.2).
-  The workflow takes them unchanged through that tag's `Package.swift`.
+  [MPVKit tag `1.1.0-n9.0.2`](https://github.com/mpvkit/MPVKit/tree/1.1.0-n9.0.2),
+  commit `98c3453e252922e3136422da3fbb2e341ed9edc8`.
+- Prebuilt binaries: the 29 binary targets of the `MPVKit` product in
+  [`Package.swift` at that commit](https://github.com/mpvkit/MPVKit/blob/98c3453e252922e3136422da3fbb2e341ed9edc8/Package.swift),
+  each pinned by URL and SHA-256 and taken unchanged. Eight come from
+  MPVKit's own release; the other 21 from releases of other `mpvkit/*-build`
+  repositories:
 
-The bundled libraries (mpv, FFmpeg and their dependencies), their versions and
-their licenses are listed in MPVKit's README and build scripts at that tag.
-`MarqueePatches/standalone-mac-bridge-stub.c` is not used in this build.
+  | Binary targets | Release |
+  | --- | --- |
+  | `Libmpv`, `Libavcodec`, `Libavdevice`, `Libavfilter`, `Libavformat`, `Libavutil`, `Libswresample`, `Libswscale` | [MPVKit `1.1.0-n9.0.2`](https://github.com/mpvkit/MPVKit/releases/tag/1.1.0-n9.0.2) |
+  | `Libcrypto`, `Libssl` | [openssl-build `3.3.5`](https://github.com/mpvkit/openssl-build/releases/tag/3.3.5) |
+  | `gmp`, `nettle`, `hogweed`, `gnutls` | [gnutls-build `3.8.11`](https://github.com/mpvkit/gnutls-build/releases/tag/3.8.11) |
+  | `Libunibreak`, `Libfreetype`, `Libfribidi`, `Libharfbuzz`, `Libass` | [libass-build `0.17.5`](https://github.com/mpvkit/libass-build/releases/tag/0.17.5) |
+  | `Libbluray` | [libbluray-build `1.4.0`](https://github.com/mpvkit/libbluray-build/releases/tag/1.4.0) |
+  | `Libuavs3d` | [libuavs3d-build `1.2.1-fix`](https://github.com/mpvkit/libuavs3d-build/releases/tag/1.2.1-fix) |
+  | `Libdovi` | [libdovi-build `3.3.2`](https://github.com/mpvkit/libdovi-build/releases/tag/3.3.2) |
+  | `MoltenVK` | [moltenvk-build `1.4.2`](https://github.com/mpvkit/moltenvk-build/releases/tag/1.4.2) |
+  | `Libshaderc_combined` | [libshaderc-build `2025.5.0`](https://github.com/mpvkit/libshaderc-build/releases/tag/2025.5.0) |
+  | `lcms2` | [lcms2-build `2.17.0`](https://github.com/mpvkit/lcms2-build/releases/tag/2.17.0) |
+  | `Libplacebo` | [libplacebo-build `7.360.1`](https://github.com/mpvkit/libplacebo-build/releases/tag/7.360.1) |
+  | `Libdav1d` | [libdav1d-build `1.5.3`](https://github.com/mpvkit/libdav1d-build/releases/tag/1.5.3) |
+  | `Libuchardet` | [libuchardet-build `0.0.8`](https://github.com/mpvkit/libuchardet-build/releases/tag/0.0.8) |
+  | `Libluajit` | [libluajit-build `2.1.0-fix`](https://github.com/mpvkit/libluajit-build/releases/tag/2.1.0-fix) |
+
+The release zips carry no license files. Each library's version, upstream
+source at that version and license text are in
+[`THIRD_PARTY_LICENSES.md`](THIRD_PARTY_LICENSES.md), which ships in the disk
+image. `MarqueePatches/standalone-mac-bridge-stub.c` is not used in this build.
 
 ## C++/Qt v3
 
