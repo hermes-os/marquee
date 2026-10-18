@@ -21,6 +21,9 @@ intermediate version bump.
 - The macOS 2.0.2 build's Swift self-tests pass in any month (the browse
   snapshot test no longer depends on the date) and the self-test binary is built
   before the first harness runs.
+- The macOS 2.0.2 app no longer embeds MPVKit's static archives as unused
+  frameworks; the build removes them before signing and checks that the
+  executable loads none of them.
 - The picture no longer comes up black now and then. Marquee scaled video with
   libmpv's default lanczos filters, which on a software GL stack (the test
   displays, a virtual machine) sometimes drew a black or banded picture for the

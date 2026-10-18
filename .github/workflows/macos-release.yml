@@ -95,6 +95,58 @@ jobs:
           exe="${app}/Contents/MacOS/Marquee"
           test -d "${app}"
 
+          # MPVKit's macOS binaries are static archives that are already
+          # linked into the executable. Xcode still embeds each xcframework as
+          # a framework; those archives are dead weight and carry build-machine
+          # temp paths in their member names. Remove them before signing, and
+          # fail on any framework binary that is neither a static archive nor
+          # a dylib, so nothing unexpected ships unchecked.
+          removed_list="${RUNNER_TEMP}/marquee-removed-frameworks.txt"
+          : > "${removed_list}"
+          removed=0
+          kept=0
+          for fw in "${app}"/Contents/Frameworks/*.framework; do
+            test -d "${fw}" || continue
+            name="$(basename "${fw}" .framework)"
+            if [ -f "${fw}/Versions/Current/${name}" ]; then
+              bin="${fw}/Versions/Current/${name}"
+            elif [ -f "${fw}/${name}" ]; then
+              bin="${fw}/${name}"
+            else
+              echo "no binary found in ${fw}" >&2
+              exit 1
+            fi
+            probe="${bin}"
+            thin=""
+            case "$(file -b "${bin}")" in
+              *"universal binary"*)
+                thin="$(mktemp)"
+                lipo -thin arm64 "${bin}" -output "${thin}"
+                probe="${thin}"
+                ;;
+            esac
+            kind="$(file -b "${probe}")"
+            if [ -n "${thin}" ]; then rm -f "${thin}"; fi
+            case "${kind}" in
+              *"ar archive"*)
+                echo "removing static framework: ${name}"
+                rm -rf "${fw}"
+                printf '%s\n' "${name}" >> "${removed_list}"
+                removed=$((removed + 1))
+                ;;
+              *Mach-O*"shared library"*)
+                kept=$((kept + 1))
+                ;;
+              *)
+                echo "${bin} is neither a static archive nor a dylib: ${kind}" >&2
+                exit 1
+                ;;
+            esac
+          done
+          echo "removed ${removed} static frameworks; ${kept} dylib frameworks left"
+          # Drop the directory if nothing is left in it.
+          rmdir "${app}/Contents/Frameworks" 2>/dev/null || true
+
           codesign --force --deep -s - "${app}"
           codesign --verify --deep --strict --verbose=2 "${app}"
 
@@ -137,7 +189,10 @@ jobs:
           macho_list="$(mktemp)"
           find "${app}/Contents" -type f -print0 \
             | while IFS= read -r -d '' f; do
+                # A static archive's otool -L lists object members, not loads.
+                # Check that first: a universal archive also says Mach-O.
                 case "$(file -b "${f}")" in
+                  *"ar archive"*) ;;
                   *Mach-O*) printf '%s\n' "${f}" ;;
                 esac
               done > "${macho_list}"
@@ -195,6 +250,18 @@ jobs:
           # with SIGPIPE and pipefail would fail the step.
           nm -U "${exe}" > "${RUNNER_TEMP}/marquee-symbols.txt"
           grep -q ' _mpv_create$' "${RUNNER_TEMP}/marquee-symbols.txt"
+
+          # The removed frameworks must not be load commands of the executable.
+          otool -L "${exe}" > "${RUNNER_TEMP}/marquee-loads.txt"
+          while IFS= read -r name; do
+            if grep -qF "@rpath/${name}.framework/" "${RUNNER_TEMP}/marquee-loads.txt"; then
+              echo "executable still loads removed framework ${name}" >&2
+              bad=1
+            fi
+          done < "${removed_list}"
+          test "${bad}" -eq 0
+
+          du -sh "${app}"
 
           # shellcheck source=scripts/lib/bundle-safety.sh
           source scripts/lib/bundle-safety.sh
