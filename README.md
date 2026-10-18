@@ -39,6 +39,14 @@ cannot prove are in [`docs/QUALITY_GATES.md`](docs/QUALITY_GATES.md).
   frozen Swift v2 reference.
 - `issues.md` — open bugs and gaps. `CHANGELOG.md` — user-facing changes.
 
+## macOS (2.0.2)
+
+The macOS download is the frozen Swift app, built by the manual
+`.github/workflows/macos-release.yml` workflow against the official MPVKit
+`1.1.0-n9.0.2` release. It is a universal (Apple silicon and Intel) disk image,
+ad-hoc signed and not notarized: right-click `Marquee.app` and choose Open, or
+run `xattr -dr com.apple.quarantine /Applications/Marquee.app`.
+
 ## Product constraints
 
 - Offline browsing must remain functional without TMDB or network access.

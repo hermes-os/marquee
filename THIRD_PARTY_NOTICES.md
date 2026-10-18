@@ -37,6 +37,23 @@ The small bridge source in `MarqueePatches/standalone-mac-bridge-stub.c` is part
 of Marquee and is covered by Marquee's GPL-3.0 license. It isn't a substitute
 for MPVKit or libmpv corresponding source.
 
+## macOS download (2.0.2)
+
+The macOS 2.0.2 download is the frozen Swift v2 app, built by
+`.github/workflows/macos-release.yml` on GitHub's macOS runners. It bundles the
+official MPVKit release `1.1.0-n9.0.2`, the `MPVKit` product (the LGPL one, not
+`MPVKit-GPL`), instead of the historical local frameworks above.
+
+- Build scripts and source recipe:
+  [MPVKit tag `1.1.0-n9.0.2`](https://github.com/mpvkit/MPVKit/tree/1.1.0-n9.0.2).
+- Prebuilt binaries:
+  [MPVKit release `1.1.0-n9.0.2`](https://github.com/mpvkit/MPVKit/releases/tag/1.1.0-n9.0.2).
+  The workflow takes them unchanged through that tag's `Package.swift`.
+
+The bundled libraries (mpv, FFmpeg and their dependencies), their versions and
+their licenses are listed in MPVKit's README and build scripts at that tag.
+`MarqueePatches/standalone-mac-bridge-stub.c` is not used in this build.
+
 ## C++/Qt v3
 
 Marquee v3 builds against Qt 6, QML, libmpv, and SQLite, but no v3 dependency

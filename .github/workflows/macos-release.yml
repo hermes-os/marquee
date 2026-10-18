@@ -1,0 +1,163 @@
+name: macOS release build
+
+# Builds the frozen Swift v2 app as the public macOS download. Manual only; it
+# uploads one workflow artifact and creates no GitHub release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MARQUEE_VERSION: "2.0.2"
+  # Official MPVKit release: its Package.swift downloads the prebuilt
+  # xcframeworks attached to this tag's GitHub release.
+  MPVKIT_TAG: "1.1.0-n9.0.2"
+
+defaults:
+  run:
+    # Explicit bash so the runner adds -o pipefail; without it a failing
+    # xcodebuild piped through tee would pass.
+    shell: bash
+
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 90
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Record Xcode version
+        run: |
+          xcodebuild -version
+          swift --version
+          sw_vers
+
+      - name: Fetch MPVKit
+        # The project references the local package Vendor/MPVKit-local; put the
+        # official release there so the project file stays unchanged.
+        run: |
+          mkdir -p Vendor
+          git clone --depth 1 --branch "${MPVKIT_TAG}" \
+            https://github.com/mpvkit/MPVKit.git Vendor/MPVKit-local
+          echo "MPVKit tag ${MPVKIT_TAG} at $(git -C Vendor/MPVKit-local rev-parse HEAD)"
+
+      - name: Swift self-tests
+        # The SwiftPM harness target needs no app bundle and no display. The
+        # full Xcode gate (scripts/quality-gate.sh without --toolchain) launches
+        # the app and drives AppKit windows, which a plain runner cannot do.
+        run: |
+          mkdir -p artifact
+          ./scripts/quality-gate.sh --toolchain --full 2>&1 | tee artifact/toolchain-gate.log
+
+      - name: Build universal Release app
+        run: |
+          mkdir -p artifact
+          xcodebuild \
+            -project Marquee.xcodeproj \
+            -scheme Marquee \
+            -configuration Release \
+            -destination 'generic/platform=macOS' \
+            -derivedDataPath build/derived \
+            ARCHS="arm64 x86_64" \
+            ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            build 2>&1 | tee artifact/xcodebuild.log
+
+      - name: Ad-hoc sign and check the app
+        run: |
+          app="build/derived/Build/Products/Release/Marquee.app"
+          exe="${app}/Contents/MacOS/Marquee"
+          test -d "${app}"
+
+          codesign --force --deep -s - "${app}"
+          codesign --verify --deep --strict --verbose=2 "${app}"
+
+          archs="$(lipo -archs "${exe}")"
+          echo "architectures: ${archs}"
+          case " ${archs} " in
+            *" arm64 "*) ;;
+            *) echo "missing arm64 slice" >&2; exit 1 ;;
+          esac
+          case " ${archs} " in
+            *" x86_64 "*) ;;
+            *) echo "missing x86_64 slice" >&2; exit 1 ;;
+          esac
+
+          version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "${app}/Contents/Info.plist")"
+          echo "bundle version: ${version}"
+          test "${version}" = "${MARQUEE_VERSION}"
+
+          # Every bundled-library dependency must ship inside the app. The
+          # Swift runtime resolves from the system through @rpath, so skip it.
+          ls -l "${app}/Contents/Frameworks" || true
+          otool -L "${exe}"
+          missing=0
+          for dep in $(otool -L "${exe}" | awk '/@rpath\// { print $1 }'); do
+            name="${dep#@rpath/}"
+            case "${name}" in
+              libswift*) continue ;;
+            esac
+            if [ ! -e "${app}/Contents/Frameworks/${name}" ]; then
+              echo "not bundled: ${dep}" >&2
+              missing=1
+            fi
+          done
+          test "${missing}" -eq 0
+
+          # shellcheck source=scripts/lib/bundle-safety.sh
+          source scripts/lib/bundle-safety.sh
+          verify_app_excludes_local_secrets "${app}"
+
+      - name: Build DMG and checksum
+        run: |
+          app="build/derived/Build/Products/Release/Marquee.app"
+          dmg="Marquee-${MARQUEE_VERSION}.dmg"
+          stage="build/dmg-stage"
+
+          rm -rf "${stage}"
+          mkdir -p "${stage}" artifact
+          ditto "${app}" "${stage}/Marquee.app"
+          cp LICENSE THIRD_PARTY_NOTICES.md "${stage}/"
+          ln -s /Applications "${stage}/Applications"
+          cat > "${stage}/READ ME FIRST.txt" <<'EOF'
+          Marquee for macOS
+
+          This build is not signed with an Apple Developer ID and is not
+          notarized, so macOS will refuse to open it the first time.
+
+          1. Drag Marquee.app to the Applications folder.
+          2. Right-click (or Control-click) Marquee in Applications and choose
+             Open, then choose Open again in the dialog.
+
+          If macOS still says the app is damaged or cannot be checked, remove
+          the quarantine flag in Terminal and open it again:
+
+              xattr -dr com.apple.quarantine /Applications/Marquee.app
+
+          LICENSE is Marquee's license. THIRD_PARTY_NOTICES.md names the
+          libraries bundled in the app and where their licenses and source are.
+          EOF
+
+          hdiutil create \
+            -volname "Marquee ${MARQUEE_VERSION}" \
+            -srcfolder "${stage}" \
+            -ov \
+            -format UDZO \
+            "artifact/${dmg}"
+
+          (cd artifact && shasum -a 256 "${dmg}" > "${dmg}.sha256" && cat "${dmg}.sha256")
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Marquee-${{ env.MARQUEE_VERSION }}-macos
+          path: |
+            artifact/Marquee-${{ env.MARQUEE_VERSION }}.dmg
+            artifact/Marquee-${{ env.MARQUEE_VERSION }}.dmg.sha256
+            artifact/xcodebuild.log
+            artifact/toolchain-gate.log
+          if-no-files-found: error
