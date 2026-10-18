@@ -14,9 +14,10 @@ intermediate version bump.
   blocks it, go to System Settings, Privacy & Security, and choose Open Anyway
   (on macOS 14 and earlier, right-click and choose Open). If macOS still
   refuses, run `xattr -dr com.apple.quarantine /Applications/Marquee.app`.
-  The app's behavior is unchanged from 2.0.1; only the version
-  and build number change. The disk image carries `THIRD_PARTY_LICENSES.md`
-  with the version, source and license text of every bundled library.
+  No Swift source changed; the bundled libmpv and FFmpeg are newer (MPVKit
+  1.1.0-n9.0.2) and statically linked. The disk image carries
+  `THIRD_PARTY_LICENSES.md` with the version, source and license text of every
+  bundled library.
 - The picture no longer comes up black now and then. Marquee scaled video with
   libmpv's default lanczos filters, which on a software GL stack (the test
   displays, a virtual machine) sometimes drew a black or banded picture for the
