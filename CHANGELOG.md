@@ -18,6 +18,9 @@ intermediate version bump.
   1.1.0-n9.0.2) and statically linked. The disk image carries
   `THIRD_PARTY_LICENSES.md` with the version, source and license text of every
   bundled library.
+- The macOS 2.0.2 build's Swift self-tests pass in any month (the browse
+  snapshot test no longer depends on the date) and the self-test binary is built
+  before the first harness runs.
 - The picture no longer comes up black now and then. Marquee scaled video with
   libmpv's default lanczos filters, which on a software GL stack (the test
   displays, a virtual machine) sometimes drew a black or banded picture for the

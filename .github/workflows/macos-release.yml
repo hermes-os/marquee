@@ -54,6 +54,14 @@ jobs:
             exit 1
           fi
 
+      - name: Build the self-test binary
+        # The gate's first `swift run` otherwise links and launches the binary
+        # in the same moment, and macOS killed that launch (Killed: 9) on a
+        # hosted runner. Build it here so the gate finds it up to date.
+        run: |
+          mkdir -p artifact
+          swift build --package-path . --product marquee-toolchain-gate 2>&1 | tee -a artifact/toolchain-gate.log
+
       - name: Swift self-tests
         # The SwiftPM harness target needs no app bundle and no display. The
         # full Xcode gate (scripts/quality-gate.sh without --toolchain) stops
