@@ -12,7 +12,8 @@ intermediate version bump.
   official MPVKit `1.1.0-n9.0.2` release instead of the earlier hand-patched
   frameworks. It is ad-hoc signed, not notarized: right-click and choose Open
   the first time. The app's behavior is unchanged from 2.0.1; only the version
-  and build number change.
+  and build number change. The disk image carries `THIRD_PARTY_LICENSES.md`
+  with the version, source and license text of every bundled library.
 - The picture no longer comes up black now and then. Marquee scaled video with
   libmpv's default lanczos filters, which on a software GL stack (the test
   displays, a virtual machine) sometimes drew a black or banded picture for the

@@ -121,7 +121,7 @@ jobs:
           rm -rf "${stage}"
           mkdir -p "${stage}" artifact
           ditto "${app}" "${stage}/Marquee.app"
-          cp LICENSE THIRD_PARTY_NOTICES.md "${stage}/"
+          cp LICENSE THIRD_PARTY_NOTICES.md THIRD_PARTY_LICENSES.md "${stage}/"
           ln -s /Applications "${stage}/Applications"
           cat > "${stage}/READ ME FIRST.txt" <<'EOF'
           Marquee for macOS
@@ -138,8 +138,9 @@ jobs:
 
               xattr -dr com.apple.quarantine /Applications/Marquee.app
 
-          LICENSE is Marquee's license. THIRD_PARTY_NOTICES.md names the
-          libraries bundled in the app and where their licenses and source are.
+          LICENSE is Marquee's license. THIRD_PARTY_NOTICES.md says where the
+          libraries bundled in the app come from. THIRD_PARTY_LICENSES.md
+          lists each of them with its version, its source and its license text.
           EOF
 
           hdiutil create \
