@@ -13,6 +13,9 @@ env:
   # Official MPVKit release: its Package.swift downloads the prebuilt
   # xcframeworks attached to this tag's GitHub release.
   MPVKIT_TAG: "1.1.0-n9.0.2"
+  # The tag is lightweight and could move; the build fails unless the clone
+  # is exactly this commit.
+  MPVKIT_COMMIT: 98c3453e252922e3136422da3fbb2e341ed9edc8
 
 defaults:
   run:
@@ -41,7 +44,12 @@ jobs:
           mkdir -p Vendor
           git clone --depth 1 --branch "${MPVKIT_TAG}" \
             https://github.com/mpvkit/MPVKit.git Vendor/MPVKit-local
-          echo "MPVKit tag ${MPVKIT_TAG} at $(git -C Vendor/MPVKit-local rev-parse HEAD)"
+          head="$(git -C Vendor/MPVKit-local rev-parse HEAD)"
+          echo "MPVKit tag ${MPVKIT_TAG} at ${head}"
+          if [ "${head}" != "${MPVKIT_COMMIT}" ]; then
+            echo "MPVKit tag ${MPVKIT_TAG} is at ${head}, expected ${MPVKIT_COMMIT}" >&2
+            exit 1
+          fi
 
       - name: Swift self-tests
         # The SwiftPM harness target needs no app bundle and no display. The
