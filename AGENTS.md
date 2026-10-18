@@ -53,8 +53,11 @@ claims need the theater host (`docs/RUNTIME_SMOKE_TEST.md`).
   device names, IP addresses, or real home or media paths. Use example values
   (`/Volumes/FixtureDisk`, `/home/alex/Videos`). The history from before the
   public root commit is kept private and is never pushed here
-  (`docs/operations/source-publication.md`). Binary publishing is disabled
-  (same doc). There is no package or deploy artifact yet (`issues.md`).
+  (`docs/operations/source-publication.md`). Upstream copyright lines in
+  `THIRD_PARTY_LICENSES.md` are the one exception to the names and emails
+  rule: licences require them verbatim. Binary publishing is disabled except
+  the macOS 2.0.2 workflow artifact (same doc). There is no Linux package or
+  deploy artifact yet (`issues.md`).
 
 ## Where things are
 
