@@ -95,55 +95,132 @@ jobs:
           exe="${app}/Contents/MacOS/Marquee"
           test -d "${app}"
 
-          # MPVKit's macOS binaries are static archives that are already
-          # linked into the executable. Xcode still embeds each xcframework as
-          # a framework; those archives are dead weight and carry build-machine
-          # temp paths in their member names. Remove them before signing, and
-          # fail on any framework binary that is neither a static archive nor
-          # a dylib, so nothing unexpected ships unchecked.
+          # Xcode embeds every MPVKit xcframework in Contents/Frameworks, but
+          # libmpv and FFmpeg are linked into the executable itself, so the
+          # embedded copies are unused. Their install names are Xcode build
+          # temp paths. Remove every framework that nothing in the bundle
+          # loads, directly or through another kept framework, before signing.
+          exe_dir="$(dirname "${exe}")"
+          rpaths_of() {
+            otool -l "$1" | awk '$1 == "cmd" && $2 == "LC_RPATH" { r = 1; next }
+              r && $1 == "path" { print $2; r = 0 }'
+          }
+          expand() {
+            # $1 path, $2 loader directory
+            case "$1" in
+              @executable_path/*) printf '%s\n' "${exe_dir}/${1#@executable_path/}" ;;
+              @loader_path/*) printf '%s\n' "$2/${1#@loader_path/}" ;;
+              *) printf '%s\n' "$1" ;;
+            esac
+          }
+          is_macho() {
+            # A static archive's otool -L lists object members, not loads.
+            # Check that first: a universal archive also says Mach-O.
+            case "$(file -b "$1")" in
+              *"ar archive"*) return 1 ;;
+              *Mach-O*) return 0 ;;
+              *) return 1 ;;
+            esac
+          }
+          # Every load command of $1 except the file's own install name. A
+          # dylib's otool -L lists its LC_ID_DYLIB first; otool -D names it per
+          # architecture, so drop one matching line per architecture section.
+          loads_of() {
+            ids="$(otool -D "$1" | awk 'NF && $0 !~ /:$/ { print $1 }')"
+            otool -L "$1" | awk -v ids="${ids}" '
+              BEGIN { n = split(ids, a, "\n"); for (i = 1; i <= n; i++) if (a[i] != "") id[a[i]] = 1 }
+              /^[^ \t]/ { delete dropped; next }
+              /^[ \t]/ {
+                if (($1 in id) && !($1 in dropped)) { dropped[$1] = 1; next }
+                print $1
+              }'
+          }
+          # dyld searches the executable's rpaths, relative to the executable,
+          # for every image it loads.
+          exe_rpaths="$(rpaths_of "${exe}" | while IFS= read -r rp; do expand "${rp}" "${exe_dir}"; done)"
+          # Print the bundle file that load $1 of file $2 resolves to; return
+          # 1 when it does not resolve to a file inside the bundle.
+          resolve_in_bundle() {
+            r_dep="$1"
+            r_dir="$(dirname "$2")"
+            case "${r_dep}" in
+              @executable_path/*|@loader_path/*)
+                r_target="$(expand "${r_dep}" "${r_dir}")"
+                if [ -e "${r_target}" ]; then printf '%s\n' "${r_target}"; return 0; fi
+                ;;
+              @rpath/*)
+                r_rpaths="$(printf '%s\n%s\n' "$(rpaths_of "$2")" "${exe_rpaths}" | sort -u)"
+                for r_rp in ${r_rpaths}; do
+                  r_base="$(expand "${r_rp}" "${r_dir}")"
+                  case "${r_base}" in
+                    "${app}"/*)
+                      if [ -e "${r_base}/${r_dep#@rpath/}" ]; then
+                        printf '%s\n' "${r_base}/${r_dep#@rpath/}"
+                        return 0
+                      fi
+                      ;;
+                  esac
+                done
+                ;;
+            esac
+            return 1
+          }
+
+          reach_list="${RUNNER_TEMP}/marquee-loaded-frameworks.txt"
           removed_list="${RUNNER_TEMP}/marquee-removed-frameworks.txt"
+          : > "${reach_list}"
           : > "${removed_list}"
+          # Roots: every Mach-O file that is not inside an embedded framework
+          # (the executable, and any helper or plug-in that could load one).
+          work=()
+          while IFS= read -r -d '' f; do
+            case "${f}" in
+              "${app}"/Contents/Frameworks/*.framework/*) continue ;;
+            esac
+            if is_macho "${f}"; then work+=("${f}"); fi
+          done < <(find "${app}/Contents" -type f -print0)
+          while [ "${#work[@]}" -gt 0 ]; do
+            cur="${work[0]}"
+            work=("${work[@]:1}")
+            for dep in $(loads_of "${cur}"); do
+              target="$(resolve_in_bundle "${dep}" "${cur}")" || continue
+              case "${target}" in
+                */*.framework/*) ;;
+                *) continue ;;
+              esac
+              fwname="${target%%.framework/*}"
+              fwname="${fwname##*/}"
+              fwdir="${app}/Contents/Frameworks/${fwname}.framework"
+              test -d "${fwdir}" || continue
+              grep -qxF "${fwname}" "${reach_list}" && continue
+              case "$(file -b "${target}")" in
+                *"ar archive"*)
+                  echo "${cur} loads ${dep}, which is a static archive" >&2
+                  exit 1
+                  ;;
+              esac
+              echo "keeping framework ${fwname} (loaded by ${cur#"${app}"/})"
+              printf '%s\n' "${fwname}" >> "${reach_list}"
+              while IFS= read -r -d '' f; do
+                if is_macho "${f}"; then work+=("${f}"); fi
+              done < <(find "${fwdir}" -type f -print0)
+            done
+          done
           removed=0
           kept=0
           for fw in "${app}"/Contents/Frameworks/*.framework; do
             test -d "${fw}" || continue
             name="$(basename "${fw}" .framework)"
-            if [ -f "${fw}/Versions/Current/${name}" ]; then
-              bin="${fw}/Versions/Current/${name}"
-            elif [ -f "${fw}/${name}" ]; then
-              bin="${fw}/${name}"
+            if grep -qxF "${name}" "${reach_list}"; then
+              kept=$((kept + 1))
             else
-              echo "no binary found in ${fw}" >&2
-              exit 1
+              echo "removing unloaded framework: ${name}"
+              rm -rf "${fw}"
+              printf '%s\n' "${name}" >> "${removed_list}"
+              removed=$((removed + 1))
             fi
-            probe="${bin}"
-            thin=""
-            case "$(file -b "${bin}")" in
-              *"universal binary"*)
-                thin="$(mktemp)"
-                lipo -thin arm64 "${bin}" -output "${thin}"
-                probe="${thin}"
-                ;;
-            esac
-            kind="$(file -b "${probe}")"
-            if [ -n "${thin}" ]; then rm -f "${thin}"; fi
-            case "${kind}" in
-              *"ar archive"*)
-                echo "removing static framework: ${name}"
-                rm -rf "${fw}"
-                printf '%s\n' "${name}" >> "${removed_list}"
-                removed=$((removed + 1))
-                ;;
-              *Mach-O*"shared library"*)
-                kept=$((kept + 1))
-                ;;
-              *)
-                echo "${bin} is neither a static archive nor a dylib: ${kind}" >&2
-                exit 1
-                ;;
-            esac
           done
-          echo "removed ${removed} static frameworks; ${kept} dylib frameworks left"
+          echo "removed ${removed} unloaded frameworks; ${kept} frameworks kept"
           # Drop the directory if nothing is left in it.
           rmdir "${app}/Contents/Frameworks" 2>/dev/null || true
 
@@ -169,42 +246,20 @@ jobs:
           test "${build_number}" = "${MARQUEE_BUILD}"
 
           # Every Mach-O file in the bundle may load only system libraries or
-          # files that ship inside the bundle. MPVKit's frameworks are static,
-          # so libmpv must be linked into the executable itself.
+          # files that ship inside the bundle. libmpv must be linked into the
+          # executable itself. A dylib's own install name is not a load.
           ls -l "${app}/Contents/Frameworks" || true
           otool -L "${exe}"
-          exe_dir="$(dirname "${exe}")"
-          rpaths_of() {
-            otool -l "$1" | awk '$1 == "cmd" && $2 == "LC_RPATH" { r = 1; next }
-              r && $1 == "path" { print $2; r = 0 }'
-          }
-          expand() {
-            # $1 path, $2 loader directory
-            case "$1" in
-              @executable_path/*) printf '%s\n' "${exe_dir}/${1#@executable_path/}" ;;
-              @loader_path/*) printf '%s\n' "$2/${1#@loader_path/}" ;;
-              *) printf '%s\n' "$1" ;;
-            esac
-          }
           macho_list="$(mktemp)"
-          find "${app}/Contents" -type f -print0 \
-            | while IFS= read -r -d '' f; do
-                # A static archive's otool -L lists object members, not loads.
-                # Check that first: a universal archive also says Mach-O.
-                case "$(file -b "${f}")" in
-                  *"ar archive"*) ;;
-                  *Mach-O*) printf '%s\n' "${f}" ;;
-                esac
-              done > "${macho_list}"
+          while IFS= read -r -d '' f; do
+            if is_macho "${f}"; then printf '%s\n' "${f}"; fi
+          done < <(find "${app}/Contents" -type f -print0) > "${macho_list}"
           test -s "${macho_list}"
-          # dyld searches the executable's rpaths, relative to the executable,
-          # for every image it loads.
-          exe_rpaths="$(rpaths_of "${exe}" | while IFS= read -r rp; do expand "${rp}" "${exe_dir}"; done)"
           bad=0
           while IFS= read -r f; do
             loader_dir="$(dirname "${f}")"
             rpaths="$(printf '%s\n%s\n' "$(rpaths_of "${f}")" "${exe_rpaths}" | sort -u)"
-            deps="$(otool -L "${f}" | awk 'NR > 1 && $0 !~ /:$/ { print $1 }' | sort -u)"
+            deps="$(loads_of "${f}" | sort -u)"
             for dep in ${deps}; do
               case "${dep}" in
                 /usr/lib/*|/System/Library/*) continue ;;
@@ -260,6 +315,25 @@ jobs:
             fi
           done < "${removed_list}"
           test "${bad}" -eq 0
+
+          # No file in the signed app may carry a build-machine temp path.
+          # Print every file that does; this is a finding, not something to
+          # filter out.
+          leak=0
+          for needle in '/private/var/folders/' 'swbuild.tmp'; do
+            rc=0
+            hits="$(grep -rlF -- "${needle}" "${app}")" || rc=$?
+            if [ "${rc}" -gt 1 ]; then
+              echo "grep failed (${rc}) scanning for ${needle}" >&2
+              exit 1
+            fi
+            if [ -n "${hits}" ]; then
+              echo "build-machine path ${needle} found in:" >&2
+              printf '%s\n' "${hits}" >&2
+              leak=1
+            fi
+          done
+          test "${leak}" -eq 0
 
           du -sh "${app}"
 
