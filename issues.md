@@ -375,3 +375,8 @@ Found: investigation of the playbackSurvivesLosingAndRegainingItsRenderSurface f
 Where: `THIRD_PARTY_LICENSES.md`, `Libdovi` section.
 What happens: `Libdovi` is a Rust static library built with `-Zbuild-std`, so it contains the Rust standard library (archive members `std`, `core`, `alloc`, `compiler_builtins`, `hashbrown`, `gimli`, `addr2line`, `miniz_oxide`, `object`, `memchr`, `rustc_demangle` and others). libdovi-build does not record the nightly toolchain it used, so those crates' versions and license texts are not in the file; only the `dolby_vision` crate and its Cargo.lock dependencies are.
 Found: listing the arm64 archive members of `Libdovi.xcframework` from libdovi-build release 3.3.2 while writing `THIRD_PARTY_LICENSES.md`.
+
+## The sidebar stays on screen during playback
+Where: `qml/Main.qml` (the `Player` route loads in `screenLoader`, inside the content column beside `Sidebar`).
+What happens: while a film plays, the navigation sidebar (about 78 px at 1280x800) stays drawn at the left edge and the picture fills only the rest of the window. The released app presents `PlayerView` as a layer over the whole shell, sidebar included (`ContentView.swift:52-62`).
+Found: frames 25-34 s of a Release-build screen recording (`--test-mode --windowed`, 1280x800 headless sway) made for the portfolio site, 2026-10-21.
