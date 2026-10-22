@@ -15,7 +15,15 @@ void PlaybackFullscreen::setWindow(QWindow *window)
     if (m_window == window) {
         return;
     }
+    if (m_window != nullptr) {
+        disconnect(m_window, &QWindow::visibilityChanged, this, nullptr);
+    }
     m_window = window;
+    m_awaitingFullscreen = false;
+    if (m_window != nullptr) {
+        connect(m_window, &QWindow::visibilityChanged, this,
+                &PlaybackFullscreen::onVisibilityChanged);
+    }
     emit windowChanged();
     if (m_active) {
         enter();
@@ -46,10 +54,8 @@ void PlaybackFullscreen::toggle()
     if (m_window == nullptr) {
         return;
     }
-    // Only the viewer's own controls count as a change. A window system
-    // reports the states it passes through (the state before a request is
-    // carried out, a late echo of an earlier one) in an order that differs
-    // between platforms, so the visibility signal cannot tell who asked.
+    // The viewer's own controls are a change however the window system
+    // reports it.
     m_viewerChanged = m_active;
     if (m_window->visibility() == QWindow::FullScreen) {
         m_window->showNormal();
@@ -58,10 +64,27 @@ void PlaybackFullscreen::toggle()
     }
 }
 
+void PlaybackFullscreen::onVisibilityChanged(QWindow::Visibility visibility)
+{
+    if (!m_active) {
+        return;
+    }
+    // The states between our request and the window reporting fullscreen
+    // are ours; once it has, anything further was not asked for here: the
+    // window manager's own fullscreen key, a tiling shortcut, a maximize
+    // button.
+    if (m_awaitingFullscreen) {
+        m_awaitingFullscreen = visibility != QWindow::FullScreen;
+        return;
+    }
+    m_viewerChanged = true;
+}
+
 void PlaybackFullscreen::enter()
 {
     m_viewerChanged = false;
     m_restoreOnLeave = false;
+    m_awaitingFullscreen = false;
     if (m_window == nullptr || m_window->visibility() == QWindow::FullScreen) {
         return;
     }
@@ -69,6 +92,7 @@ void PlaybackFullscreen::enter()
     const QWindow::Visibility before = m_window->visibility();
     m_wasMaximized = before == QWindow::Maximized;
     m_restoreOnLeave = before == QWindow::Windowed || before == QWindow::Maximized;
+    m_awaitingFullscreen = m_restoreOnLeave;
     m_window->showFullScreen();
 }
 
@@ -77,6 +101,7 @@ void PlaybackFullscreen::leave()
     const bool restore = m_restoreOnLeave && !m_viewerChanged;
     m_restoreOnLeave = false;
     m_viewerChanged = false;
+    m_awaitingFullscreen = false;
     if (!restore || m_window == nullptr
         || m_window->visibility() != QWindow::FullScreen) {
         return;

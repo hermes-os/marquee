@@ -12,14 +12,17 @@ intermediate version bump.
   route with the remote on the content, as before.
 - Playback goes fullscreen. Starting a film (a card, Play Something, Continue
   Watching, `--play`) puts the window fullscreen if it is not already; closing
-  the player puts it back to windowed unless you changed fullscreen yourself
-  during playback (the Fullscreen control, F or F11), in which case the window
-  stays as you left it. Moving to the next episode changes nothing. This
-  differs from the released macOS app on purpose.
+  the player puts it back the way it was (windowed or maximized) unless you
+  changed the window yourself during playback (the Fullscreen control, F or
+  F11, or your window manager's own fullscreen or maximize key), in which case
+  the window stays as you left it. Moving to the next episode changes
+  nothing. This differs from the released macOS app on purpose.
 - The mouse pointer hides with the player controls: when they fade out after
   three seconds (or Back hides them) the pointer disappears over the picture,
   and any pointer movement brings it and the controls back, as in the released
-  app. It stays visible over "Still watching?" and the failure card.
+  app. It stays visible over "Still watching?" and the failure card, and a
+  failed player keeps its controls up instead of hiding them after three
+  seconds.
 - The player controls match the released HUD more closely: the bottom bar
   fades from clear to black at 0.8 instead of a flat 0.72 slab, the progress
   bar is the released 4 (7 in lean-back) capsule over a dim track, the slash

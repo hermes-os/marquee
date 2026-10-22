@@ -216,6 +216,46 @@ private slots:
         }
     }
 
+    // A window manager's own fullscreen key (Super+F on Hyprland) changes the
+    // window without going through toggle(); it is the viewer's all the same.
+    void aWindowManagerToggleDuringPlaybackIsLeftAsSet()
+    {
+        {
+            Env env;
+            QVERIFY(load(env, false));
+            QVERIFY(play(env));
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+
+            // Out of fullscreen and back in: the window ends where playback
+            // put it, which is not the state to give back.
+            env.window->showNormal();
+            QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
+            env.window->showFullScreen();
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+            closePlayer(env);
+            QTRY_VERIFY(env.controller.navigation()->route()
+                        != NavigationController::Route::Player);
+            QTest::qWait(300);
+            QCOMPARE(env.window->visibility(), QWindow::FullScreen);
+        }
+        {
+            Env env;
+            QVERIFY(load(env, false));
+            QVERIFY(play(env));
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+
+            // Out of fullscreen to maximized: the viewer's choice, not the
+            // windowed state from before.
+            env.window->showMaximized();
+            QTRY_COMPARE(env.window->visibility(), QWindow::Maximized);
+            closePlayer(env);
+            QTRY_VERIFY(env.controller.navigation()->route()
+                        != NavigationController::Route::Player);
+            QTest::qWait(300);
+            QCOMPARE(env.window->visibility(), QWindow::Maximized);
+        }
+    }
+
     // `--play` opens the player before the window is shown.
     void aPlayStartTakesTheWindowFullscreenToo()
     {
