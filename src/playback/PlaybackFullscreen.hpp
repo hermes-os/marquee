@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QPointer>
+#include <QTimer>
 #include <QWindow>
 #include <QtQml/qqmlregistration.h>
 
@@ -53,8 +54,10 @@ private:
     bool m_viewerChanged{false};
     bool m_restoreOnLeave{false};
     bool m_wasMaximized{false};
-    // Set from our own request for fullscreen until the window reports it:
-    // the states a window system passes through on the way are not the
-    // viewer's.
+    // Set from our own request for fullscreen until the window has been quiet
+    // for kSettleMs: the states a window system passes through on the way
+    // are not the viewer's.
+    static constexpr int kSettleMs = 400;
     bool m_awaitingFullscreen{false};
+    QTimer m_settle;
 };

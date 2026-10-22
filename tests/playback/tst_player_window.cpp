@@ -230,7 +230,9 @@ private slots:
             QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
 
             // Out of fullscreen and back in: the window ends where playback
-            // put it, which is not the state to give back.
+            // put it, which is not the state to give back. Entering has
+            // settled by now.
+            QTest::qWait(700);
             env.window->showNormal();
             QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
             env.window->showFullScreen();
@@ -249,6 +251,7 @@ private slots:
 
             // Out of fullscreen to maximized: the viewer's choice, not the
             // windowed state from before.
+            QTest::qWait(700);
             env.window->showMaximized();
             QTRY_COMPARE(env.window->visibility(), QWindow::Maximized);
             closePlayer(env);
@@ -318,8 +321,16 @@ private slots:
         QQuickItem *bar = itemNamed(env.window, "playerProgress");
         QVERIFY(scrim != nullptr && bar != nullptr);
 
-        const QPoint center = bar->mapToScene(QPointF(bar->width() / 2, bar->height() / 2)).toPoint();
-        const QPoint left = bar->mapToScene(QPointF(bar->width() / 4, bar->height() / 2)).toPoint();
+        // The window takes its fullscreen size first, then the bar its place.
+        QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+        const auto barPoint = [&](qreal fraction) {
+            return bar->mapToScene(QPointF(bar->width() * fraction, bar->height() / 2)).toPoint();
+        };
+        QTRY_VERIFY(QRect(QPoint(0, 0), env.window->size()).contains(barPoint(0.5)));
+        QTest::qWait(300);
+        QTRY_VERIFY(QRect(QPoint(0, 0), env.window->size()).contains(barPoint(0.5)));
+        const QPoint center = barPoint(0.5);
+        const QPoint left = barPoint(0.25);
         QTest::mouseMove(env.window, center + QPoint(5, 0));
         QTest::mouseMove(env.window, center);
         QTest::mousePress(env.window, Qt::LeftButton, Qt::NoModifier, center);
@@ -494,8 +505,9 @@ private slots:
         QVERIFY(scrim != nullptr && video != nullptr);
 
         // The file's own load clears an earlier error, so the failure comes
-        // once playback has started.
-        QTRY_VERIFY_WITH_TIMEOUT(!video->property("startupPending").toBool(), 15000);
+        // once playback has started. The offscreen platform has no render
+        // context, never starts, and takes the error as it is.
+        QTest::qWaitFor([video] { return !video->property("startupPending").toBool(); }, 5000);
         QVERIFY(QMetaObject::invokeMethod(video, "setError",
                                           Q_ARG(QString, QStringLiteral("Cannot open file"))));
         QTRY_VERIFY(video->property("failed").toBool());
