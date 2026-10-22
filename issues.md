@@ -370,3 +370,8 @@ Found: investigation of the playbackSurvivesLosingAndRegainingItsRenderSurface f
 Where: `THIRD_PARTY_LICENSES.md`, `Libdovi` section.
 What happens: `Libdovi` is a Rust static library built with `-Zbuild-std`, so it contains the Rust standard library (archive members `std`, `core`, `alloc`, `compiler_builtins`, `hashbrown`, `gimli`, `addr2line`, `miniz_oxide`, `object`, `memchr`, `rustc_demangle` and others). libdovi-build does not record the nightly toolchain it used, so those crates' versions and license texts are not in the file; only the `dolby_vision` crate and its Cargo.lock dependencies are.
 Found: listing the arm64 archive members of `Libdovi.xcframework` from libdovi-build release 3.3.2 while writing `THIRD_PARTY_LICENSES.md`.
+
+## The player does not keep the screen awake or tell the viewer audio is unavailable
+Where: `src/playback/MpvVideoItem.cpp`, `qml/screens/PlayerScreen.qml`.
+What happens: nothing holds off the idle screen blanker while a film plays (the released app holds a display-sleep assertion while unpaused, `MPVPlayerService.swift:3486-3502`; libmpv's own `stop-screensaver` does nothing without a VO window under the render API). When libmpv cannot open an audio output the film plays silently with no word to the viewer (the released HUD shows a "speaker.slash" badge top right with the notice, `PlayerView.swift:147-157`, `:549-570`, `MPVPlayerService.swift:1697`, `:1711`).
+Found: comparing the HUD with `PlayerControlsOverlay.swift` and `PlayerView.swift`; neither exists in `qml/` or `src/`.

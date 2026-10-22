@@ -20,6 +20,12 @@ intermediate version bump.
   three seconds (or Back hides them) the pointer disappears over the picture,
   and any pointer movement brings it and the controls back, as in the released
   app. It stays visible over "Still watching?" and the failure card.
+- The player controls match the released HUD more closely: the bottom bar
+  fades from clear to black at 0.8 instead of a flat 0.72 slab, the progress
+  bar is the released 4 (7 in lean-back) capsule over a dim track, the slash
+  in the clock is dimmed, the side and bottom margins are the released 24/16
+  (40/28 in lean-back) and the top bar's 20/16 (36/28), and dragging the
+  progress bar keeps the controls up.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the

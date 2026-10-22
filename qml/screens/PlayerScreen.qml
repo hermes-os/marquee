@@ -409,7 +409,7 @@ FocusScope {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        implicitHeight: topColumn.implicitHeight + Theme.outerPadding(root.leanBack)
+        implicitHeight: topColumn.implicitHeight + Theme.scaled(16, 28, root.leanBack)
         height: implicitHeight
         opacity: root.controlsVisible ? 1.0 : 0.0
         visible: opacity > 0
@@ -435,8 +435,9 @@ FocusScope {
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.leftMargin: Theme.outerPadding(root.leanBack)
-            anchors.rightMargin: Theme.outerPadding(root.leanBack)
+            // :189-190: 20 (36 in lean-back) at the sides, 16 (28) above.
+            anchors.leftMargin: Theme.scaled(20, 36, root.leanBack)
+            anchors.rightMargin: Theme.scaled(20, 36, root.leanBack)
             anchors.topMargin: Theme.scaled(16, 28, root.leanBack)
             spacing: Theme.scaled(10, 16, root.leanBack)
 
@@ -487,8 +488,14 @@ FocusScope {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        implicitHeight: controls.implicitHeight + Theme.spacingXXL * 2
-        color: Qt.rgba(0, 0, 0, 0.72)
+        implicitHeight: controls.implicitHeight + Theme.spacingXXL
+            + Theme.scaled(Theme.spacingMD, 28, root.leanBack)
+        // PlayerControlsOverlay.swift:567-575: clear at the top of the
+        // controls, black at 0.8 at the bottom.
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.8) }
+        }
         opacity: root.controlsVisible ? 1.0 : 0.0
         visible: opacity > 0
 
@@ -500,10 +507,16 @@ FocusScope {
             }
         }
 
+        // :250-254: 24 (40 in lean-back) at the sides and 16 (28) below; the
+        // fade above the seek bar is the gradient's own room.
         ColumnLayout {
             id: controls
-            anchors.fill: parent
-            anchors.margins: Theme.outerPadding(root.leanBack)
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: Theme.scaled(Theme.spacingLG, 40, root.leanBack)
+            anchors.rightMargin: Theme.scaled(Theme.spacingLG, 40, root.leanBack)
+            anchors.bottomMargin: Theme.scaled(Theme.spacingMD, 28, root.leanBack)
             spacing: Theme.spacingMD
 
             // PlayerControlsOverlay.swift:273-302: the bar answers a tap or a
@@ -516,12 +529,15 @@ FocusScope {
                 Layout.fillWidth: true
                 implicitHeight: Theme.scaled(24, 38, root.leanBack)
 
+                // :243-262: a capsule 4 (7 in lean-back) high, the tertiary
+                // text colour at 0.3 under the secondary accent's fill.
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
-                    height: Theme.scaled(6, 9, root.leanBack)
+                    height: Theme.scaled(4, 7, root.leanBack)
                     radius: height / 2
-                    color: Theme.surfaceLayer
+                    color: Qt.rgba(Theme.textTertiary.r, Theme.textTertiary.g,
+                                   Theme.textTertiary.b, 0.3)
 
                     Rectangle {
                         objectName: "playerProgressFill"
@@ -656,7 +672,11 @@ FocusScope {
                 // :415-424.
                 Text {
                     objectName: "playerClock"
-                    text: root.formatTime(root.shownPosition) + " / " + root.formatTime(video.duration)
+                    // :415-424: the slash is drawn in the tertiary colour.
+                    textFormat: Text.StyledText
+                    text: root.formatTime(root.shownPosition)
+                        + " <font color=\"" + Theme.textTertiary + "\">/</font> "
+                        + root.formatTime(video.duration)
                     color: Theme.textSecondary
                     font.pixelSize: Theme.scaled(12, 17, root.leanBack)
                     font.weight: Font.Medium
