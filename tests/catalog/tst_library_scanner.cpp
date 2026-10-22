@@ -8,6 +8,9 @@
 #include <QVariant>
 #include <QtTest>
 
+#include <algorithm>
+#include <optional>
+
 #include "app/AppPaths.hpp"
 #include "app/ApplicationController.hpp"
 #include "catalog/CatalogDatabase.hpp"
@@ -306,6 +309,122 @@ private slots:
         for (const MediaItem &item : result.items) {
             QVERIFY(item.modifiedAt.isValid());
         }
+    }
+
+    // The listing names the file but the stat refuses it. The walk stays
+    // Complete, the file is skipped, its siblings are stored and its row from
+    // an earlier scan survives.
+    void aListedMovieThatFailsStatIsSkippedReportedAndItsRowKept()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Heat.1995.mkv")));
+
+        CatalogStore store(catalogPath);
+        const QVector<LibraryRoot> roots = store.registerRoots({library.path()});
+        QCOMPARE(roots.size(), 1);
+        store.applyScan(roots.constFirst(), LibraryScanner::scan(roots.constFirst()));
+        QCOMPARE(store.projection(roots).size(), 2);
+
+        const auto restore = qScopeGuard([] { LibraryScanner::setMediaStatForTest({}); });
+        LibraryScanner::setMediaStatForTest(
+            [](const QFileInfo &listed) -> std::optional<QFileInfo> {
+                if (listed.fileName() == QStringLiteral("Moon.2009.mkv")) {
+                    return std::nullopt;
+                }
+                return QFileInfo(listed.absoluteFilePath());
+            });
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Zodiac.2007.mkv")));
+
+        const LibraryScanner::ScanResult result = LibraryScanner::scan(roots.constFirst());
+
+        QCOMPARE(result.outcome, LibraryScanner::ScanOutcome::Complete);
+        QCOMPARE(relativePathsOf(result.items),
+                 QStringList({QStringLiteral("Heat.1995.mkv"), QStringLiteral("Zodiac.2007.mkv")}));
+        QCOMPARE(result.unreadableIds,
+                 QSet<QString>({LibraryScanner::mediaIdFor(roots.constFirst().id,
+                                                           QStringLiteral("Moon.2009.mkv"))}));
+
+        store.applyScan(roots.constFirst(), result);
+        QCOMPARE(titlesOf(store.projection(roots)),
+                 QStringList({QStringLiteral("Heat"), QStringLiteral("Moon"),
+                              QStringLiteral("Zodiac")}));
+    }
+
+    void aListedEpisodeThatFailsStatIsSkippedReportedAndItsRowKept()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+        const QString first = QStringLiteral("Show (2001)/Season 1/Show - S01E01 - One.mkv");
+        const QString second = QStringLiteral("Show (2001)/Season 1/Show - S01E02 - Two.mkv");
+        QVERIFY(writeMediaFile(library.path(), first));
+        QVERIFY(writeMediaFile(library.path(), second));
+
+        CatalogStore store(catalogPath);
+        const QVector<LibraryRoot> roots = store.registerRoots(
+            LibraryRootPaths{.movies = {}, .tvShows = {library.path()}});
+        QCOMPARE(roots.size(), 1);
+        store.applyScan(roots.constFirst(), LibraryScanner::scan(roots.constFirst()));
+        QCOMPARE(store.projection(roots).size(), 2);
+
+        const auto restore = qScopeGuard([] { LibraryScanner::setMediaStatForTest({}); });
+        LibraryScanner::setMediaStatForTest(
+            [](const QFileInfo &listed) -> std::optional<QFileInfo> {
+                if (listed.fileName().contains(QStringLiteral("S01E01"))) {
+                    return std::nullopt;
+                }
+                return QFileInfo(listed.absoluteFilePath());
+            });
+        QVERIFY(writeMediaFile(library.path(),
+                               QStringLiteral("Show (2001)/Season 1/Show - S01E03 - Three.mkv")));
+
+        const LibraryScanner::ScanResult result = LibraryScanner::scan(roots.constFirst());
+
+        QCOMPARE(result.outcome, LibraryScanner::ScanOutcome::Complete);
+        QCOMPARE(result.items.size(), 2);
+        QCOMPARE(result.items.at(0).episodeNumber, 2);
+        QCOMPARE(result.items.at(1).episodeNumber, 3);
+        QCOMPARE(result.unreadableIds,
+                 QSet<QString>({LibraryScanner::mediaIdFor(roots.constFirst().id, first)}));
+
+        store.applyScan(roots.constFirst(), result);
+        const QVector<MediaItem> after = store.projection(roots);
+        QCOMPARE(after.size(), 3);
+        QVERIFY(std::any_of(after.cbegin(), after.cend(), [](const MediaItem &item) {
+            return item.episodeNumber == 1;
+        }));
+    }
+
+    // A sidecar's presence comes from the listing alone, so a stat failure on
+    // it cannot clear the artwork a stored row already has.
+    void aSidecarIsAdoptedFromTheListingEvenWhenTheStatRefusesIt()
+    {
+        QTemporaryDir library;
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeFile(library.path(), QStringLiteral("Moon.2009-poster.jpg"),
+                          QByteArrayLiteral("art")));
+
+        const auto restore = qScopeGuard([] { LibraryScanner::setMediaStatForTest({}); });
+        LibraryScanner::setMediaStatForTest(
+            [](const QFileInfo &listed) -> std::optional<QFileInfo> {
+                if (listed.suffix() == QStringLiteral("jpg")) {
+                    return std::nullopt;
+                }
+                return QFileInfo(listed.absoluteFilePath());
+            });
+
+        const LibraryScanner::ScanResult result = LibraryScanner::scan(rootAt(library.path()));
+
+        QCOMPARE(result.items.size(), 1);
+        QCOMPARE(result.items.constFirst().posterRelativePath,
+                 QStringLiteral("Moon.2009-poster.jpg"));
     }
 
     void aBrokenSymlinkNamedLikeMediaDoesNotFailTheCatalogWrite()

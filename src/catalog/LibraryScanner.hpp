@@ -5,6 +5,9 @@
 #include <QString>
 #include <QVector>
 
+#include <functional>
+#include <optional>
+
 #include "catalog/LibraryRoot.hpp"
 #include "catalog/MediaItem.hpp"
 
@@ -52,6 +55,12 @@ struct ScanResult
     /// of files that are truly gone.
     QSet<QString> unreadableIds;
 };
+
+/// Replaces the fresh stat the walk makes of each media entry it lists, so a
+/// test can make one listed file fail it. Returning no value marks the entry
+/// unreadable. An empty function restores the real stat.
+using MediaStat = std::function<std::optional<QFileInfo>(const QFileInfo &)>;
+void setMediaStatForTest(MediaStat stat);
 
 [[nodiscard]] bool isSupportedMediaFile(const QFileInfo &file);
 

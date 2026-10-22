@@ -11,6 +11,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <utility>
 
 #include "support/Logging.hpp"
 
@@ -58,12 +59,23 @@ const QStringList &imageExtensions()
     return {};
 }
 
+// Set only by tests, to make a listed media entry fail its stat.
+LibraryScanner::MediaStat &mediaStatOverride()
+{
+    static LibraryScanner::MediaStat override;
+    return override;
+}
+
 /// A listing can name an entry the filesystem then refuses to open or stat (a
 /// name the driver cannot map, a link to nowhere, a file deleted mid-scan).
 /// The listing's own `QFileInfo` may answer from the directory read alone, so
-/// the entry is stat'ed afresh by path.
+/// a media entry is stat'ed afresh by path. Sidecar names are taken from the
+/// listing alone: a stat failure there must not clear a stored artwork path.
 [[nodiscard]] std::optional<QFileInfo> statableFile(const QFileInfo &listed)
 {
+    if (const LibraryScanner::MediaStat &override = mediaStatOverride(); override) {
+        return override(listed);
+    }
     const QFileInfo fresh(listed.absoluteFilePath());
     if (!fresh.exists() || !fresh.isFile()) {
         return std::nullopt;
@@ -73,13 +85,12 @@ const QStringList &imageExtensions()
 
 /// The names a directory's own listing holds, under the walk's containment
 /// rules, so folder artwork is adopted by the same evidence as media files.
-/// A sidecar that cannot be stat'ed is missing, not an error.
 [[nodiscard]] QSet<QString> fileNamesIn(const QString &directoryPath)
 {
     QSet<QString> names;
     const QFileInfoList entries = QDir(directoryPath).entryInfoList(libraryEntryFilters);
     for (const QFileInfo &entry : entries) {
-        if (!entry.isDir() && statableFile(entry)) {
+        if (!entry.isDir()) {
             names.insert(entry.fileName());
         }
     }
@@ -271,7 +282,7 @@ const QVector<QRegularExpression> &episodeExpressions()
     // item.
     QSet<QString> fileNames;
     for (const QFileInfo &entry : entries) {
-        if (!entry.isDir() && statableFile(entry)) {
+        if (!entry.isDir()) {
             fileNames.insert(entry.fileName());
         }
     }
@@ -566,6 +577,11 @@ QString LibraryScanner::mediaIdFor(const QString &rootId, const QString &relativ
 
     return QString::fromLatin1(
         QCryptographicHash::hash(material, QCryptographicHash::Sha256).toHex());
+}
+
+void LibraryScanner::setMediaStatForTest(MediaStat stat)
+{
+    mediaStatOverride() = std::move(stat);
 }
 
 LibraryScanner::ScanResult LibraryScanner::scan(const LibraryRoot &root)
