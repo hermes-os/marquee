@@ -219,6 +219,15 @@ marquee_add_test(tst_player_window
     playback/tst_player_window.cpp
 )
 
+# The title shadow needs the OpenGL scene graph, which the offscreen platform
+# does not provide, so the binary builds the same platform fallback chain as
+# tst_playback and the shell's own QT_QPA_PLATFORM must not reach it. Every
+# other case here runs on whichever platform connects.
+set_tests_properties(tst_player_window PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORMTHEME=none"
+    ENVIRONMENT_MODIFICATION "QT_QPA_PLATFORM=unset:"
+)
+
 marquee_add_test(tst_playback
     playback/tst_playback.cpp
 )

@@ -48,6 +48,23 @@ constexpr auto kFilmRelativePath = "Arrival (2016)/Arrival (2016).mkv";
     file.close();
     return file.error() == QFileDevice::NoError;
 }
+
+/// Qt tries the platforms in QT_QPA_PLATFORM in order and moves on when one
+/// cannot connect, so the chain names every display the session advertises and
+/// leaves connecting to the plugins. Offscreen is last, where the title shadow
+/// case skips, because the shadow needs the OpenGL scene graph.
+QByteArray platformFallbackChain(const QString &waylandDisplay, const QString &x11Display)
+{
+    QByteArrayList platforms;
+    if (!waylandDisplay.isEmpty()) {
+        platforms.append("wayland");
+    }
+    if (!x11Display.isEmpty()) {
+        platforms.append("xcb");
+    }
+    platforms.append("offscreen");
+    return platforms.join(';');
+}
 }
 
 // How the player sits in the window: over the whole of it, fullscreen while
@@ -538,6 +555,14 @@ private slots:
 
 int main(int argc, char *argv[])
 {
+    if (qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM")) {
+        qputenv("QT_QPA_PLATFORM",
+                platformFallbackChain(qEnvironmentVariable("WAYLAND_DISPLAY"),
+                                      qEnvironmentVariable("DISPLAY")));
+    }
+    // The title shadow is a layer effect, drawn only by the OpenGL scene
+    // graph, which the application entry point selects the same way.
+    QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
     QGuiApplication app(argc, argv);
     // The player surface builds a libmpv core, which refuses to start under a
     // locale whose decimal separator is not a dot.

@@ -90,7 +90,9 @@ Change-specific additions:
   platform fallback chain from the live session's display variables and skips
   its render cases when nothing connects. A skip is not a pass and is not render
   proof. The OpenGL branch of `FocusRing` and the libmpv render path are only
-  exercised on a display-backed OpenGL session.
+  exercised on a display-backed OpenGL session. `tst_player_window` builds the
+  same chain so its title-shadow case, which needs the OpenGL scene graph, runs
+  under an X display (xvfb) and skips on a headless offscreen run.
 - Browse fixtures that need a window narrower than the compositor grants skip as
   an unsupported fixture rather than passing. Count skips; do not call a run
   with skips acceptance.
