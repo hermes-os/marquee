@@ -144,6 +144,11 @@ Where: `QCollator` default-constructed in `src/models/PlaySomething.cpp` (`brows
 What happens: a `QCollator` takes the process locale. With no `LANG`, or `LANG=C`, `C.UTF-8` or `POSIX` (a bare ssh session, a service unit), the locale is C and titles collate by code point, not as the released `localizedCaseInsensitiveCompare` does: "\u00C6on Flux" sorts after "Zebra", and "Alien\u00B3" after "Aliens". Movies, Home rows, Shows, Play Something order and Search order differ from the same library under `en_US.UTF-8`. The app does not set a locale of its own.
 Found: `tst_play_something` and `tst_search_session` failed 3 cases under `env -u LANG -u LC_ALL` and passed with `LANG=en_US.UTF-8`; a probe `QCollator` gave Æ after Zebra under C and before it under en_US. The tests now pin en_US; the app was not changed.
 
+## Hardware decoding shows black frames for H.264 on an AMD Radeon HD 6770M
+Where: `src/playback/MpvVideoItem.cpp` (`mpv_set_option_string(core, "hwdec", ...)`, default `hwdec=auto-safe`); `src/settings/SettingsStore.cpp` (default `playback/hardwareDecoding=true`).
+What happens: on an AMD Radeon HD 6770M (TeraScale 2, Mesa r600 VA-API) the default `auto-safe` picks VA-API and decodes H.264 to black frames: sound and clock run, the picture is black. HEVC 10-bit falls back to software on that machine and shows. Setting `[playback] hardwareDecoding=false` works around it.
+Found: standalone mpv on that machine, not the app: a frame from `--hwdec=vaapi-copy` had mean brightness 0, and the same frame from `--hwdec=no` showed the picture.
+
 ## A library scan stats each file more than once
 Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, `folderArtworkIn`).
 What happens: each media file is stat'ed afresh by path once; a season folder
