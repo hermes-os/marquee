@@ -549,6 +549,55 @@ private slots:
                      .filePath(QStringLiteral("Arrival (2016)/Arrival (2016)-poster.jpg")));
     }
 
+    // The Home hero draws a movie's backdrop: its own sidecar first, then the
+    // folder's `fanart`/`backdrop`, stored relatively and projected absolutely.
+    void aMoviesBackdropSidecarIsStoredAndProjected()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+
+        QVERIFY(writeMediaFile(library.path(),
+                               QStringLiteral("Arrival (2016)/Arrival (2016).mkv")));
+        QVERIFY(writeFile(library.path(), QStringLiteral("Arrival (2016)/fanart.jpg"),
+                          QByteArrayLiteral("art")));
+        QVERIFY(writeFile(library.path(),
+                          QStringLiteral("Arrival (2016)/Arrival (2016)-backdrop.jpg"),
+                          QByteArrayLiteral("art")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Heat (1995)/Heat (1995).mkv")));
+        QVERIFY(writeFile(library.path(), QStringLiteral("Heat (1995)/backdrop.png"),
+                          QByteArrayLiteral("art")));
+
+        CatalogStore store(catalogPath);
+        const QVector<MediaItem> items = refresh(store, {library.path()});
+        QCOMPARE(items.size(), 3);
+        QHash<QString, MediaItem> byTitle;
+        for (const MediaItem &item : items) {
+            byTitle.insert(item.title, item);
+        }
+        // The file's own sidecar wins over the folder's.
+        QCOMPARE(byTitle.value(QStringLiteral("Arrival")).backdropRelativePath,
+                 QStringLiteral("Arrival (2016)/Arrival (2016)-backdrop.jpg"));
+        QCOMPARE(byTitle.value(QStringLiteral("Arrival")).backdropAbsolutePath,
+                 QDir(library.path())
+                     .filePath(QStringLiteral("Arrival (2016)/Arrival (2016)-backdrop.jpg")));
+        QCOMPARE(byTitle.value(QStringLiteral("Heat")).backdropRelativePath,
+                 QStringLiteral("Heat (1995)/backdrop.png"));
+        QVERIFY(byTitle.value(QStringLiteral("Moon")).backdropAbsolutePath.isEmpty());
+
+        // A backdrop added later reaches the next projection.
+        QVERIFY(writeFile(library.path(), QStringLiteral("Moon.2009-fanart.jpg"),
+                          QByteArrayLiteral("art")));
+        for (const MediaItem &item : refresh(store, {library.path()})) {
+            if (item.title == QStringLiteral("Moon")) {
+                QCOMPARE(item.backdropRelativePath, QStringLiteral("Moon.2009-fanart.jpg"));
+            }
+        }
+    }
+
     void folderArtworkCoversItsOwnDirectoryOnly()
     {
         QTemporaryDir library;

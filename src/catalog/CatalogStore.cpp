@@ -34,6 +34,7 @@ struct ItemFingerprint
     QString sortTitle;
     int year{0};
     QString posterRelativePath;
+    QString backdropRelativePath;
     qint64 fileSize{0};
     QString modifiedAt;
     QString showName;
@@ -55,6 +56,7 @@ struct ItemFingerprint
             .sortTitle = item.sortTitle,
             .year = item.year,
             .posterRelativePath = item.posterRelativePath,
+            .backdropRelativePath = item.backdropRelativePath,
             .fileSize = item.fileSize,
             .modifiedAt = formatTimestamp(item.modifiedAt),
             .showName = item.showName,
@@ -176,7 +178,8 @@ void executeOrThrow(QSqlDatabase &database, const QString &sql)
         QStringLiteral("SELECT id, media_kind, title, sort_title, year, poster_path, "
                        "file_size, modified_at, show_name, season_number, "
                        "episode_number, episode_title, show_poster_path, "
-                       "show_backdrop_path, season_poster_path, episode_still_path "
+                       "show_backdrop_path, season_poster_path, episode_still_path, "
+                       "backdrop_path "
                        "FROM media_items WHERE library_root_id = ?"));
     query.addBindValue(rootId);
     executeOrThrow(query);
@@ -189,6 +192,7 @@ void executeOrThrow(QSqlDatabase &database, const QString &sql)
                              .sortTitle = query.value(3).toString(),
                              .year = query.value(4).toInt(),
                              .posterRelativePath = query.value(5).toString(),
+                             .backdropRelativePath = query.value(16).toString(),
                              .fileSize = query.value(6).toLongLong(),
                              .modifiedAt = query.value(7).toString(),
                              .showName = query.value(8).toString(),
@@ -225,9 +229,9 @@ void insertItem(QSqlDatabase &database, const MediaItem &item, const QString &no
                        "modified_at, discovered_at, updated_at, show_name, "
                        "season_number, episode_number, episode_title, "
                        "show_poster_path, show_backdrop_path, season_poster_path, "
-                       "episode_still_path) "
+                       "episode_still_path, backdrop_path) "
                        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, "
-                       "?, ?, ?, ?, ?, ?, ?, ?)"));
+                       "?, ?, ?, ?, ?, ?, ?, ?, ?)"));
     query.addBindValue(item.id);
     query.addBindValue(item.libraryRootId);
     query.addBindValue(item.relativePath);
@@ -248,6 +252,7 @@ void insertItem(QSqlDatabase &database, const MediaItem &item, const QString &no
     query.addBindValue(optionalText(item.showBackdropRelativePath));
     query.addBindValue(optionalText(item.seasonPosterRelativePath));
     query.addBindValue(optionalText(item.episodeStillRelativePath));
+    query.addBindValue(optionalText(item.backdropRelativePath));
     executeOrThrow(query);
 }
 
@@ -260,7 +265,8 @@ void updateItem(QSqlDatabase &database, const MediaItem &item, const QString &no
                        "modified_at = ?, updated_at = ?, show_name = ?, "
                        "season_number = ?, episode_number = ?, episode_title = ?, "
                        "show_poster_path = ?, show_backdrop_path = ?, "
-                       "season_poster_path = ?, episode_still_path = ? "
+                       "season_poster_path = ?, episode_still_path = ?, "
+                       "backdrop_path = ? "
                        "WHERE id = ?"));
     query.addBindValue(item.mediaKind);
     query.addBindValue(item.title);
@@ -278,6 +284,7 @@ void updateItem(QSqlDatabase &database, const MediaItem &item, const QString &no
     query.addBindValue(optionalText(item.showBackdropRelativePath));
     query.addBindValue(optionalText(item.seasonPosterRelativePath));
     query.addBindValue(optionalText(item.episodeStillRelativePath));
+    query.addBindValue(optionalText(item.backdropRelativePath));
     query.addBindValue(item.id);
     executeOrThrow(query);
 }
@@ -378,7 +385,8 @@ QVector<MediaItem> CatalogStore::projection(const QVector<LibraryRoot> &roots,
                        "COALESCE(w.duration_ms, 0), COALESCE(w.completed, 0), "
                        "m.show_name, m.season_number, m.episode_number, "
                        "m.episode_title, m.show_poster_path, m.show_backdrop_path, "
-                       "m.season_poster_path, m.episode_still_path, w.updated_at "
+                       "m.season_poster_path, m.episode_still_path, w.updated_at, "
+                       "m.backdrop_path "
                        "FROM media_items m "
                        "LEFT JOIN watch_progress w ON w.media_id = m.id "
                        "AND w.profile_id = ? "
@@ -405,6 +413,7 @@ QVector<MediaItem> CatalogStore::projection(const QVector<LibraryRoot> &roots,
         const QString showBackdropRelativePath = query.value(18).toString();
         const QString seasonPosterRelativePath = query.value(19).toString();
         const QString episodeStillRelativePath = query.value(20).toString();
+        const QString backdropRelativePath = query.value(22).toString();
         items.push_back(MediaItem{
             .id = query.value(0).toString(),
             .libraryRootId = rootId,
@@ -423,6 +432,8 @@ QVector<MediaItem> CatalogStore::projection(const QVector<LibraryRoot> &roots,
             .posterAbsolutePath = posterRelativePath.isEmpty()
                 ? QString()
                 : rootDirectory.filePath(posterRelativePath),
+            .backdropRelativePath = backdropRelativePath,
+            .backdropAbsolutePath = absoluteOrEmpty(backdropRelativePath),
             .fileSize = query.value(8).toLongLong(),
             .modifiedAt = parseTimestamp(query.value(9).toString()),
             .resumePositionMs = query.value(10).toLongLong(),

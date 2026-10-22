@@ -59,6 +59,30 @@ const QStringList &imageExtensions()
     return {};
 }
 
+/// The movie's backdrop, matched the way posters are: the sidecar named after
+/// the media file, then the artwork the whole folder shares
+/// (`fanart`/`backdrop`, as the released scanner names them,
+/// CatalogContentPolicy.swift:123-136, in the extensions v3 reads for posters).
+[[nodiscard]] QString backdropNameFor(const QString &stem, const QSet<QString> &fileNames)
+{
+    const QStringList candidates{stem + QStringLiteral("-backdrop.jpg"),
+                                 stem + QStringLiteral("-backdrop.png"),
+                                 stem + QStringLiteral("-fanart.jpg"),
+                                 stem + QStringLiteral("-fanart.png"),
+                                 QStringLiteral("fanart.jpg"),
+                                 QStringLiteral("backdrop.jpg"),
+                                 QStringLiteral("fanart.png"),
+                                 QStringLiteral("backdrop.png")};
+
+    for (const QString &candidate : candidates) {
+        if (fileNames.contains(candidate)) {
+            return candidate;
+        }
+    }
+
+    return {};
+}
+
 // Set only by tests, to make a listed media entry fail its stat. A plain
 // static: set it only while no catalog worker is scanning.
 LibraryScanner::MediaStat &mediaStatOverride()
@@ -334,6 +358,9 @@ const QVector<QRegularExpression> &episodeExpressions()
         const QString posterName = posterNameFor(entry.completeBaseName(), fileNames);
         const QString posterPath =
             posterName.isEmpty() ? QString() : entry.absoluteDir().filePath(posterName);
+        const QString backdropName = backdropNameFor(entry.completeBaseName(), fileNames);
+        const QString backdropPath =
+            backdropName.isEmpty() ? QString() : entry.absoluteDir().filePath(backdropName);
 
         if (root.role == LibraryRoot::Role::TvShows) {
             if (seasonNumber == 0) {
@@ -426,6 +453,10 @@ const QVector<QRegularExpression> &episodeExpressions()
                 posterPath.isEmpty() ? QString()
                                      : rootDirectory.relativeFilePath(posterPath),
             .posterAbsolutePath = posterPath,
+            .backdropRelativePath =
+                backdropPath.isEmpty() ? QString()
+                                       : rootDirectory.relativeFilePath(backdropPath),
+            .backdropAbsolutePath = backdropPath,
             .fileSize = movieFile->size(),
             .modifiedAt = movieModifiedAt,
             // Movies store NULL in every episode column, so the projection's
