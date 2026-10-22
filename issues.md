@@ -137,10 +137,21 @@ to movies before `replaceItems`.
 ## A partially readable library root is only logged
 Where: `src/catalog/CatalogStore.cpp` (`applyScan`, `Incomplete`),
 `src/catalog/CatalogWorker.cpp`.
-What happens: when part of a root cannot be read, or a file in it cannot be
-stat'ed, what did scan is stored, its existing rows are kept, and a warning goes
-to the log. The viewer is told nothing, unlike an unavailable root.
+What happens: when a folder in a root cannot be read, what did scan is stored,
+its existing rows are kept and no row is removed, and a warning goes to the log.
+A file that is listed but cannot be stat'ed is skipped and logged the same way,
+but keeps its row and does not stop the removal of deleted files. The viewer is
+told nothing in either case, unlike an unavailable root.
 Found: source read at 81c8fa8.
+
+## A library scan stats each file more than once
+Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, `folderArtworkIn`).
+What happens: each media file is stat'ed afresh by path once; a season folder
+also re-lists its own and its show folder's directory for artwork, so the show
+folder's files are listed again for every season. The cost is linear and mostly
+served from the kernel cache, but on a network mount a large library pays for
+the extra round trips.
+Found: review of aa0533e.
 
 ## A moved library is treated as a new library
 Where: `src/catalog/CatalogStore.*` (root identity keyed on the configured path),
