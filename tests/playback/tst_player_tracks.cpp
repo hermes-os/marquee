@@ -937,6 +937,28 @@ private slots:
         QCOMPARE(video.position(), 30.0);
     }
 
+    // The hand-delivered twin of the case above for a bar click or Restart:
+    // seekAbsolute ends the settle, so the report at its target is taken and
+    // not dropped for being far from the old landing.
+    void anAbsoluteSeekRightAfterAKeyframeLandingReadsTheNewPosition()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        video.beginScrub();
+        video.previewScrub(40.0);
+        QVERIFY(video.finishScrub(40.0));
+        QCOMPARE(video.position(), 40.0);
+        QVERIFY(video.seekAbsolute(60.0));
+
+        double reported = 60.0;
+        mpv_event_property property{"time-pos", MPV_FORMAT_DOUBLE, &reported};
+        mpv_event event{};
+        event.event_id = MPV_EVENT_PROPERTY_CHANGE;
+        event.data = &property;
+        QVERIFY(QMetaObject::invokeMethod(&video, "applyEvent", Q_ARG(mpv_event *, &event)));
+        QCOMPARE(video.position(), 60.0);
+    }
+
     // A Left hold clamped at 0 on a playing film: the exact seek lands where
     // libmpv already is, so no position report marks the landing and only its
     // restart does. The clock must follow playback well before the 1.5 s
@@ -961,7 +983,9 @@ private slots:
 
     // The landing's restart is the only sign a landing where libmpv already
     // is has run, so it ends the settle: a position far from the landing
-    // delivered after it is taken, not dropped until the watchdog.
+    // delivered after it is taken, not dropped until the watchdog. The
+    // restart and the command reply come from real libmpv; only the `time-pos`
+    // report is delivered by hand.
     void theRestartOfALandingWithNoPositionChangeEndsTheSettle()
     {
         MpvVideoItem video;

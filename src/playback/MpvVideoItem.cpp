@@ -697,11 +697,14 @@ void MpvVideoItem::handlePlaybackRestartEvent()
         // The quiet fallback for a landing where libmpv already is (a hold
         // clamped at 0): it sends no position report, so the restart that
         // follows the landing's own command reply is the only sign the seek
-        // ran. The 0.25 s window stays the main rule, because the first
-        // restart after the reply can still be a preview's.
+        // ran. libmpv posts command replies and PLAYBACK_RESTART in order from
+        // one thread, so the acknowledgement plus the skip counter (one
+        // restart for a preview still in flight when the settle began) order
+        // the fallback. The 0.25 s window stays the main rule for a landing
+        // that does move.
         if (m_settleRestartsToSkip > 0) {
             --m_settleRestartsToSkip;
-        } else if (m_settleAcknowledged && qAbs(m_position - m_settleLanding) < 1e-6) {
+        } else if (m_settleAcknowledged) {
             endSettle();
         }
         return;

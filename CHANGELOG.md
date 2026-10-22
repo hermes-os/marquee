@@ -62,8 +62,7 @@ intermediate version bump.
   progress-bar click or Restart in the moment after a release moves the clock
   to where it goes (it stayed on the old landing, for good while paused, when
   the release landed where the film already was, for example a Left hold
-  clamped at 0), and a playing film's clock follows it at once after such a
-  release instead of after a second and a half.
+  clamped at 0).
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the
