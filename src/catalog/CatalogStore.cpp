@@ -204,7 +204,10 @@ void executeOrThrow(QSqlDatabase &database, const QString &sql)
 }
 
 // Every NOT NULL media_items column. A null QString or an invalid QDateTime
-// binds NULL, which would fail the insert and roll back the whole root.
+// binds NULL, which would fail the insert and roll back the whole root. The
+// scanner already skips such files, so this is a backstop for a scanner bug: an
+// item it catches is dropped alone and logged, and the root is not reported
+// partial.
 [[nodiscard]] bool hasRequiredColumns(const MediaItem &item)
 {
     return !item.id.isEmpty() && !item.libraryRootId.isEmpty()
