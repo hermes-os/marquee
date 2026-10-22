@@ -159,6 +159,10 @@ public:
     using PlayableFileCheck = std::function<bool(const QString &)>;
     void setPlayableFileCheckForTest(PlayableFileCheck check);
 
+    /// The catalog worker, so a test can raise the signals it answers with
+    /// while a request is held on its thread.
+    [[nodiscard]] CatalogWorker *catalogWorkerForTest() const;
+
     /// Shows the details of the catalog item carrying `mediaId`. Browse
     /// surfaces activate a title by identity, so a projection replaced under
     /// them cannot make an activation open the wrong title.

@@ -270,11 +270,23 @@ void ApplicationController::startCatalogWorker()
     connect(worker, &CatalogWorker::projectionReady, this,
             [this] { finishCatalogRefresh(); });
     connect(worker, &CatalogWorker::scanFailed, this, [this](const QString &message) {
-        // A reload that failed brings no projection to restart Home for.
-        m_homeRestartPending = false;
         finishCatalogRefresh();
         raiseError(QStringLiteral("Library scan"), message);
     });
+    // A reload that fails brings no projection to restart
+    // Home for. Only the active profile's reload disarms it: a scan failing
+    // while the reload waits behind it, or the reload of a profile already
+    // left, says nothing about the one still to land.
+    const auto reloadEnded = [this](const QString &profileId) {
+        if (profileId == activeProfileId()) {
+            m_homeRestartPending = false;
+        }
+    };
+    connect(worker, &CatalogWorker::projectionReloadFailed, this,
+            [this, reloadEnded](const QString &message, const QString &profileId) {
+                reloadEnded(profileId);
+                raiseError(QStringLiteral("Library scan"), message);
+            });
     connect(worker, &CatalogWorker::rootsUnavailable, this,
             [this](const QStringList &paths, const QStringList &rootIds) {
                 m_unavailableRootIds = QSet<QString>(rootIds.cbegin(), rootIds.cend());
@@ -379,6 +391,11 @@ std::optional<MediaItem> ApplicationController::catalogItem(const QString &media
         m_projection.cbegin(), m_projection.cend(),
         [&mediaId](const MediaItem &item) { return item.id == mediaId; });
     return match == m_projection.cend() ? std::nullopt : std::optional<MediaItem>(*match);
+}
+
+CatalogWorker *ApplicationController::catalogWorkerForTest() const
+{
+    return m_catalogWorker;
 }
 
 void ApplicationController::requestCatalogRefresh()

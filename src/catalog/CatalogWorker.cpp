@@ -84,7 +84,7 @@ void CatalogWorker::reloadProjection(const QString &profileId)
         m_store.reset();
         const QString message = QString::fromStdString(error.what());
         qCWarning(logCatalog) << "projection not reloaded:" << message;
-        emit scanFailed(message);
+        emit projectionReloadFailed(message, profileId);
     }
 }
 

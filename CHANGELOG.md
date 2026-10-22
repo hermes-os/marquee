@@ -48,6 +48,10 @@ intermediate version bump.
   above no longer hands the rows below it another row's column. Before, the
   repair moved twice and forgot every row's column, and the columns followed
   row positions, so the next Down could land on the wrong column.
+- A library scan that fails while the new profile's progress is still loading
+  no longer cancels Home's return to its top card: only the failure of that
+  load itself does. Before, the unrelated failure left the first card the
+  remote had been on, now one row lower.
 - Choosing a different profile now lands the remote on Home's top card even
   when that profile has progress. Before, a Continue Watching row that arrived
   above the rows after the choice left the remote on the card it had been on,
