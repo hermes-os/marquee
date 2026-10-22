@@ -219,6 +219,24 @@ private slots:
         QCOMPARE(tmdb::bestMatch(results({{6, QStringLiteral("Star Trek Voyager")}}),
                                  QStringLiteral("Star Trek The Original Series"), QStringLiteral("name")),
                  std::optional<int>());
+        // A short title inside the query, not at its start, is another film.
+        const QJsonArray shortTitles{
+            QJsonObject{{"id", 1}, {"title", "Us"}, {"release_date", "2019-03-14"}},
+            QJsonObject{{"id", 2}, {"title", "Home"}, {"release_date", "2015-03-26"}},
+            QJsonObject{{"id", 3}, {"title", "It"}, {"release_date", "2017-09-06"}}};
+        QCOMPARE(tmdb::bestMatch(shortTitles, QStringLiteral("Between Us Girls"),
+                                 QStringLiteral("title"), QStringLiteral("release_date"), 2019),
+                 std::optional<int>());
+        QCOMPARE(tmdb::bestMatch(shortTitles, QStringLiteral("Home Alone Again"),
+                                 QStringLiteral("title"), QStringLiteral("release_date"), 2017),
+                 std::optional<int>());
+        QCOMPARE(tmdb::bestMatch(shortTitles, QStringLiteral("Sleep It Off"),
+                                 QStringLiteral("title"), QStringLiteral("release_date"), 2017),
+                 std::optional<int>());
+        // At the start of the query it is still the film.
+        QCOMPARE(tmdb::bestMatch(shortTitles, QStringLiteral("Us Again"),
+                                 QStringLiteral("title"), QStringLiteral("release_date"), 2019),
+                 std::optional<int>(1));
         // An equal title still wins over the subset one.
         const QJsonArray both{
             QJsonObject{{"id", 253}, {"name", "Star Trek"}, {"first_air_date", "1966-09-08"}},

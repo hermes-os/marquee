@@ -80,7 +80,7 @@ public:
     /// The version of the rules that match a file to a TMDB title (title and
     /// year parse, normalization, ranking). Raise it when they change: rows
     /// written by an older version are matched again on the next run.
-    static constexpr int matcherVersion = 2;
+    static constexpr int matcherVersion = 3;
 
     static constexpr int unmatchedRetryDays = 7;
     static constexpr int failedRetryDays = 1;

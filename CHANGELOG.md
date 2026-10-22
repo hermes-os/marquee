@@ -22,6 +22,9 @@ intermediate version bump.
   title when TMDB lists the show in the folder's year: "Star Trek The Original
   Series (1966)" and "The Office US (2005)". Titles are checked once more, in
   the background, after the update.
+- A short film title inside a folder name is no longer taken for the film: "Us"
+  (2019) is not "Between Us Girls (2019)". Only a title the name begins with
+  matches this way. Titles are checked once more, in the background.
 - Movie titles keep the dots of initials in a `Title (YYYY)` name, as the
   released app does: "E.T. the Extra-Terrestrial" and "L.A. Confidential" are
   no longer shown as "E T the Extra-Terrestrial" and "L A Confidential". A
