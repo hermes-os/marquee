@@ -1,0 +1,28 @@
+{
+  "id": 4,
+  "season_number": 1,
+  "episodes": [
+    {
+      "id": 91011,
+      "episode_number": 1,
+      "name": "Arrivals",
+      "overview": "The first ferry.",
+      "air_date": "2015-03-02",
+      "vote_average": 7.9,
+      "still_path": "/e1.jpg"
+    },
+    {
+      "id": 91012,
+      "episode_number": 2,
+      "name": "Fog",
+      "overview": null,
+      "air_date": "2015-03-09",
+      "vote_average": 8.2,
+      "still_path": null
+    },
+    {
+      "episode_number": 3,
+      "overview": "nameless"
+    }
+  ]
+}

@@ -12,6 +12,21 @@ intermediate version bump.
   remembered stop is back on Home instead of the profile control, as in the
   released app. Before, the remote went to the collapsed sidebar still resting
   on the profile control, so every Return reopened the picker.
+- Online metadata (TMDB) is fetched and stored. With a TMDB v3 key in the
+  `MARQUEE_TMDB_API_KEY` environment variable, or in a one-line `tmdb-api-key`
+  file next to `marquee.ini`, Marquee fetches each title's overview, genres,
+  cast, director, certification, rating, votes, popularity, collection and
+  keywords (and each episode's title, summary and still) in the background after
+  a scan, one title at a time and never on the interface thread. Posters,
+  backdrops and stills that your folders do not have are saved in Marquee's
+  cache folder; artwork in your folders always wins and nothing is ever written
+  into a library folder. A title that was fetched is not asked again, a run cut
+  short resumes after a restart, and with no network, no key or the switch off
+  the app works exactly as before. The Online Metadata switch in Settings now
+  does this, starts on for new installs, and says "No TMDB key" when there is
+  none; the key is never logged or shown. Nothing on screen uses the new data
+  yet: rows and Details sections come in later changes. The catalog is migrated
+  to schema 6 on first start; titles and watch progress are kept.
 - A few unreadable files no longer empty the whole library. A file the drive
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the

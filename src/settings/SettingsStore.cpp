@@ -6,6 +6,8 @@
 #include <algorithm>
 
 #include "app/AppPaths.hpp"
+#include "metadata/MetadataSwitch.hpp"
+#include "metadata/TmdbApiKey.hpp"
 
 namespace
 {
@@ -70,8 +72,9 @@ SettingsStore::SettingsStore(QObject *parent)
             QStringLiteral("ui/leanBackMode"), true).toBool();
         m_interfaceSounds = settings.value(
             QStringLiteral("audio/interfaceSounds"), true).toBool();
+        // UserSettings.swift:182 seeds a fresh install with the switch on.
         m_onlineMetadataEnabled = settings.value(
-            QStringLiteral("metadata/onlineEnabled"), false).toBool();
+            QStringLiteral("metadata/onlineEnabled"), true).toBool();
         m_hardwareDecodingEnabled = settings.value(
             QStringLiteral("playback/hardwareDecoding"), true).toBool();
         m_autoPlayNextEpisode = settings.value(
@@ -94,6 +97,8 @@ SettingsStore::SettingsStore(QObject *parent)
     } catch (const std::exception &error) {
         setStorageError(QString::fromStdString(error.what()));
     }
+    m_tmdbKeyPresent = !tmdb_key::load().isEmpty();
+    metadata_switch::setEnabled(m_onlineMetadataEnabled);
 }
 
 QStringList SettingsStore::libraryRoots() const
@@ -205,7 +210,46 @@ void SettingsStore::setOnlineMetadataEnabled(bool value)
     }
     m_onlineMetadataEnabled = value;
     writeValue(QStringLiteral("metadata/onlineEnabled"), value);
+    // Publishing first lets a run in progress see the change before its next
+    // request; turning it on starts a run that fills in what is missing.
+    metadata_switch::setEnabled(value);
     emit onlineMetadataEnabledChanged();
+    emit onlineMetadataNoteChanged();
+    if (value) {
+        recheckTmdbKey();
+    }
+}
+
+bool SettingsStore::tmdbKeyPresent() const
+{
+    return m_tmdbKeyPresent;
+}
+
+QString SettingsStore::onlineMetadataNote() const
+{
+    if (!m_onlineMetadataEnabled) {
+        return QStringLiteral("Off. Marquee shows only what is in your folders and sends "
+                              "nothing to TMDB.");
+    }
+    if (!m_tmdbKeyPresent) {
+        return QStringLiteral("No TMDB key, so nothing is fetched. Put a TMDB v3 API key in "
+                              "the MARQUEE_TMDB_API_KEY environment variable, or in a file "
+                              "named tmdb-api-key next to marquee.ini.");
+    }
+    return QStringLiteral("After each scan, fetch TMDB details (overview, cast, rating, "
+                          "genres) and fill missing artwork into the app cache. Artwork in "
+                          "your folders always wins.");
+}
+
+void SettingsStore::recheckTmdbKey()
+{
+    const bool present = !tmdb_key::load().isEmpty();
+    if (present == m_tmdbKeyPresent) {
+        return;
+    }
+    m_tmdbKeyPresent = present;
+    emit tmdbKeyPresentChanged();
+    emit onlineMetadataNoteChanged();
 }
 
 void SettingsStore::setStorageError(const QString &message)

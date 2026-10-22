@@ -475,7 +475,7 @@ FocusScope {
                         objectName: "onlineMetadataRow"
                         width: parent.width - 40
                         title: qsTr("Online Metadata")
-                        subtitle: qsTr("Fetch TMDB details and artwork during library scans.")
+                        subtitle: root.settings.onlineMetadataNote
                         checked: root.settings.onlineMetadataEnabled
                         focused: root.isFocused("switch", "onlineMetadataEnabled")
                         onToggled: value => root.settings.onlineMetadataEnabled = value

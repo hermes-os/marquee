@@ -4,6 +4,11 @@
 #include <QMetaType>
 #include <QString>
 
+#include <memory>
+#include <optional>
+
+#include "catalog/TitleMetadata.hpp"
+
 /// One playable library entry. The catalog projects these as plain values so a
 /// projection can cross the catalog worker's thread boundary by copy.
 ///
@@ -65,6 +70,25 @@ struct MediaItem
     // Home orders Continue Watching and Recently Watched by it.
     QDateTime lastPlayedAt{};
 
+    // What TMDB said about the title (MediaItem.swift's `metadata`), or null
+    // while the title has none: online metadata is off, no key exists, TMDB
+    // has not been asked yet, or it found no match. An episode carries its
+    // show's metadata, as CatalogProjection.makeShowMetadata does; the
+    // episodes of one show share the one value.
+    std::shared_ptr<const TitleMetadata> metadata{};
+    // TMDB artwork cached under the app's cache directory, empty when there is
+    // none. A local sidecar above always wins; these only fill its absence
+    // (MediaItem.swift:195-218 `thumbPosterPath`, `thumbBackdropPath`).
+    QString tmdbPosterAbsolutePath{};
+    QString tmdbBackdropAbsolutePath{};
+    // The episode's own TMDB facts (CatalogEpisode): its title when the file
+    // name gave none, summary, air date, rating and cached still.
+    QString tmdbEpisodeTitle{};
+    QString episodeOverview{};
+    QString episodeAirDate{};
+    std::optional<double> episodeVoteAverage{};
+    QString tmdbEpisodeStillAbsolutePath{};
+
     [[nodiscard]] bool isEpisode() const { return !showName.isEmpty(); }
     [[nodiscard]] bool isMovie() const { return showName.isEmpty(); }
 
@@ -77,19 +101,44 @@ struct MediaItem
         return QStringLiteral("S%1 E%2").arg(seasonNumber).arg(episodeNumber);
     }
 
-    // MediaItem.swift:246-248.
+    // MediaItem.swift:246-248. TMDB's title for the episode is `tmdbEpisodeTitle`;
+    // the label stays the file's own until the Details task chooses to use it.
     [[nodiscard]] QString displayEpisodeTitle() const
     {
         return episodeTitle.isEmpty() ? QStringLiteral("Episode %1").arg(episodeNumber)
                                       : episodeTitle;
     }
 
-    // MediaItem.swift:270-272: the poster a show card shows; the show folder
-    // wins, then the season folder. No TMDB fallback exists here.
+    // MediaItem.swift:195-199, :270-272: the poster a show card shows; the
+    // show folder wins, then the season folder, and the cached TMDB poster only
+    // when the folders have none.
     [[nodiscard]] QString gridShowPosterPath() const
     {
-        return showPosterAbsolutePath.isEmpty() ? seasonPosterAbsolutePath
-                                                : showPosterAbsolutePath;
+        if (!showPosterAbsolutePath.isEmpty()) {
+            return showPosterAbsolutePath;
+        }
+        return seasonPosterAbsolutePath.isEmpty() ? tmdbPosterAbsolutePath
+                                                  : seasonPosterAbsolutePath;
+    }
+
+    // MediaItem.swift:195-218: the poster this title draws. A local sidecar
+    // always wins (the show folder's, then the season folder's, for an
+    // episode); the cached TMDB image only fills its absence.
+    [[nodiscard]] QString displayPosterPath() const
+    {
+        if (isEpisode()) {
+            return gridShowPosterPath();
+        }
+        return posterAbsolutePath.isEmpty() ? tmdbPosterAbsolutePath : posterAbsolutePath;
+    }
+
+    // MediaItem.swift:202-208: the backdrop, the show folder's sidecar first.
+    // The scanner reads no movie backdrop sidecar yet (issues.md), so a movie's
+    // backdrop is TMDB's.
+    [[nodiscard]] QString displayBackdropPath() const
+    {
+        return isEpisode() && !showBackdropAbsolutePath.isEmpty() ? showBackdropAbsolutePath
+                                                                  : tmdbBackdropAbsolutePath;
     }
 
     // MediaItem.swift:228-229.

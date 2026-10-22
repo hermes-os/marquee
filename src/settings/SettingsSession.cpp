@@ -254,7 +254,10 @@ void SettingsSession::rescanLibrary()
         m_scanStatusText = QStringLiteral("Finishing current scan, then checking updates...");
     } else {
         m_hasQueuedScan = false;
+        // Metadata is only part of the scan when it can actually be fetched.
+        m_application.settings()->recheckTmdbKey();
         m_scanStatusText = m_application.settings()->onlineMetadataEnabled()
+                && m_application.settings()->tmdbKeyPresent()
             ? QStringLiteral("Refreshing library and metadata...")
             : QStringLiteral("Updating library index...");
     }

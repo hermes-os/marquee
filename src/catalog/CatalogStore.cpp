@@ -446,7 +446,13 @@ QVector<MediaItem> CatalogStore::projection(const QVector<LibraryRoot> &roots,
                 : parseTimestamp(query.value(21).toString())});
     }
 
+    MetadataStore::attach(m_database.connection(), items, m_metadataCache);
     return items;
+}
+
+void CatalogStore::setMetadataCache(const MetadataStore::CacheDirectories &cache)
+{
+    m_metadataCache = cache;
 }
 
 void CatalogStore::recordWatchProgress(const QString &profileId,

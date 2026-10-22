@@ -71,7 +71,21 @@ public:
         // metadata line and the badge on the fallback artwork.
         SeasonLabelRole,
         // ShowCard.swift:23: the up-next episode label in the highlight colour.
-        UpNextLabelRole
+        UpNextLabelRole,
+        // The show's TMDB metadata, as the episodes carry it
+        // (CatalogProjection.makeShowMetadata). Empty or null when TMDB has
+        // not matched the show; nothing draws these yet.
+        HasMetadataRole,
+        TmdbIdRole,
+        OverviewRole,
+        DirectorRole,
+        CertificationRole,
+        ReleaseDateRole,
+        VoteAverageRole,
+        RuntimeMinutesRole,
+        GenresRole,
+        CastRole,
+        BackdropUrlRole
     };
     Q_ENUM(Role)
 

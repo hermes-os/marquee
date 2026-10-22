@@ -63,6 +63,11 @@ QString AppPaths::settingsFile()
     return QDir(configDirectory()).filePath(QStringLiteral("marquee.ini"));
 }
 
+QString AppPaths::tmdbKeyFile()
+{
+    return QDir(configDirectory()).filePath(QStringLiteral("tmdb-api-key"));
+}
+
 QString AppPaths::catalogFile()
 {
     return QDir(dataDirectory()).filePath(QStringLiteral("catalog.sqlite"));
@@ -109,4 +114,9 @@ void AppPaths::setRuntimeRoot(const QString &path)
 void AppPaths::clearRuntimeRoot()
 {
     gRuntimeRootOverride.clear();
+}
+
+bool AppPaths::hasRuntimeRoot()
+{
+    return !gRuntimeRootOverride.isEmpty();
 }

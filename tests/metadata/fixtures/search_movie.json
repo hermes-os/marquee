@@ -1,0 +1,16 @@
+{
+  "page": 1,
+  "results": [
+    {
+      "id": 9200,
+      "title": "Synthetic Odyssey: The Documentary",
+      "release_date": "2020-01-01"
+    },
+    {
+      "id": 9001,
+      "title": "Synthetic Odyssey",
+      "release_date": "2019-07-12"
+    }
+  ],
+  "total_results": 2
+}

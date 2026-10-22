@@ -260,9 +260,11 @@ private slots:
         catalog.migrate();
 
         QVERIFY(QFileInfo::exists(path));
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(tableNames(catalog),
-                 QStringList({"library_roots", "media_items", "watch_progress"}));
+                 QStringList({"episode_metadata", "library_roots", "media_items",
+                                      "title_cast", "title_keyword", "title_metadata",
+                                      "watch_progress"}));
     }
 
     void reopeningMigratedCatalogKeepsSchemaVersionAndRows()
@@ -279,7 +281,7 @@ private slots:
         CatalogDatabase reopened(path);
         reopened.migrate();
 
-        QCOMPARE(schemaVersionOf(reopened), 5);
+        QCOMPARE(schemaVersionOf(reopened), 6);
         QCOMPARE(rowCount(reopened, "library_roots"), 1);
     }
 
@@ -417,9 +419,11 @@ private slots:
         }
 
         CatalogDatabase catalog(path);
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(tableNames(catalog),
-                 QStringList({"library_roots", "media_items", "watch_progress"}));
+                 QStringList({"episode_metadata", "library_roots", "media_items",
+                                      "title_cast", "title_keyword", "title_metadata",
+                                      "watch_progress"}));
     }
 
     void rejectsRowsWithoutAnIdentity()
@@ -454,9 +458,11 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(tableNames(catalog),
-                 QStringList({"library_roots", "media_items", "watch_progress"}));
+                 QStringList({"episode_metadata", "library_roots", "media_items",
+                                      "title_cast", "title_keyword", "title_metadata",
+                                      "watch_progress"}));
         QCOMPARE(
             indexNames(catalog),
             QStringList({"media_items_root_idx", "media_items_show_idx",
@@ -532,7 +538,7 @@ private slots:
         }
 
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
     }
 
     void startupLoadsTheReadableFilesOfRootsWithUnreadableEntries()
@@ -624,7 +630,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main"), kids});
 
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "watch_progress"), 4);
         for (const QString &profile : {QStringLiteral("main"), kids}) {
             QCOMPARE(progressOf(catalog, profile, "item-1"),
@@ -676,7 +682,7 @@ private slots:
         CatalogDatabase reopened(path);
         reopened.migrate({QStringLiteral("main"), QStringLiteral("added")});
 
-        QCOMPARE(schemaVersionOf(reopened), 5);
+        QCOMPARE(schemaVersionOf(reopened), 6);
         QCOMPARE(rowCount(reopened, "watch_progress"), 2);
         QCOMPARE(progressOf(reopened, "main", "item-1").at(0).toLongLong(), 1);
         QVERIFY(progressOf(reopened, "added", "item-1").isEmpty());
@@ -694,7 +700,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "watch_progress"), 0);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
@@ -727,7 +733,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QString()});
 
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
     }
 
@@ -743,7 +749,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({odd, QStringLiteral("a")});
 
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "watch_progress"), 4);
         QCOMPARE(progressOf(catalog, odd, "item-1"),
                  (QVariantList{600000, 7200000, 0}));
@@ -764,7 +770,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "watch_progress"), 0);
     }
 
@@ -790,8 +796,122 @@ private slots:
 
         QVERIFY(execute(catalog, "DROP TABLE watch_progress_v5"));
         catalog.migrate({QStringLiteral("main")});
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "watch_progress"), 2);
+    }
+
+    // The catalog the release before TMDB wrote: schema 5, with titles and
+    // per-profile progress. Dropping what migration 6 adds from a migrated
+    // catalog gives that exact shape without restating migrations 1 to 5.
+    static bool downgradeToVersionFive(CatalogDatabase &catalog)
+    {
+        return execute(catalog, "DROP TRIGGER media_items_metadata_cleanup")
+            && execute(catalog, "DROP TABLE title_cast")
+            && execute(catalog, "DROP TABLE title_keyword")
+            && execute(catalog, "DROP TABLE title_metadata")
+            && execute(catalog, "DROP TABLE episode_metadata")
+            && execute(catalog, "PRAGMA user_version = 5");
+    }
+
+    void metadataMigrationKeepsTitlesAndWatchProgressOfAVersionFiveCatalog()
+    {
+        QTemporaryDir dataDirectory;
+        const QString path = QDir(dataDirectory.path()).filePath("catalog.sqlite");
+        {
+            CatalogDatabase seeded(path);
+            seeded.migrate({QStringLiteral("main")});
+            QVERIFY(execute(seeded, insertMoviesRoot));
+            QVERIFY(execute(seeded, insertMediaItem("'item-1'", "'root-1'")));
+            QVERIFY(execute(seeded,
+                            "INSERT INTO watch_progress (profile_id, media_id, position_ms, "
+                            "duration_ms, completed, updated_at) VALUES "
+                            "('main', 'item-1', 600000, 7200000, 0, '2026-01-01T00:00:00Z')"));
+            QVERIFY(downgradeToVersionFive(seeded));
+            QCOMPARE(schemaVersionOf(seeded), 5);
+            QVERIFY(!tableNames(seeded).contains("title_metadata"));
+        }
+
+        CatalogDatabase catalog(path);
+        catalog.migrate({QStringLiteral("main")});
+
+        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(rowCount(catalog, "library_roots"), 1);
+        QCOMPARE(rowCount(catalog, "media_items"), 1);
+        QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
+        const QStringList metadataTables{"title_metadata", "title_cast", "title_keyword",
+                                         "episode_metadata"};
+        for (const QString &table : metadataTables) {
+            QVERIFY2(tableNames(catalog).contains(table), qPrintable(table));
+            QCOMPARE(rowCount(catalog, table), 0);
+        }
+    }
+
+    void metadataMigrationRunsFromTheOldestSchemaToo()
+    {
+        QTemporaryDir dataDirectory;
+        const QString path = QDir(dataDirectory.path()).filePath("catalog.sqlite");
+        QVERIFY(seedVersionFourCatalog(path));
+
+        CatalogDatabase catalog(path);
+        catalog.migrate({QStringLiteral("main")});
+
+        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(rowCount(catalog, "media_items"), 2);
+        QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
+        QVERIFY(tableNames(catalog).contains("title_metadata"));
+    }
+
+    void aFailedMetadataMigrationLeavesTheVersionFiveCatalogUsable()
+    {
+        QTemporaryDir dataDirectory;
+        const QString path = QDir(dataDirectory.path()).filePath("catalog.sqlite");
+        {
+            CatalogDatabase seeded(path);
+            seeded.migrate({QStringLiteral("main")});
+            QVERIFY(execute(seeded, insertMoviesRoot));
+            QVERIFY(execute(seeded, insertMediaItem("'item-1'", "'root-1'")));
+            QVERIFY(downgradeToVersionFive(seeded));
+            // The migration creates title_keyword after title_metadata and
+            // title_cast; a table holding that name fails it part-way.
+            QVERIFY(execute(seeded, "CREATE TABLE title_keyword (x INTEGER)"));
+        }
+
+        CatalogDatabase catalog(path);
+        QVERIFY_EXCEPTION_THROWN(catalog.migrate({QStringLiteral("main")}), std::runtime_error);
+
+        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(rowCount(catalog, "media_items"), 1);
+        // The tables the failed run created before it stopped are rolled back.
+        QVERIFY(!tableNames(catalog).contains("title_metadata"));
+        QVERIFY(!tableNames(catalog).contains("title_cast"));
+
+        QVERIFY(execute(catalog, "DROP TABLE title_keyword"));
+        catalog.migrate({QStringLiteral("main")});
+        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(rowCount(catalog, "media_items"), 1);
+    }
+
+    void deletingAMediaItemTakesItsMovieMetadataAndNothingElse()
+    {
+        QTemporaryDir dataDirectory;
+        CatalogDatabase catalog(QDir(dataDirectory.path()).filePath("catalog.sqlite"));
+        catalog.migrate();
+        QVERIFY(execute(catalog, insertMoviesRoot));
+        QVERIFY(execute(catalog, insertMediaItem("'item-1'", "'root-1'")));
+        QVERIFY(execute(catalog, "INSERT INTO title_metadata (owner_key, kind, fetch_state, "
+                                 "fetched_at) VALUES ('item-1', 'movie', 'matched', 'x'), "
+                                 "('show:Fixture Show|2001', 'show', 'matched', 'x')"));
+        QVERIFY(execute(catalog, "INSERT INTO title_cast (owner_key, ordinal, person_id, name, "
+                                 "character) VALUES ('item-1', 0, 1, 'Actor', 'Role')"));
+        QVERIFY(execute(catalog, "INSERT INTO episode_metadata (media_id, fetched_at) "
+                                 "VALUES ('item-1', 'x')"));
+
+        // Removing the movie's media item takes its fetched facts with it, and
+        // the cast and episode row behind them; a show is not tied to one file.
+        QVERIFY(execute(catalog, "DELETE FROM media_items WHERE id = 'item-1'"));
+        QCOMPARE(rowCount(catalog, "title_metadata"), 1);
+        QCOMPARE(rowCount(catalog, "title_cast"), 0);
+        QCOMPARE(rowCount(catalog, "episode_metadata"), 0);
     }
 
     void startupWithAnUnreadableProfilesFileStillOpensTheLibrary()
@@ -815,7 +935,7 @@ private slots:
         }
 
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
     }
@@ -839,7 +959,7 @@ private slots:
 
         QCOMPARE(profileIds.size(), 2);
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 5);
+        QCOMPARE(schemaVersionOf(catalog), 6);
         for (const QString &profile : profileIds) {
             QCOMPARE(progressOf(catalog, profile, "item-1"),
                      (QVariantList{600000, 7200000, 0}));

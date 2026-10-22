@@ -38,6 +38,15 @@ class SettingsStore final : public QObject
                READ onlineMetadataEnabled
                WRITE setOnlineMetadataEnabled
                NOTIFY onlineMetadataEnabledChanged)
+    /// Whether a TMDB key exists (never the key itself). Without one the
+    /// switch changes nothing and the note says so.
+    Q_PROPERTY(bool tmdbKeyPresent
+               READ tmdbKeyPresent
+               NOTIFY tmdbKeyPresentChanged)
+    /// What the Online Metadata row's text says, from the switch and the key.
+    Q_PROPERTY(QString onlineMetadataNote
+               READ onlineMetadataNote
+               NOTIFY onlineMetadataNoteChanged)
     // The remaining released preferences, `Marquee/Models/UserSettings.swift:
     // 22-58`, with the defaults `:154-184` seeds a fresh install with.
     Q_PROPERTY(bool hardwareDecodingEnabled
@@ -99,6 +108,12 @@ public:
 
     [[nodiscard]] bool onlineMetadataEnabled() const;
     void setOnlineMetadataEnabled(bool value);
+    [[nodiscard]] bool tmdbKeyPresent() const;
+    [[nodiscard]] QString onlineMetadataNote() const;
+    /// Looks for the key again (environment, then the key file), because the
+    /// owner may have added it while the app was running. Only whether one
+    /// exists is kept.
+    Q_INVOKABLE void recheckTmdbKey();
     [[nodiscard]] bool hardwareDecodingEnabled() const;
     void setHardwareDecodingEnabled(bool value);
     [[nodiscard]] bool autoPlayNextEpisode() const;
@@ -126,6 +141,8 @@ signals:
     void leanBackModeChanged();
     void interfaceSoundsChanged();
     void onlineMetadataEnabledChanged();
+    void tmdbKeyPresentChanged();
+    void onlineMetadataNoteChanged();
     void hardwareDecodingEnabledChanged();
     void autoPlayNextEpisodeChanged();
     void defaultSubtitleLanguageChanged();
@@ -145,7 +162,8 @@ private:
     bool m_reduceMotion{false};
     bool m_leanBackMode{true};
     bool m_interfaceSounds{true};
-    bool m_onlineMetadataEnabled{false};
+    bool m_onlineMetadataEnabled{true};
+    bool m_tmdbKeyPresent{false};
     bool m_hardwareDecodingEnabled{true};
     bool m_autoPlayNextEpisode{true};
     QString m_defaultSubtitleLanguage{QStringLiteral("None")};
