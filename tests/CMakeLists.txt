@@ -108,6 +108,12 @@ marquee_add_test(tst_browse_order
     browse/tst_browse_order.cpp
 )
 
+# The taste model behind Home's taste rows and Play Something's weight is a
+# plain function over projected items: no window.
+marquee_add_test(tst_taste_model
+    browse/tst_taste_model.cpp
+)
+
 marquee_add_test(tst_movies_route
     browse/tst_movies_route.cpp
 )
