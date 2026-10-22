@@ -40,8 +40,7 @@ namespace
 }
 
 // A catalog holding scanned movies, so Home has cards to take the remote.
-// `ids` receives the catalog ids of the movies, in creation order.
-[[nodiscard]] bool seedMovies(const QString &moviesDir, int count = 1, QStringList *ids = nullptr)
+[[nodiscard]] bool seedMovies(const QString &moviesDir, int count = 1)
 {
     AppPaths::ensureDirectories();
     for (int index = 0; index < count; ++index) {
@@ -59,10 +58,6 @@ namespace
     const QVector<LibraryRoot> roots = store.registerRoots(paths);
     for (const LibraryRoot &root : roots) {
         store.applyScan(root, LibraryScanner::scan(root));
-        for (int index = 0; ids != nullptr && index < count; ++index) {
-            ids->push_back(LibraryScanner::mediaIdFor(
-                root.id, QStringLiteral("Arrival %1 (%2).mkv").arg(index).arg(2016 + index)));
-        }
     }
     return !roots.isEmpty();
 }
@@ -446,13 +441,21 @@ private slots:
         QVERIFY(!firstCard.isEmpty());
         // Off the first card, so a Home that kept the remote where it stood
         // would open another card after the re-choice.
-        QTest::keyClick(window, Qt::Key_Right);
+        // The same movie can sit in several rows, so walk to a card that is a
+        // different title.
         QTest::keyClick(window, Qt::Key_Down);
         QCOMPARE(home->focus()->row(), 1);
-        QVERIFY(home->focus()->column() > 0);
+        const auto focusedCard = [home] {
+            return home->cardAt(home->focus()->row(), home->focus()->column())
+                .value(QStringLiteral("mediaId")).toString();
+        };
+        while (focusedCard() == firstCard) {
+            QVERIFY2(home->moveRight(), "row 1 holds no title other than the first card");
+        }
+        const QString stale = focusedCard();
         QTest::keyClick(window, Qt::Key_Return);
         QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
-        QVERIFY(controller.navigation()->selectedMediaId() != firstCard);
+        QCOMPARE(controller.navigation()->selectedMediaId(), stale);
 
         QTest::keyClick(window, Qt::Key_Escape);
         QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Home);
@@ -492,8 +495,7 @@ private slots:
         QTemporaryDir movies;
         AppPaths::setRuntimeRoot(runtimeRoot.path());
         const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
-        QStringList ids;
-        QVERIFY(seedMovies(movies.path(), 4, &ids));
+        QVERIFY(seedMovies(movies.path(), 4));
 
         ApplicationController controller;
         controller.setTemporaryLibraryRoot(movies.path());
@@ -501,11 +503,6 @@ private slots:
             QStringLiteral("Second"), QStringLiteral("hare.fill"), QStringLiteral("#3366CC"),
             static_cast<int>(ProfileStore::Maturity::Adult));
         QVERIFY(!second.isEmpty());
-        const QString watched = ids.at(0);
-        {
-            CatalogStore store(AppPaths::catalogFile());
-            store.recordWatchProgress(second, watched, 600'000, 3'600'000, false);
-        }
 
         QQmlApplicationEngine engine;
         QQuickWindow *window = loadMainWindow(controller, engine);
@@ -519,7 +516,15 @@ private slots:
         verifyHomeHoldsTheRemote(window, controller);
         HomeRowsModel *home = controller.homeRows();
         QTRY_VERIFY(home->rowCount() >= 2);
-        QVERIFY(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString() != watched);
+        // A title that is not Home's first card for a profile without
+        // progress, so the new row's card is told apart from the old top one.
+        const QString watched = home->cardAt(0, 1).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!watched.isEmpty());
+        QVERIFY(watched != home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString());
+        {
+            CatalogStore store(AppPaths::catalogFile());
+            store.recordWatchProgress(second, watched, 600'000, 3'600'000, false);
+        }
         QTest::keyClick(window, Qt::Key_Right);
         QTest::keyClick(window, Qt::Key_Down);
         QCOMPARE(home->focus()->row(), 1);
