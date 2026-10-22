@@ -230,8 +230,9 @@ marquee_add_test(tst_player_window
 # does not provide, so the binary builds the same platform fallback chain as
 # tst_playback and the shell's own QT_QPA_PLATFORM must not reach it. Every
 # other case here runs on whichever platform connects. Each case builds and
-# tears down its own window; the threaded render loop crashed in the glyph cache
-# across those windows, so the basic loop is used.
+# tears down its own window. Across those windows Qt's text node crashes now
+# and then on either render loop (issues.md); the basic loop keeps the crash on
+# the GUI thread, where its stack is readable.
 set_tests_properties(tst_player_window PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORMTHEME=none;QSG_RENDER_LOOP=basic"
     ENVIRONMENT_MODIFICATION "QT_QPA_PLATFORM=unset:"
