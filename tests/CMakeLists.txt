@@ -1,4 +1,4 @@
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui GuiPrivate Qml Quick QuickControls2 Test)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test)
 
 function(marquee_add_test target)
     qt_add_executable(${target} ${ARGN})
@@ -206,14 +206,21 @@ marquee_add_test(tst_player_tracks
 
 # The window system's state reports are fed in by hand, as a compositor sends
 # them; the minimal platform adds none of its own. QWindowSystemInterface is Qt's
-# own private GUI API, shipped with Qt6::Gui.
-marquee_add_test(tst_playback_fullscreen
-    playback/tst_playback_fullscreen.cpp
-)
-target_link_libraries(tst_playback_fullscreen PRIVATE Qt6::GuiPrivate)
-set_tests_properties(tst_playback_fullscreen PROPERTIES
-    ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORMTHEME=none"
-)
+# own private GUI API, so the test needs Qt's private development files, which
+# some distributions ship separately; without them only this test is left out.
+set(QT_NO_PRIVATE_MODULE_WARNING ON)
+find_package(Qt6 6.8 QUIET COMPONENTS GuiPrivate)
+if(TARGET Qt6::GuiPrivate)
+    marquee_add_test(tst_playback_fullscreen
+        playback/tst_playback_fullscreen.cpp
+    )
+    target_link_libraries(tst_playback_fullscreen PRIVATE Qt6::GuiPrivate)
+    set_tests_properties(tst_playback_fullscreen PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORMTHEME=none"
+    )
+else()
+    message(STATUS "tst_playback_fullscreen skipped: Qt6::GuiPrivate not found")
+endif()
 
 marquee_add_test(tst_player_window
     playback/tst_player_window.cpp
