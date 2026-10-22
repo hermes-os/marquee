@@ -273,7 +273,7 @@ void ApplicationController::startCatalogWorker()
         finishCatalogRefresh();
         raiseError(QStringLiteral("Library scan"), message);
     });
-    // A reload that fails brings no projection to restart
+    // A reload that fails or finds no roots brings no projection to restart
     // Home for. Only the active profile's reload disarms it: a scan failing
     // while the reload waits behind it, or the reload of a profile already
     // left, says nothing about the one still to land.
@@ -282,6 +282,7 @@ void ApplicationController::startCatalogWorker()
             m_homeRestartPending = false;
         }
     };
+    connect(worker, &CatalogWorker::projectionReloadSkipped, this, reloadEnded);
     connect(worker, &CatalogWorker::projectionReloadFailed, this,
             [this, reloadEnded](const QString &message, const QString &profileId) {
                 reloadEnded(profileId);

@@ -35,7 +35,8 @@ public slots:
 
     /// Publishes the projection of the roots the last refresh registered, with
     /// the progress of `profileId`, without scanning: what choosing another
-    /// profile needs. Before a refresh has registered any root it publishes nothing.
+    /// profile needs. Before a refresh has registered any root it publishes nothing
+    /// and answers `projectionReloadSkipped`.
     void reloadProjection(const QString &profileId);
 
     /// Stores where `profileId` left `mediaId` so that profile's next viewing
@@ -79,6 +80,9 @@ signals:
     /// A `reloadProjection` that threw. Apart from `scanFailed` so a failure
     /// of a scan already running is never taken for the reload's.
     void projectionReloadFailed(QString message, QString profileId);
+    /// A `reloadProjection` with no registered roots: nothing to project until
+    /// the first scan, which answers for itself.
+    void projectionReloadSkipped(QString profileId);
     void watchHistoryCleared();
     /// A background TMDB run ended; carries what it did.
     void metadataRunFinished(MetadataEnrichment::Summary summary);

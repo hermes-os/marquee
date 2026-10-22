@@ -840,6 +840,86 @@ private slots:
         QVERIFY(home->heroFocused());
     }
 
+    // The worker itself: a reload before any root is registered publishes no
+    // projection and says it skipped, so the controller is not left waiting.
+    void aReloadWithoutRootsAnswersThatItWasSkipped()
+    {
+        QTemporaryDir runtimeRoot;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(QDir().mkpath(QFileInfo(AppPaths::catalogFile()).absolutePath()));
+        CatalogWorker worker(AppPaths::catalogFile());
+        QSignalSpy skipped(&worker, &CatalogWorker::projectionReloadSkipped);
+        QSignalSpy reloaded(&worker, &CatalogWorker::projectionReloaded);
+        QSignalSpy failed(&worker, &CatalogWorker::projectionReloadFailed);
+        worker.reloadProjection(QStringLiteral("profile-a"));
+        QCOMPARE(skipped.count(), 1);
+        QCOMPARE(skipped.constFirst().constFirst().toString(), QStringLiteral("profile-a"));
+        QCOMPARE(reloaded.count(), 0);
+        QCOMPARE(failed.count(), 0);
+    }
+
+    // A reload with no registered roots answers nothing from the catalog, so
+    // the worker says it skipped it; the restart it was waiting for is
+    // disarmed and a later projection finds the viewer's remote where it is.
+    void aReloadSkippedForWantOfRootsDisarmsTheHomeRestart()
+    {
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(seedMovies(movies.path(), 4));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        SwitchFixture fixture;
+        QVERIFY(prepareSwitch(controller, window, fixture));
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+        QTRY_VERIFY(!controller.scanning());
+        fixture.watched = home->cardAt(0, 1).value(QStringLiteral("mediaId")).toString();
+        const QString top = home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!fixture.watched.isEmpty() && fixture.watched != top);
+        {
+            CatalogStore store(AppPaths::catalogFile());
+            store.recordWatchProgress(fixture.second, fixture.watched, 600'000, 3'600'000, false);
+        }
+
+        QSemaphore refreshEntered;
+        QSemaphore releaseRefresh;
+        const QMetaObject::Connection gate = QObject::connect(
+            &controller, &ApplicationController::catalogRefreshStarted, &controller,
+            [&] {
+                refreshEntered.release();
+                releaseRefresh.acquire();
+            },
+            Qt::DirectConnection);
+        const auto releaseGate = qScopeGuard([&] {
+            QObject::disconnect(gate);
+            releaseRefresh.release(2);
+        });
+        controller.requestCatalogRefresh();
+        QVERIFY2(refreshEntered.tryAcquire(1, 5000), "the refresh did not reach its gate");
+
+        chooseSecondProfile(window, controller, fixture.second);
+        emit controller.catalogWorkerForTest()->projectionReloadSkipped(fixture.second);
+        releaseRefresh.release();
+
+        // The projection that lands later is not a restart: the new row sits
+        // above and the remote stays on the card it was on, one row lower.
+        QTRY_COMPARE(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString(), fixture.watched);
+        QTRY_VERIFY(!controller.scanning());
+        QCOMPARE(home->focus()->row(), 1);
+        QCOMPARE(home->cardAt(1, 0).value(QStringLiteral("mediaId")).toString(), top);
+    }
+
     // Choosing the same profile again while the switch's reload is in flight
     // leaves the restart pending: the viewer has not moved, and the reload has
     // not landed.

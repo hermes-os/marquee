@@ -52,6 +52,10 @@ intermediate version bump.
   no longer cancels Home's return to its top card: only the failure of that
   load itself does. Before, the unrelated failure left the first card the
   remote had been on, now one row lower.
+- Choosing a profile before any library folder is known no longer leaves
+  Home's return to its top card armed until the first scan. Before, the first
+  library to load afterwards pulled the remote back to the top card even while
+  the viewer was on the sidebar.
 - Choosing a different profile now lands the remote on Home's top card even
   when that profile has progress. Before, a Continue Watching row that arrived
   above the rows after the choice left the remote on the card it had been on,

@@ -77,6 +77,7 @@ void CatalogWorker::reloadProjection(const QString &profileId)
         // scan has run, not because the library is, and the surface would
         // take it for the answer.
         if (roots.isEmpty()) {
+            emit projectionReloadSkipped(profileId);
             return;
         }
         emit projectionReloaded(m_store->projection(roots, profileId), profileId);
