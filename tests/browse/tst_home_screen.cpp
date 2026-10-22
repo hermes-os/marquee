@@ -6,6 +6,7 @@
 #include <QImage>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScopeGuard>
@@ -786,6 +787,81 @@ private slots:
             return colour.red() > 200 && colour.green() > 200 && colour.blue() > 200;
         });
         QVERIFY2(bright > 40, qPrintable(QString::number(bright)));
+    }
+
+    // On a GPU scene graph every full-size layer and shader effect is a pass
+    // over the card's pixels each frame, and the owner's iMac has an old GPU.
+    // Three visible cards share one rounded mask, and a poster blur that a
+    // loaded backdrop covers is not drawn.
+    void theHeroDrawsNoLayerOrEffectThatIsCoveredOrDuplicated()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        QQuickItem *homeHero = itemNamed(shell.window, "homeHero");
+        QVERIFY(homeHero != nullptr);
+
+        QList<QQuickItem *> visibleCards;
+        QTRY_VERIFY([&] {
+            visibleCards.clear();
+            for (QQuickItem *card : allNamed(homeHero, QStringLiteral("heroCard"))) {
+                if (card->isVisible()) {
+                    visibleCards.push_back(card);
+                }
+            }
+            for (QQuickItem *card : std::as_const(visibleCards)) {
+                QQuickItem *backdrop = firstNamed(card, QStringLiteral("heroBackdrop"));
+                QQuickItem *poster = firstNamed(card, QStringLiteral("heroPoster"));
+                if (backdrop == nullptr || backdrop->property("status").toInt() != 1
+                    || poster == nullptr || poster->property("status").toInt() != 1) {
+                    return false;
+                }
+            }
+            return visibleCards.size() == 3;
+        }());
+        if (!visibleCards.constFirst()->property("gpu").toBool()) {
+            QSKIP("The software scene graph draws no layers or shader effects.");
+        }
+
+        const auto layerEnabled = [](QQuickItem *item) {
+            return QQmlProperty(item, QStringLiteral("layer.enabled")).read().toBool();
+        };
+        int layers = 0;
+        int effects = 0;
+        for (QQuickItem *card : std::as_const(visibleCards)) {
+            for (QQuickItem *content : allNamed(card, QStringLiteral("heroCardContent"))) {
+                layers += layerEnabled(content) ? 1 : 0;
+            }
+            // The card's content sits in a hidden layer on a GPU scene graph,
+            // so the poster blur is counted by the card's own verdict on it.
+            effects += allNamed(card, QStringLiteral("heroCardMasked")).size();
+            effects += card->property("posterBlurLive").toBool() ? 1 : 0;
+        }
+        // Every mask layer in the hero, whichever card or the root holds it.
+        int masks = 0;
+        for (QQuickItem *mask : allNamed(homeHero, QStringLiteral("heroCardMask"))) {
+            masks += layerEnabled(mask) ? 1 : 0;
+        }
+        qInfo("hero GPU cost with three visible cards: %d content layers, %d mask layers, %d visible effects",
+              layers, masks, effects);
+
+        QCOMPARE(masks, 1);
+        QCOMPARE(layers, 3);
+        // Only each card's masked composite; the poster blur sits under a
+        // loaded backdrop and is skipped.
+        QCOMPARE(effects, 3);
+
+        // A card whose backdrop has not loaded still shows the blurred poster.
+        QQuickItem *bare = visibleCards.constFirst();
+        QVERIFY(firstNamed(bare, QStringLiteral("heroPosterBlur")) != nullptr);
+        QVERIFY(!bare->property("posterBlurLive").toBool());
+        QVERIFY(QQmlProperty(firstNamed(bare, QStringLiteral("heroBackdrop")), QStringLiteral("source"))
+                    .write(QUrl()));
+        QTRY_VERIFY(bare->property("posterBlurLive").toBool());
     }
 
     // Set MARQUEE_HERO_GRAB to a file name to keep the frame this case sees,

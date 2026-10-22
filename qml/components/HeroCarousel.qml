@@ -49,6 +49,13 @@ Item {
 
     implicitHeight: Theme.scaled(420, 520, root.leanBack)
 
+    // :349 clips the whole card to its rounded rectangle. Qt clips to
+    // rectangles, so on a GPU scene graph the card is drawn into a layer and
+    // masked by the rounded shape; the software scene graph (the offscreen
+    // test platform) has no shader effects and keeps the rectangle.
+    readonly property bool cardGpu: root.GraphicsInfo.api !== GraphicsInfo.Software
+        && root.GraphicsInfo.api !== GraphicsInfo.Unknown
+
     // The slide's length, which Reduce Motion cuts to the released ten
     // milliseconds (:63-65) without changing where it ends.
     readonly property int slideDuration: root.reduceMotion ? 10 : Theme.motionHero
@@ -126,6 +133,25 @@ Item {
             gradient.addColorStop(1, Qt.rgba(ink.r, ink.g, ink.b, 0))
             context.fillStyle = gradient
             context.fillRect(0, 0, width, height)
+        }
+    }
+
+    // :349's rounded clip, drawn once for every card: all of them share one
+    // size and the effect samples the mask by its own coordinates, so a layer
+    // per card would only repeat the same texture.
+    Item {
+        id: cardMask
+        objectName: "heroCardMask"
+
+        width: root.cardWidth
+        height: root.cardHeight
+        visible: false
+        layer.enabled: root.cardGpu
+
+        Rectangle {
+            anchors.fill: parent
+            radius: Theme.radiusLG
+            color: "#ffffff"
         }
     }
 
@@ -220,13 +246,11 @@ Item {
                 offsetY: card.showHover ? 10 : 3
             }
 
-            // :349 clips the whole card to its rounded rectangle. Qt clips to
-            // rectangles, so on a GPU scene graph the card is drawn into a
-            // layer and masked by the rounded shape; the software scene graph
-            // (the offscreen test platform) has no shader effects and keeps
-            // the rectangle.
-            readonly property bool gpu: card.GraphicsInfo.api !== GraphicsInfo.Software
-                && card.GraphicsInfo.api !== GraphicsInfo.Unknown
+            readonly property bool gpu: root.cardGpu
+            // Once the backdrop has loaded it fills the card and covers the
+            // blurred poster behind it, so that blur pass is not run.
+            readonly property bool posterBlurLive: card.gpu
+                && posterImage.status === Image.Ready && backdrop.status !== Image.Ready
 
             Item {
                 id: content
@@ -305,7 +329,7 @@ Item {
 
                         anchors.fill: parent
                         source: posterImage
-                        visible: card.gpu && posterImage.status === Image.Ready
+                        visible: card.posterBlurLive
                         scale: 1.18
                         opacity: 0.5
                         blurEnabled: true
@@ -481,21 +505,6 @@ Item {
                 }
             }
 
-            Item {
-                id: mask
-                objectName: "heroCardMask"
-
-                anchors.fill: parent
-                visible: false
-                layer.enabled: card.gpu
-
-                Rectangle {
-                    anchors.fill: parent
-                    radius: Theme.radiusLG
-                    color: "#ffffff"
-                }
-            }
-
             MultiEffect {
                 objectName: "heroCardMasked"
 
@@ -503,7 +512,7 @@ Item {
                 source: content
                 visible: card.gpu
                 maskEnabled: true
-                maskSource: mask
+                maskSource: cardMask
             }
 
             // :324-376's Watch Now button takes the tap here, not in `content`.

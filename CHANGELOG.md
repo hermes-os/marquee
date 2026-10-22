@@ -28,6 +28,9 @@ intermediate version bump.
   scan of an existing library picks up a movie's backdrop; no migration.
   A click on Watch Now reaches the button when the window is drawn by the GPU.
   The carousel also stops advancing while the window is minimized or hidden.
+  On a GPU-drawn window the hero shares one rounded mask between its cards and
+  skips the blurred-poster pass once a backdrop covers it, which takes about
+  half the full-size layers and effects off each frame.
   The title bar takes its own clicks, hover and drags: a hero arrow, dot or
   card scrolled under it no longer moves the carousel, takes the remote or
   scrolls the page.
