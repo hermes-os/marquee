@@ -375,3 +375,8 @@ Found: listing the arm64 archive members of `Libdovi.xcframework` from libdovi-b
 Where: `qml/Main.qml` (the `Player` route loads in `screenLoader`, inside the content column beside `Sidebar`).
 What happens: while a film plays, the navigation sidebar (about 78 px at 1280x800) stays drawn at the left edge and the picture fills only the rest of the window. The released app presents `PlayerView` as a layer over the whole shell, sidebar included (`ContentView.swift:52-62`).
 Found: frames 25-34 s of a Release-build screen recording (`--test-mode --windowed`, 1280x800 headless sway) made for the portfolio site, 2026-10-21.
+
+## tst_media_details aRowScrolledOutMidFadeComesBackAtRest fails offscreen
+Where: `tests/details/tst_media_details.cpp:459` (`aRowScrolledOutMidFadeComesBackAtRest`).
+What happens: under `QT_QPA_PLATFORM=offscreen` the wait for the focused episode row's scale to sit between 1.0005 and 1.03 times out, and the case fails (3 of 3 runs on 95952b7 and 3 of 3 on the scrub commit; the other 31 cases pass, the run takes about 63 s).
+Found: the live-frame scrub work, running the test on the base commit in a scratch copy and on its head.
