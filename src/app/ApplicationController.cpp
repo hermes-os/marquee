@@ -81,6 +81,11 @@ ApplicationController::ApplicationController(QObject *parent)
     };
     QObject::connect(m_homeRows.focus(), &FocusNavigator::focusChanged, this, remoteMoved);
     QObject::connect(&m_homeRows, &HomeRowsModel::playSomethingFocusedChanged, this, remoteMoved);
+    // Down from the hero to the first row, and Up back, change the section
+    // without changing the row the focus navigator holds, so only this signal
+    // tells that the viewer moved (HomeDetailView.swift:57-60). The hero's own
+    // appearing or going with a projection arrives under `ShellDrivesHome`.
+    QObject::connect(&m_homeRows, &HomeRowsModel::heroFocusedChanged, this, remoteMoved);
     // ProfilePickerView.swift:1101, :1107, and :1195: every edit, addition,
     // and deletion is followed by a reconcile so the shell's active profile
     // never shows stale fields or a profile that no longer exists.

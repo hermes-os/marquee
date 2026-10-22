@@ -63,6 +63,9 @@ intermediate version bump.
   on that stale place (Play Something, or nothing when nothing was playable)
   instead of opening the first card. A switch made with the pointer, or to the
   same profile, is covered too.
+- Switching profile while a library scan is running no longer pulls a viewer
+  who has gone Down from the hero to the first row back to the hero when the
+  scan finishes. Before, only a move between rows counted as the viewer moving.
 - Choosing a profile now puts the remote on Home's hero, as in the released app,
   when the library has a spotlight: Home opens on the hero's first slide and the
   first Return plays it, whatever slide or place the last viewer left. Left on
