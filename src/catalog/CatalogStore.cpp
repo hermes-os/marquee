@@ -345,10 +345,10 @@ void CatalogStore::applyScan(const LibraryRoot &root,
         // row is removed on the strength of a partial picture.
         qCWarning(logCatalog) << "kept stored rows for partially readable root"
                               << root.path;
-        applyAvailableScan(root, result.items, false);
+        applyAvailableScan(root, result.items, result.unreadableIds, false);
         return;
     case LibraryScanner::ScanOutcome::Complete:
-        applyAvailableScan(root, result.items, true);
+        applyAvailableScan(root, result.items, result.unreadableIds, true);
         return;
     }
 }
@@ -495,7 +495,7 @@ QVector<LibraryRoot> CatalogStore::knownRoots() const
 
 void CatalogStore::applyAvailableScan(const LibraryRoot &root,
                                       const QVector<MediaItem> &items,
-                                      bool removeMissing)
+                                      const QSet<QString> &unreadableIds, bool removeMissing)
 {
     QSqlDatabase &database = m_database.connection();
     const QString now = formatTimestamp(QDateTime::currentDateTimeUtc());
@@ -505,7 +505,9 @@ void CatalogStore::applyAvailableScan(const LibraryRoot &root,
     try {
         const QHash<QString, ItemFingerprint> stored =
             storedFingerprints(database, root.id);
-        QSet<QString> scanned;
+        // A file the listing named but stat refused still exists, so its row
+        // is not "missing" below.
+        QSet<QString> scanned = unreadableIds;
 
         for (const MediaItem &item : items) {
             // Counted as scanned even when dropped below, so a bad item never

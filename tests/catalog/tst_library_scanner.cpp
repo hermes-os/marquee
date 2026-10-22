@@ -678,6 +678,60 @@ private slots:
                  QStringLiteral("0"));
     }
 
+    // A listed file that fails stat is still there, so a complete walk must
+    // not read its absence as deletion; a file that is really gone still is.
+    void aCompleteWalkKeepsTheRowOfAListedFileThatFailedStat()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Arrival (2016)/Arrival (2016).mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Heat.1995.mkv")));
+
+        CatalogStore store(catalogPath);
+        const QVector<LibraryRoot> roots = store.registerRoots({library.path()});
+        QCOMPARE(roots.size(), 1);
+        store.applyScan(roots.constFirst(), LibraryScanner::scan(roots.constFirst()));
+        QVector<MediaItem> stored = store.projection(roots, QStringLiteral("profile-1"));
+        QCOMPARE(stored.size(), 3);
+
+        QString moonId;
+        QString heatId;
+        for (const MediaItem &item : stored) {
+            if (item.title == QStringLiteral("Moon")) {
+                moonId = item.id;
+            } else if (item.title == QStringLiteral("Heat")) {
+                heatId = item.id;
+            }
+        }
+        QVERIFY(!moonId.isEmpty());
+        QVERIFY(!heatId.isEmpty());
+        store.recordWatchProgress(QStringLiteral("profile-1"), moonId, 5000, 90000, false);
+
+        // Moon failed stat this time; Heat is gone from the listing altogether.
+        LibraryScanner::ScanResult result;
+        result.outcome = LibraryScanner::ScanOutcome::Complete;
+        for (const MediaItem &item : stored) {
+            if (item.id != moonId && item.id != heatId) {
+                result.items.push_back(item);
+            }
+        }
+        result.unreadableIds.insert(moonId);
+
+        store.applyScan(roots.constFirst(), result);
+
+        const QVector<MediaItem> after = store.projection(roots, QStringLiteral("profile-1"));
+        QCOMPARE(titlesOf(after), QStringList({QStringLiteral("Arrival"), QStringLiteral("Moon")}));
+        for (const MediaItem &item : after) {
+            if (item.id == moonId) {
+                QCOMPARE(item.resumePositionMs, qint64(5000));
+            }
+        }
+    }
+
     void aPartiallyReadableRootKeepsItsPreviouslyCatalogedRows()
     {
         QTemporaryDir dataDirectory;

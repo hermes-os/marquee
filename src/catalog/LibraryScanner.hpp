@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QFileInfo>
+#include <QSet>
 #include <QString>
 #include <QVector>
 
@@ -32,11 +33,12 @@ struct ParsedEpisode
 enum class ScanOutcome {
     /// The root is missing, unreadable, or not a directory.
     RootUnavailable,
-    /// Part of the root could not be enumerated, or a media entry in it could
-    /// not be stat'ed. `items` holds everything that was read, but the walk is
-    /// not evidence of what the root no longer holds.
+    /// Part of the root could not be enumerated. `items` holds everything that
+    /// was read, but the walk is not evidence of what the root no longer holds.
     Incomplete,
-    /// Every directory under the root was enumerated.
+    /// Every directory under the root was enumerated. A media entry that was
+    /// listed but could not be stat'ed does not change that; see
+    /// `ScanResult::unreadableIds`.
     Complete
 };
 
@@ -44,6 +46,11 @@ struct ScanResult
 {
     ScanOutcome outcome{ScanOutcome::RootUnavailable};
     QVector<MediaItem> items;
+    /// Ids of media entries the directory listing named but a fresh stat
+    /// refused. They are not in `items`, yet the files exist, so the catalog
+    /// must keep any row it already holds for them while still removing rows
+    /// of files that are truly gone.
+    QSet<QString> unreadableIds;
 };
 
 [[nodiscard]] bool isSupportedMediaFile(const QFileInfo &file);
@@ -84,7 +91,7 @@ struct ScanResult
 /// root holds; `Incomplete` items may be stored but nothing may be removed on
 /// their account, and `RootUnavailable` means the catalog preserves everything
 /// it already stored for this root. A media entry the filesystem lists but
-/// cannot stat is skipped and logged; a sidecar that cannot be stat'ed is
-/// treated as missing.
+/// cannot stat is skipped, logged and reported in `unreadableIds` (the walk
+/// stays `Complete`); a sidecar that cannot be stat'ed is treated as missing.
 [[nodiscard]] ScanResult scan(const LibraryRoot &root);
 }

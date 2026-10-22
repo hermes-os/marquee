@@ -41,9 +41,11 @@ public:
     [[nodiscard]] QVector<LibraryRoot> registerRoots(const LibraryRootPaths &paths);
 
     /// Writes one finished walk in a single transaction. Only a complete walk
-    /// may add or remove rows: an unavailable root records its availability and
-    /// a partially readable one records nothing, so in both cases the rows the
-    /// root contributed stay and browsing keeps working.
+    /// may remove rows, and even then it keeps the row of every id in
+    /// `result.unreadableIds` (listed files that could not be stat'ed). An
+    /// unavailable root records its availability only; a partially readable one
+    /// stores what it read. In both cases the rows the root contributed stay
+    /// and browsing keeps working.
     void applyScan(const LibraryRoot &root, const LibraryScanner::ScanResult &result);
 
     /// Every stored item belonging to `roots`, ordered by sort title and then
@@ -76,7 +78,7 @@ public:
 
 private:
     void applyAvailableScan(const LibraryRoot &root, const QVector<MediaItem> &items,
-                            bool removeMissing);
+                            const QSet<QString> &unreadableIds, bool removeMissing);
     void markRootUnavailable(const LibraryRoot &root);
 
     CatalogDatabase m_database;

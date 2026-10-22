@@ -245,12 +245,15 @@ const QVector<QRegularExpression> &episodeExpressions()
 }
 
 /// Appends `directoryPath`'s media files and recurses into its subdirectories.
-/// Returns false when any directory in the subtree cannot be enumerated or any
-/// media entry in it cannot be stat'ed, because a walk that silently skipped
-/// part of the tree would look like proof that the rows it missed are gone. A
-/// failure never stops the walk: everything readable is still collected.
+/// Returns false when any directory in the subtree cannot be enumerated,
+/// because a walk that silently skipped part of the tree would look like proof
+/// that the rows it missed are gone. A media entry that is listed but cannot be
+/// stat'ed does not make the walk partial: the listing proves the file is
+/// there, so its id goes into `unreadableIds` and the catalog keeps its row.
+/// A failure never stops the walk: everything readable is still collected.
 [[nodiscard]] bool collectInto(const QString &directoryPath, const QDir &rootDirectory,
-                               const LibraryRoot &root, QVector<MediaItem> &items)
+                               const LibraryRoot &root, QVector<MediaItem> &items,
+                               QSet<QString> &unreadableIds)
 {
     const QFileInfo directoryInfo(directoryPath);
     if (!directoryInfo.isReadable() || !directoryInfo.isExecutable()) {
@@ -303,7 +306,8 @@ const QVector<QRegularExpression> &episodeExpressions()
 
     for (const QFileInfo &entry : entries) {
         if (entry.isDir()) {
-            if (!collectInto(entry.absoluteFilePath(), rootDirectory, root, items)) {
+            if (!collectInto(entry.absoluteFilePath(), rootDirectory, root, items,
+                             unreadableIds)) {
                 complete = false;
             }
             continue;
@@ -340,7 +344,7 @@ const QVector<QRegularExpression> &episodeExpressions()
                 episodeFile ? episodeFile->lastModified().toUTC() : QDateTime();
             if (!episodeModifiedAt.isValid()) {
                 qCWarning(logScanner) << "skipped unreadable media file:" << entry.absoluteFilePath();
-                complete = false;
+                unreadableIds.insert(LibraryScanner::mediaIdFor(root.id, relativePath));
                 continue;
             }
 
@@ -390,7 +394,7 @@ const QVector<QRegularExpression> &episodeExpressions()
             movieFile ? movieFile->lastModified().toUTC() : QDateTime();
         if (!movieModifiedAt.isValid()) {
             qCWarning(logScanner) << "skipped unreadable media file:" << entry.absoluteFilePath();
-            complete = false;
+            unreadableIds.insert(LibraryScanner::mediaIdFor(root.id, relativePath));
             continue;
         }
 
@@ -573,7 +577,8 @@ LibraryScanner::ScanResult LibraryScanner::scan(const LibraryRoot &root)
     }
 
     ScanResult result;
-    result.outcome = collectInto(root.path, QDir(root.path), root, result.items)
+    result.outcome =
+        collectInto(root.path, QDir(root.path), root, result.items, result.unreadableIds)
         ? ScanOutcome::Complete
         : ScanOutcome::Incomplete;
 
