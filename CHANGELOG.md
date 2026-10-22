@@ -22,6 +22,9 @@ intermediate version bump.
   title when TMDB lists the show in the folder's year: "Star Trek The Original
   Series (1966)" and "The Office US (2005)". Titles are checked once more, in
   the background, after the update.
+- Movie titles keep the dots of initials in a `Title (YYYY)` name, as the
+  released app does: "E.T. the Extra-Terrestrial" and "L.A. Confidential" are
+  no longer shown as "E T the Extra-Terrestrial" and "L A Confidential".
 - A `Title - (YYYY)` or `Title (YYYY) (YYYY)` movie name now shows and sorts as
   "Title" (not "Title -" or "Title (YYYY)"), and a `Title (2099)` name no longer
   takes 2099 as its release year.

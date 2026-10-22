@@ -491,7 +491,9 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
         static const QRegularExpression trailingGroup(QStringLiteral(R"(\s*[\[(][^\])]+[\])]$)"));
         QString plexTitle = plex.captured(1).trimmed();
         plexTitle.remove(trailingGroup);
-        plexTitle = chopTrailingIntroducer(plexTitle.replace(separators, QStringLiteral(" ")).simplified());
+        // Dots stay: in a named title they are initials (`E.T.`, `L.A.`), as
+        // the released app shows them (FilenameParser.swift:246-251 trims only).
+        plexTitle = chopTrailingIntroducer(plexTitle.replace(QLatin1Char('_'), QLatin1Char(' ')).simplified());
         if (!plexTitle.isEmpty()) {
             return {.title = plexTitle, .year = plex.captured(2).toInt()};
         }

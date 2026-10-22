@@ -188,6 +188,10 @@ private slots:
             {"X (1999) (2008).mkv", "X", 2008},
             // A year no film has is not the release year.
             {"Movie (2099).mkv", "Movie (2099)", 0},
+            // Initials keep their dots, as the released app shows them.
+            {"E.T. the Extra-Terrestrial (1982).mkv", "E.T. the Extra-Terrestrial", 1982},
+            {"L.A. Confidential (1997).mkv", "L.A. Confidential", 1997},
+            {"The_Wild_Robot (2024).mkv", "The Wild Robot", 2024},
         };
         for (const auto &c : cases) {
             const LibraryScanner::ParsedFilename parsed =
