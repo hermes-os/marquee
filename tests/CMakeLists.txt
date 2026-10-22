@@ -293,3 +293,8 @@ marquee_add_test(tst_metadata_enrichment
 target_compile_definitions(tst_metadata_enrichment PRIVATE
     MARQUEE_METADATA_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/metadata/fixtures"
 )
+
+# The Online Metadata switch, its key note, and the key lookup.
+marquee_add_test(tst_metadata_switch
+    metadata/tst_metadata_switch.cpp
+)
