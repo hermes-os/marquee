@@ -275,3 +275,12 @@ marquee_add_test(tst_search_screen
 marquee_add_test(tst_settings_screen
     settings/tst_settings_screen.cpp
 )
+
+# TMDB: the client, its parsing, the key and the artwork cache, all over saved
+# JSON and a fake transport, so nothing here reaches the network.
+marquee_add_test(tst_metadata_client
+    metadata/tst_metadata_client.cpp
+)
+target_compile_definitions(tst_metadata_client PRIVATE
+    MARQUEE_METADATA_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/metadata/fixtures"
+)

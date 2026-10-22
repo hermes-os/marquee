@@ -1,0 +1,78 @@
+{
+  "id": 9101,
+  "name": "Synthetic Harbor",
+  "overview": "Tides, rumors and synthetic ferries.",
+  "first_air_date": "2015-03-02",
+  "vote_average": 8.1,
+  "vote_count": 900,
+  "popularity": 12.0,
+  "poster_path": "/harborPoster.jpg",
+  "backdrop_path": "/harborBackdrop.jpg",
+  "episode_run_time": [
+    44,
+    50
+  ],
+  "genres": [
+    {
+      "id": 18,
+      "name": "Drama"
+    },
+    {
+      "id": 9648,
+      "name": "Mystery"
+    }
+  ],
+  "created_by": [
+    {
+      "id": 8001,
+      "name": "Creator One"
+    },
+    {
+      "id": 8002,
+      "name": "Creator Two"
+    }
+  ],
+  "credits": {
+    "cast": [
+      {
+        "id": 6001,
+        "name": "Lead One",
+        "character": "Harbor Master",
+        "profile_path": "/l1.jpg"
+      },
+      {
+        "id": 6002,
+        "name": "Lead Two",
+        "character": "Ferryman",
+        "profile_path": null
+      }
+    ],
+    "crew": [
+      {
+        "id": 7009,
+        "name": "Not A Creator",
+        "job": "Director"
+      }
+    ]
+  },
+  "content_ratings": {
+    "results": [
+      {
+        "iso_3166_1": "DE",
+        "rating": "16"
+      },
+      {
+        "iso_3166_1": "US",
+        "rating": "TV-14"
+      },
+      {
+        "iso_3166_1": "US",
+        "rating": "TV-MA"
+      },
+      {
+        "iso_3166_1": "US",
+        "rating": ""
+      }
+    ]
+  }
+}

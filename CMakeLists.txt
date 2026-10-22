@@ -23,6 +23,7 @@ find_package(Qt6 6.8 REQUIRED COMPONENTS
     Concurrent
     Core
     Gui
+    Network
     OpenGL
     Qml
     Quick
@@ -113,6 +114,19 @@ qt_add_qml_module(marquee_core
         src/catalog/LibraryScanner.hpp
         src/catalog/LibraryScanner.cpp
         src/catalog/MediaItem.hpp
+        src/catalog/TitleMetadata.hpp
+
+        src/metadata/ArtworkCache.hpp
+        src/metadata/ArtworkCache.cpp
+        src/metadata/HttpTransport.hpp
+        src/metadata/MetadataClient.hpp
+        src/metadata/MetadataClient.cpp
+        src/metadata/QtHttpTransport.hpp
+        src/metadata/QtHttpTransport.cpp
+        src/metadata/TmdbApiKey.hpp
+        src/metadata/TmdbApiKey.cpp
+        src/metadata/TmdbParsing.hpp
+        src/metadata/TmdbParsing.cpp
 
         src/models/BrowseSemantics.hpp
         src/models/BrowseSemantics.cpp
@@ -198,6 +212,7 @@ target_link_libraries(marquee_core PUBLIC
     Qt6::Concurrent
     Qt6::Core
     Qt6::Gui
+    Qt6::Network
     Qt6::OpenGL
     Qt6::Qml
     Qt6::Quick
