@@ -102,6 +102,12 @@ marquee_add_test(tst_play_something
     browse/tst_play_something.cpp
 )
 
+# Browse order, genre rows and the holiday score are plain functions and models
+# over projected items: no window.
+marquee_add_test(tst_browse_order
+    browse/tst_browse_order.cpp
+)
+
 marquee_add_test(tst_movies_route
     browse/tst_movies_route.cpp
 )

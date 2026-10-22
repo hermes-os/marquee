@@ -6,6 +6,13 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Movies and TV Shows group titles as the released app does. A title's genre
+  rows come from TMDB's genres when it named any (the folder and the title
+  guess otherwise), so Movies gains a row per genre between Holiday Movies and
+  All Movies and TV Shows takes its rows from TMDB too. Holiday Movies also
+  counts a holiday word in a title's TMDB genres or overview. Rows keep the
+  released order: franchise, then year, then title. Search results and More
+  Like This break ties in that order too. No migration.
 - Movie titles no longer carry the year of a `Title (YYYY)` file or folder
   name: "1917 (2019)" is now "1917" from 2019 and "2001 A Space Odyssey (1968)"
   is "2001 A Space Odyssey" from 1968, and the year is what online metadata

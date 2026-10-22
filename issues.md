@@ -24,23 +24,21 @@ What happens: Interface Sounds, Launch Ident, and Sound Pack persist and say
 "Saved", but no code plays a cue.
 Found: source read at 81c8fa8; no audio module is linked in `CMakeLists.txt`.
 
-## TMDB metadata is stored but no screen shows it yet
+## TMDB metadata is stored but Details and search do not show it yet
 Where: `qml/screens/DetailsScreen.qml`, `qml/screens/ShowDetailScreen.qml`,
-`src/models/MovieRowsModel.cpp`, `src/models/HomeRowsModel.cpp`,
-`src/search/SearchSession.cpp`, `src/profiles/ContentPolicy.cpp` (`maturityOf`).
+`src/models/HomeRowsModel.cpp`, `src/search/SearchSession.cpp`.
 What happens: after a scan Marquee fetches TMDB details and artwork when a key
 exists (`src/metadata/`, catalog migration 6) and the models expose the fields
-as roles, but nothing reads them. Details has no overview, director, cast,
-rating or certification section; the Movies and TV routes still key their genre
-rows on `genresOf` (folder and title inference, not TMDB's genres); scoped and
-genre search find nothing from TMDB; a Kids profile still classifies from genres
-alone and ignores the stored certification; Home's Because You Watched, Hidden
-Gems and Short Tonight rows are not built. TMDB's similar and recommended movie
-ids are stored as TMDB ids and are not yet resolved to library titles. A movie
-backdrop is only ever TMDB's, because the scanner reads no movie `fanart` or
-`backdrop` sidecar, so with no key a movie has no backdrop.
+as roles. The Movies and TV routes order and group by it, and a Kids profile
+reads the stored certification, but Details has no overview, director, cast,
+rating or certification section; scoped and genre search find nothing from
+TMDB; Home's Because You Watched, Hidden Gems and Short Tonight rows are not
+built. TMDB's similar and recommended movie ids are stored as TMDB ids and are
+not yet resolved to library titles. A movie backdrop is only ever TMDB's,
+because the scanner reads no movie `fanart` or `backdrop` sidecar, so with no
+key a movie has no backdrop.
 Found: the TMDB enrichment commits; `git grep -n "metadata->" src` outside
-`src/models/TitleMetadataView.cpp` and `src/profiles/ContentPolicy.cpp` is empty.
+`src/models/`, `src/profiles/ContentPolicy.cpp` and `src/catalog/` is empty.
 
 ## Character avatars are not fetched
 Where: `src/` (no counterpart of `Marquee/Services/Metadata/AvatarService.swift`).

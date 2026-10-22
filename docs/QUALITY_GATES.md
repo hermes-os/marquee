@@ -56,7 +56,7 @@ Run one target with `ctest --test-dir build/v3-debug -R '<regex>'
 | Home poster cards and header | `^tst_library_browse` (also runs `_hidpi`) |
 | Home rows (rules, then the screen) | `^tst_home_rows$`, `^tst_home_screen$` |
 | Play Something (the pick, then the controls) | `^tst_play_something$`, `^tst_home_rows$`, `^tst_home_screen$`, `^tst_sidebar_navigation` |
-| Movies and TV routes | `^tst_movies_route` (also runs `_hidpi`), `^tst_tv_route$` |
+| Movies and TV routes (order, genre rows, holiday) | `^tst_browse_order$`, `^tst_movies_route` (also runs `_hidpi`), `^tst_tv_route$` |
 | Details | `^tst_media_details$` |
 | Player, HUD, watch progress | `^tst_playback$`, `^tst_playback_fullscreen$`, `^tst_player_window$`, `^tst_player_hud$`, `^tst_next_episode$`, `^tst_next_episode_flow$`, `^tst_player_tracks$`, `^tst_subtitle_discovery$`, `^tst_track_selection$`, `^tst_watch_progress$`, `^tst_watch_progress_process$` |
 | Profiles and Kids content filtering | `^tst_profile_store$`, `^tst_profile_picker$`, `^tst_kids_content$` |

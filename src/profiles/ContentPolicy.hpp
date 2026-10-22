@@ -11,14 +11,14 @@
 /// way on Home, Movies, TV Shows, search, details, and direct playback.
 ///
 /// The rule is the released one: `Marquee/Models/MaturityLevel.swift:33-83`
-/// classifies a title from its certification and its genres, and
-/// `Marquee/Models/UserProfile.swift:70-79` admits an item when its level is
-/// at or below the profile's (a Kids profile admits Kids and Family). The v3
-/// catalog holds no certification, so classification runs on the genres alone:
-/// the folder genre under the library root, then the genres inferred from the
-/// title (`CatalogContentPolicy.swift:322-398`). A title with no genre at all
-/// classifies as Adult, which keeps unclassified content away from Kids
-/// profiles.
+/// classifies a title from its stored certification and its `displayGenres`
+/// (`MediaItem.swift:253-258`), and `Marquee/Models/UserProfile.swift:70-79`
+/// admits an item when its level is at or below the profile's (a Kids profile
+/// admits Kids and Family). A title with no certification classifies on its
+/// genres alone: the folder genre under the library root, then the genres
+/// inferred from the title (`CatalogContentPolicy.swift:322-398`). A title
+/// with neither classifies as Adult, which keeps unclassified content away
+/// from Kids profiles.
 namespace content_policy
 {
 /// Trimmed, de-duplicated (case-insensitively) genres in first-seen order.
@@ -41,11 +41,10 @@ QStringList genresOf(const MediaItem &item);
 
 /// MediaItem.swift:154-171 `displayGenres`: TMDB's genres when it named any,
 /// followed by the local ones only when TMDB's are all generic family labels;
-/// otherwise the local genres. Rows still key on `genresOf` until the Rows
-/// task moves them.
+/// otherwise the local genres. The Movies and TV Shows rows key on it.
 QStringList displayGenresOf(const MediaItem &item);
 
-/// MaturityLevel.classify without a certification, as a ProfileStore::Maturity
+/// MediaItem.maturityLevel (MediaItem.swift:253-258) as a ProfileStore::Maturity
 /// value: 0 Kids, 1 Family, 2 Teen, 3 Adult.
 int maturityOf(const MediaItem &item);
 

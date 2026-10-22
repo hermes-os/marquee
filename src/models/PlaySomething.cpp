@@ -3,13 +3,11 @@
 #include "models/BrowseSemantics.hpp"
 
 #include <QByteArray>
-#include <QCollator>
 #include <QSet>
 
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <limits>
 #include <utility>
 
 namespace
@@ -41,34 +39,15 @@ namespace
     return 1.0 + (item.posterAbsolutePath.isEmpty() ? 0.0 : 0.5);
 }
 
-// compareMoviesForBrowsing (BrowseSnapshotStore.swift:2026-2046) breaks equal
-// keys: franchise family (or the normalized title), year with an unknown year
-// last, then title. The id only settles what the oracle leaves unordered.
+// compareMoviesForBrowsing (BrowseSnapshotStore.swift:2044-2046) breaks equal
+// keys. The id only settles what the oracle leaves unordered.
 [[nodiscard]] bool browsesBefore(const MediaItem &left, const MediaItem &right)
 {
-    const auto familyOf = [](const MediaItem &item) {
-        const QString family = browse::franchiseKey(item.title);
-        return family.isEmpty() ? browse::normalizedText(item.title) : family;
-    };
-    // localizedCaseInsensitiveCompare (BrowseSnapshotStore.swift:2034-2042),
-    // through the collator the Movies page orders families with.
-    static const QCollator familyCollator = [] {
-        QCollator collator;
-        collator.setCaseSensitivity(Qt::CaseInsensitive);
-        return collator;
-    }();
-    if (const int byFamily = familyCollator.compare(familyOf(left), familyOf(right));
-        byFamily != 0) {
-        return byFamily < 0;
+    if (browse::compareMoviesForBrowsing(left, right)) {
+        return true;
     }
-    const int leftYear = left.year > 0 ? left.year : std::numeric_limits<int>::max();
-    const int rightYear = right.year > 0 ? right.year : std::numeric_limits<int>::max();
-    if (leftYear != rightYear) {
-        return leftYear < rightYear;
-    }
-    if (const int byTitle = QString::compare(left.title, right.title, Qt::CaseInsensitive);
-        byTitle != 0) {
-        return byTitle < 0;
+    if (browse::compareMoviesForBrowsing(right, left)) {
+        return false;
     }
     return left.id < right.id;
 }

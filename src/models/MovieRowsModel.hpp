@@ -13,15 +13,12 @@
 #include "navigation/FocusNavigator.hpp"
 
 /// The Movies route's rows. `BrowseSnapshotStore.swift:3008-3048` composes
-/// `movieRows` as a "Holiday Movies" row, then one row per genre, then "All
-/// Movies" in browse order, dropping the "Other" bucket and any genre row that
-/// holds the whole library. `:2073-2101` recognizes a holiday title from its
-/// text alone -- a keyword such as "christmas", or a named film such as Home
-/// Alone or Elf -- so that row is composed here from the titles the catalog
-/// already holds, and appears once at least two qualify. The v3 catalog models
-/// no genre, so every title still falls in the dropped "Other" bucket and the
-/// genre rows arrive with the metadata milestone that gives them their input,
-/// not by inventing one here.
+/// `movieRows` as a "Holiday Movies" row (two or more qualifying titles), then
+/// one row per genre in case-insensitive order, then "All Movies", every row
+/// in browse order (`:2026-2053`). The genres are `displayGenres`
+/// (`MediaItem.swift:154-171`): TMDB's when it named any, the folder genre and
+/// title inference otherwise. "Other" and a genre that holds every movie get
+/// no row. A title with no metadata and no genre still lands in All Movies.
 ///
 /// Each row publishes its items as a `LibraryModel`, so a row's cards read the
 /// same projected roles the library grid reads.

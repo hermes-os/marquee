@@ -1,5 +1,6 @@
 #include "search/SearchSession.hpp"
 
+#include "models/BrowseSemantics.hpp"
 #include "models/LibraryModel.hpp"
 
 #include <QChar>
@@ -238,27 +239,6 @@ namespace
     }();
     return collator;
 }
-
-// `BrowseSemanticPolicy.compareMovieBrowseSortKeys`, `BrowseSnapshotStore.swift:2034-2042`.
-[[nodiscard]] bool browseOrderBefore(const MediaItem &lhs, const MediaItem &rhs)
-{
-    const auto familyOf = [](const MediaItem &item) {
-        const QString normalized = SearchSession::normalizedText(item.title);
-        const QString franchise =
-            franchiseKeyOf(normalized.split(QLatin1Char(' '), Qt::SkipEmptyParts));
-        return franchise.isEmpty() ? normalized : franchise;
-    };
-    const QString lhsFamily = familyOf(lhs);
-    const QString rhsFamily = familyOf(rhs);
-    if (lhsFamily != rhsFamily) {
-        return localizedCollator().compare(lhsFamily, rhsFamily) < 0;
-    }
-    if (lhs.year != rhs.year) {
-        const auto yearOrMax = [](int year) { return year > 0 ? year : INT_MAX; };
-        return yearOrMax(lhs.year) < yearOrMax(rhs.year);
-    }
-    return localizedCollator().compare(lhs.title, rhs.title) < 0;
-}
 }
 
 SearchSession::SearchSession(LibraryModel *library, QObject *parent)
@@ -453,7 +433,7 @@ QVector<SearchSession::Hit> SearchSession::searchPass(const QString &query,
         if (lhs.matchType != rhs.matchType) {
             return lhs.matchType < rhs.matchType;
         }
-        return browseOrderBefore(lhs.item, rhs.item);
+        return browse::compareMoviesForBrowsing(lhs.item, rhs.item);
     });
     return hits;
 }

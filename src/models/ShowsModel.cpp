@@ -567,9 +567,10 @@ void ShowsModel::replaceItems(QVector<MediaItem> items)
                             .genres = {}};
         summary.upNextIndex = show_order::upNextIndexOf(summary.episodes);
         summary.seasonCount = seasonCountOf(summary.episodes);
-        // MediaItem.swift:154-171 through CatalogProjection.swift:481-486:
-        // the folder genre leads, then the title-inferred ones.
-        summary.genres = content_policy::genresOf(summary.representative());
+        // BrowseSnapshotStore.swift:3093 reads the representative's
+        // `displayGenres` (MediaItem.swift:154-171): TMDB's when it named any,
+        // else the folder genre and then the title-inferred ones.
+        summary.genres = content_policy::displayGenresOf(summary.representative());
         summaries.push_back(std::move(summary));
     }
     std::stable_sort(summaries.begin(), summaries.end(),
@@ -590,6 +591,11 @@ void ShowsModel::recompose()
     QStringList genreOrder;
     for (const ShowSummary &summary : std::as_const(m_summaries)) {
         for (const QString &genre : summary.genres) {
+            // :3053-3063 groups a show with no genre under "Other" and then
+            // drops that group, so a genre literally named Other is dropped too.
+            if (genre == QLatin1String("Other")) {
+                continue;
+            }
             if (!byGenre.contains(genre)) {
                 genreOrder.push_back(genre);
             }
