@@ -457,6 +457,52 @@ const QVector<QRegularExpression> &episodeExpressions()
 
     return complete;
 }
+
+// A name with no space uses dots between words (`The.Matrix`) and for initials
+// (`E.T.the.Extra-Terrestrial`, `L.A.Confidential`). A dot after a word of two
+// letters or more separates words. A dot between single letters joined by dots
+// belongs to the initials and stays, and the dot that ends the run gets a space
+// after it when a word follows. A lone letter (`A.Beautiful.Mind`,
+// `Star.Trek.V.The.Final.Frontier`) is a word, not an initial.
+[[nodiscard]] QString replaceSeparatorsKeepingInitials(const QString &title)
+{
+    static const QRegularExpression separatorRun(QStringLiteral(R"([._]+)"));
+    QStringList words;
+    QStringList joiners;
+    qsizetype position = 0;
+    QRegularExpressionMatchIterator runs = separatorRun.globalMatch(title);
+    while (runs.hasNext()) {
+        const QRegularExpressionMatch run = runs.next();
+        words.push_back(title.mid(position, run.capturedStart() - position));
+        joiners.push_back(run.captured());
+        position = run.capturedEnd();
+    }
+    words.push_back(title.mid(position));
+
+    const auto isLetter = [&words](qsizetype index) {
+        return index >= 0 && index < words.size() && words.at(index).size() == 1
+            && words.at(index).front().isLetter();
+    };
+    const auto dotAfter = [&joiners](qsizetype index) {
+        return index >= 0 && index < joiners.size() && joiners.at(index) == QLatin1String(".");
+    };
+    const auto isInitial = [&](qsizetype index) {
+        return isLetter(index)
+            && ((isLetter(index + 1) && dotAfter(index)) || (isLetter(index - 1) && dotAfter(index - 1)));
+    };
+
+    QString result = words.front();
+    for (qsizetype index = 0; index < joiners.size(); ++index) {
+        const bool nextIsWord = !words.at(index + 1).isEmpty();
+        if (isInitial(index) && dotAfter(index)) {
+            result += isInitial(index + 1) || !nextIsWord ? QStringLiteral(".") : QStringLiteral(". ");
+        } else {
+            result += QLatin1Char(' ');
+        }
+        result += words.at(index + 1);
+    }
+    return result;
+}
 }
 
 bool LibraryScanner::isSupportedMediaFile(const QFileInfo &file)
@@ -499,7 +545,7 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
         static const QRegularExpression wordThenDot(QStringLiteral(R"(\w{2,}\.)"));
         static const QRegularExpression noSpace(QStringLiteral(R"(^\S+$)"));
         if (noSpace.match(plexTitle).hasMatch() && wordThenDot.match(plexTitle).hasMatch()) {
-            plexTitle.replace(separators, QStringLiteral(" "));
+            plexTitle = replaceSeparatorsKeepingInitials(plexTitle);
         }
         plexTitle = chopTrailingIntroducer(plexTitle.replace(QLatin1Char('_'), QLatin1Char(' ')).simplified());
         if (!plexTitle.isEmpty()) {

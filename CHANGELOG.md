@@ -6,6 +6,11 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- A dot-separated movie name keeps the dots of its initials:
+  "E.T.the.Extra-Terrestrial.(1982)" shows as "E.T. the Extra-Terrestrial" and
+  "L.A.Confidential.(1997)" as "L.A. Confidential", not "E T the
+  Extra-Terrestrial" and "L A Confidential". Shown titles change on the next
+  scan; no migration.
 - Online metadata keeps a title the folder name only begins with ("Star Trek"
   for "Star Trek The Original Series") when the second search, without the
   year, fails on the network or is rate limited, instead of dropping it and
