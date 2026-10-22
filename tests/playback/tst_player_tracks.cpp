@@ -861,6 +861,82 @@ private slots:
         QVERIFY(qAbs(video.position() - landing) < kLandingTolerance);
     }
 
+    // A landing where libmpv already is (a hold clamped at 0, a keyframe a
+    // preview showed) sends no position report, so the settle would wait for
+    // its watchdog. A tap, a bar click or Restart in that window is a newer
+    // seek: the clock must follow it, and stay there while paused.
+    void aTapRightAfterAHoldClampedAtZeroMovesTheClock()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+        video.previewScrub(0.0);
+        // Released only once libmpv is already at 0: the exact seek then
+        // lands where it is and reports no change.
+        QTRY_VERIFY_WITH_TIMEOUT(timePosition(video) < kLandingTolerance, 5000);
+        QTest::qWait(300);
+        QVERIFY(video.finishScrub(0.0));
+        QTest::qWait(200);
+        QVERIFY(video.seekRelative(30.0));
+        QTRY_VERIFY_WITH_TIMEOUT(timePosition(video) > 25.0, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(video.position() - timePosition(video)) < kLandingTolerance,
+                                 2000);
+        // Paused: nothing more arrives after the settle watchdog would have
+        // ended, so a clock left on the old landing would stay wrong.
+        QTest::qWait(1800);
+        QVERIFY(qAbs(video.position() - timePosition(video)) < kLandingTolerance);
+        QVERIFY(video.position() > 25.0);
+        QVERIFY(video.paused());
+    }
+
+    void aBarClickRightAfterAHoldClampedAtZeroMovesTheClock()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+        video.previewScrub(0.0);
+        // Released only once libmpv is already at 0: the exact seek then
+        // lands where it is and reports no change.
+        QTRY_VERIFY_WITH_TIMEOUT(timePosition(video) < kLandingTolerance, 5000);
+        QTest::qWait(300);
+        QVERIFY(video.finishScrub(0.0));
+        QTest::qWait(200);
+        QVERIFY(video.seekAbsolute(60.0));
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(video.position() - 60.0) < kLandingTolerance, 5000);
+        QTest::qWait(1800);
+        QVERIFY(qAbs(video.position() - timePosition(video)) < kLandingTolerance);
+        QVERIFY(qAbs(video.position() - 60.0) < kLandingTolerance);
+    }
+
+    // A landing on a keyframe the preview already showed sends no position
+    // report either, and a host without a render context cannot make libmpv
+    // do that on cue, so the reports are delivered by hand (as in
+    // aLateRestartDoesNotReleaseTheFirstPreviewOfANewHold): none for the
+    // landing, then the one for the Left tap's own seek. The tap's position
+    // is what the session must show and store, not the old landing.
+    void aLeftTapRightAfterAKeyframeLandingReadsTheNewPosition()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        video.beginScrub();
+        video.previewScrub(40.0);
+        QVERIFY(video.finishScrub(40.0));
+        QCOMPARE(video.position(), 40.0);
+        QVERIFY(video.seekRelative(-10.0));
+
+        double reported = 30.0;
+        mpv_event_property property{"time-pos", MPV_FORMAT_DOUBLE, &reported};
+        mpv_event event{};
+        event.event_id = MPV_EVENT_PROPERTY_CHANGE;
+        event.data = &property;
+        QVERIFY(QMetaObject::invokeMethod(&video, "applyEvent", Q_ARG(mpv_event *, &event)));
+        QCOMPARE(video.position(), 30.0);
+    }
+
     // A hold that starts before the last landing has confirmed can see that
     // landing's PLAYBACK_RESTART arrive after its own first preview was
     // issued. It is not that preview's restart: counting it would let the

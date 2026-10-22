@@ -572,6 +572,9 @@ bool MpvVideoItem::seekAbsolute(double seconds)
     if (!m_core || !m_fileLoaded) {
         return false;
     }
+    // A seek of the viewer's own supersedes a landing still settling: its
+    // position reports are not near the old landing and would all be dropped.
+    endSettle();
 
     const QByteArray target = QByteArray::number(qMax(0.0, seconds), 'f', 3);
     const char *command[] = {"seek", target.constData(), "absolute", nullptr};
@@ -588,6 +591,7 @@ bool MpvVideoItem::seekRelative(double seconds)
     if (!m_core || !m_fileLoaded || !std::isfinite(seconds)) {
         return false;
     }
+    endSettle();
 
     const QByteArray amount = QByteArray::number(seconds, 'f', 3);
     const char *command[] = {"seek", amount.constData(), "relative+keyframes", nullptr};
