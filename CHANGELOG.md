@@ -18,9 +18,10 @@ intermediate version bump.
   plays the spotlight in front, and Back hands the remote to the sidebar. The
   carousel moves on every 15 seconds on its own, and stops while the remote is
   on it or Reduce Motion is on. The arrows, the dots, a tap on a side card, and
-  a drag also move it. A movie's `-backdrop`/`-fanart` sidecar, or its folder's
-  `fanart`/`backdrop`, is its hero picture; a title without one shows the
-  poster and the fallback tile. A spotlight for a show plays the episode you are
+  a drag also move it. A movie's hero picture is found by the released app's
+  names and order: `fanart`, `backdrop`, `<name> fanart`, `<name> backdrop`, in
+  jpg, jpeg, png and webp (v3's `<name>-backdrop` and `<name>-fanart` come
+  after them); a title without one shows the poster and the fallback tile. A spotlight for a show plays the episode you are
   up to rather than always the first, which differs from the released app.
   Ratings, taste, genres, and online artwork are not in the catalog, so those
   terms of the released selection are left out (see `issues.md`). The next

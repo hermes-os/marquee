@@ -59,24 +59,32 @@ const QStringList &imageExtensions()
     return {};
 }
 
-/// The movie's backdrop, matched the way posters are: the sidecar named after
-/// the media file, then the artwork the whole folder shares
-/// (`fanart`/`backdrop`, as the released scanner names them,
-/// CatalogContentPolicy.swift:123-136, in the extensions v3 reads for posters).
+/// The movie's backdrop, in the released scanner's names and order
+/// (CatalogContentPolicy.swift:96-136): across the image extensions,
+/// `fanart`, `backdrop`, `<base> fanart`, `<base> backdrop`. v3's own
+/// `<base>-backdrop` and `<base>-fanart` follow them, so a library the
+/// released app already reads picks the same image here.
 [[nodiscard]] QString backdropNameFor(const QString &stem, const QSet<QString> &fileNames)
 {
-    const QStringList candidates{stem + QStringLiteral("-backdrop.jpg"),
-                                 stem + QStringLiteral("-backdrop.png"),
-                                 stem + QStringLiteral("-fanart.jpg"),
-                                 stem + QStringLiteral("-fanart.png"),
-                                 QStringLiteral("fanart.jpg"),
-                                 QStringLiteral("backdrop.jpg"),
-                                 QStringLiteral("fanart.png"),
-                                 QStringLiteral("backdrop.png")};
+    for (const QString &extension : imageExtensions()) {
+        const QString suffix = QLatin1Char('.') + extension;
+        for (const QString &candidate : {QStringLiteral("fanart") + suffix,
+                                         QStringLiteral("backdrop") + suffix,
+                                         stem + QStringLiteral(" fanart") + suffix,
+                                         stem + QStringLiteral(" backdrop") + suffix}) {
+            if (fileNames.contains(candidate)) {
+                return candidate;
+            }
+        }
+    }
 
-    for (const QString &candidate : candidates) {
-        if (fileNames.contains(candidate)) {
-            return candidate;
+    for (const QString &extension : imageExtensions()) {
+        const QString suffix = QLatin1Char('.') + extension;
+        for (const QString &candidate : {stem + QStringLiteral("-backdrop") + suffix,
+                                         stem + QStringLiteral("-fanart") + suffix}) {
+            if (fileNames.contains(candidate)) {
+                return candidate;
+            }
         }
     }
 
