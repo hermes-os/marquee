@@ -6,6 +6,15 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- While Left or Right is held past half a second the picture now follows the
+  scrub: the player sets libmpv's `hr-seek` to `no` for the hold, previews the
+  frame the clock points at (one preview seek at a time, only the newest target
+  queued behind it, so a long hold leaves no backlog) and, on release, seeks
+  exactly to the landing time and puts `hr-seek` back to `absolute`. Cancelling
+  the hold (a menu opening, Media Stop, the player closing, a new file, a lost
+  render surface) restores the seek mode and puts the picture back where the
+  hold began. The watch-progress position never takes a preview time, only the
+  landing.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the

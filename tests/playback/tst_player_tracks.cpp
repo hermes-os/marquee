@@ -56,6 +56,19 @@ constexpr auto kSrt = "1\n00:00:00,000 --> 00:00:01,500\nHello\n";
         && ffmpeg.exitCode() == 0;
 }
 
+/// A two-minute clip with a keyframe every second. The audio track is what
+/// lets libmpv play it on a host with no render context.
+[[nodiscard]] bool writeScrubClip(const QString &path)
+{
+    QProcess ffmpeg;
+    ffmpeg.start(QStringLiteral("ffmpeg"),
+                 {"-v", "error", "-y", "-f", "lavfi", "-i", "color=c=black:s=64x64:d=120:r=2",
+                  "-f", "lavfi", "-i", "sine=d=120", "-c:v", "mpeg4", "-g", "2",
+                  "-keyint_min", "2", "-c:a", "aac", path});
+    return ffmpeg.waitForFinished(120000) && ffmpeg.exitStatus() == QProcess::NormalExit
+        && ffmpeg.exitCode() == 0;
+}
+
 /// A two-second clip with one audio track and no subtitles.
 [[nodiscard]] bool writePlainClip(const QString &path)
 {
@@ -85,6 +98,12 @@ constexpr auto kSrt = "1\n00:00:00,000 --> 00:00:01,500\nHello\n";
         && ffmpeg.exitCode() == 0;
 }
 
+// Without a render context libmpv plays only the audio, whose packets are
+// about a tenth of a second long, so "exact" is judged to a quarter second; a
+// keyframe landing would be off by up to the one second between the scrub
+// clip's keyframes.
+constexpr double kLandingTolerance = 0.25;
+
 [[nodiscard]] QVariantMap trackAt(const QVariantList &tracks, int index)
 {
     return tracks.value(index).toMap();
@@ -98,6 +117,7 @@ class PlayerTracksTest final : public QObject
 private:
     QTemporaryDir m_directory;
     QString m_clip;
+    QString m_scrubClip;
 
     /// Opens `m_clip` the way the player screen does once the scene graph has
     /// handed the item a render context: the context's arrival is the only
@@ -120,6 +140,8 @@ private slots:
         QVERIFY(m_directory.isValid());
         m_clip = QDir(m_directory.path()).filePath(QStringLiteral("clip.mkv"));
         QVERIFY2(writeTrackClip(m_directory.path(), m_clip), "ffmpeg could not make the clip");
+        m_scrubClip = QDir(m_directory.path()).filePath(QStringLiteral("scrub.mkv"));
+        QVERIFY2(writeScrubClip(m_scrubClip), "ffmpeg could not make the scrub clip");
     }
 
     void itListsTheFilesAudioAndSubtitleTracks()
@@ -763,6 +785,172 @@ private slots:
         video.seekRelative(-0.5);
         QTRY_VERIFY_WITH_TIMEOUT(video.position() < forward - 0.2, 5000);
         QVERIFY(!video.failed());
+    }
+
+    // Opens the long clip, paused at `at` seconds, ready to scrub.
+    void openForScrub(MpvVideoItem &video, double at)
+    {
+        open(video, m_scrubClip);
+        QTRY_VERIFY_WITH_TIMEOUT(video.duration() > 100.0, 10000);
+        video.pause();
+        QTRY_VERIFY_WITH_TIMEOUT(video.paused(), 5000);
+        QVERIFY(video.seekAbsolute(at));
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(video.position() - at) < 0.6, 5000);
+    }
+
+    [[nodiscard]] static double timePosition(const MpvVideoItem &video)
+    {
+        return video.propertyForTest(QStringLiteral("time-pos")).toDouble();
+    }
+
+    // A hold relaxes libmpv's seek mode for its previews, the clock the
+    // session stores stays where the hold began, and letting go lands
+    // exactly where the scrub got to with the normal seek mode back. (What
+    // the picture shows during the hold is judged where a render context
+    // exists: tst_playback.)
+    void releaseLandsExactlyAndRestoresTheSeekMode()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        QCOMPARE(video.propertyForTest(QStringLiteral("hr-seek")), QStringLiteral("absolute"));
+        const double origin = video.position();
+
+        video.beginScrub();
+        QVERIFY(video.scrubbing());
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+        video.previewScrub(origin + 7.3);
+        video.previewScrub(origin + 12.37);
+        QTest::qWait(300);
+        QCOMPARE(video.position(), origin);
+
+        const double landing = origin + 12.37;
+        QVERIFY(video.finishScrub(landing));
+        QVERIFY(!video.scrubbing());
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("absolute"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(timePosition(video) - landing) < kLandingTolerance, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(video.position() - landing) < kLandingTolerance, 5000);
+        QVERIFY(video.paused());
+        QVERIFY2(!video.failed(), qPrintable(video.errorMessage()));
+    }
+
+    // A hold of ten seconds calls for a preview at every tick; only one seek
+    // may be in flight, and nothing keeps moving the picture after release.
+    void previewsDoNotPileUpAndLeaveNoBacklogAfterRelease()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 5.0);
+        video.beginScrub();
+        const int before = video.previewSeeksIssuedForTest();
+        for (int step = 1; step <= 200; ++step) {
+            video.previewScrub(5.0 + step * 0.5);
+        }
+        // The loop never yielded to the event loop, so libmpv cannot have
+        // answered the first one: the other 199 collapsed into one.
+        QCOMPARE(video.previewSeeksIssuedForTest() - before, 1);
+
+        const double landing = 5.0 + 200 * 0.5;
+        QVERIFY(video.finishScrub(landing));
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(video.position() - landing) < kLandingTolerance, 5000);
+
+        const int afterRelease = video.previewSeeksIssuedForTest();
+        QTest::qWait(600);
+        QCOMPARE(video.previewSeeksIssuedForTest(), afterRelease);
+        QVERIFY(qAbs(timePosition(video) - landing) < kLandingTolerance);
+        QVERIFY(qAbs(video.position() - landing) < kLandingTolerance);
+    }
+
+    // Cancelling puts the picture back where the hold began and the seek mode
+    // back to normal, without landing anywhere else.
+    void cancellingAScrubRestoresThePictureAndTheSeekMode()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 30.0);
+        const double origin = video.position();
+        video.beginScrub();
+        video.previewScrub(origin + 20.0);
+        QTest::qWait(300);
+
+        video.cancelScrub();
+        QVERIFY(!video.scrubbing());
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("absolute"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(timePosition(video) - origin) < kLandingTolerance, 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(qAbs(video.position() - origin) < kLandingTolerance, 5000);
+        QTest::qWait(300);
+        QVERIFY(qAbs(video.position() - origin) < kLandingTolerance);
+        QVERIFY(video.paused());
+    }
+
+    // The player closing: stop() ends the hold and restores the mode.
+    void stoppingTheItemMidScrubRestoresTheSeekMode()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 30.0);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+        video.previewScrub(60.0);
+
+        video.stop();
+        QVERIFY(!video.scrubbing());
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("absolute"), 5000);
+        // A preview that was still queued does not seek the empty player.
+        QTest::qWait(300);
+        QVERIFY(!video.failed());
+    }
+
+    // The next episode: a new source ends the hold and the next file does not
+    // inherit the relaxed seek mode.
+    void aNewSourceMidScrubRestoresTheSeekMode()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 30.0);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+
+        video.setSource(QUrl::fromLocalFile(m_clip));
+        QVERIFY(!video.scrubbing());
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("absolute"), 5000);
+    }
+
+    // A lost render surface takes the hold with it.
+    void losingTheRenderSurfaceMidScrubRestoresTheSeekMode()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 30.0);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+
+        QVERIFY(QMetaObject::invokeMethod(&video, "onRenderContextLost"));
+        QVERIFY(!video.scrubbing());
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("absolute"), 5000);
+    }
+
+    // Scrubbing to the very end and letting go: the previews on the way are
+    // not the film ending, and the film ends once it plays on from the
+    // landing, exactly once.
+    void scrubbingToTheEndEndsTheFilmOnlyWhenItPlaysOnFromTheLanding()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 60.0);
+        QSignalSpy ended(&video, &MpvVideoItem::playbackEnded);
+        video.beginScrub();
+        video.previewScrub(200.0);
+        QTest::qWait(500);
+        QCOMPARE(ended.count(), 0);
+        QVERIFY(video.finishScrub(video.duration()));
+        QTRY_VERIFY_WITH_TIMEOUT(video.position() > video.duration() - 1.0, 5000);
+        video.play();
+        QTRY_COMPARE_WITH_TIMEOUT(ended.count(), 1, 10000);
+        QTest::qWait(300);
+        QCOMPARE(ended.count(), 1);
     }
 
     // The S key: the first subtitle the file lists, then Off.

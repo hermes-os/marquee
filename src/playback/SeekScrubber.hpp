@@ -92,6 +92,14 @@ signals:
     void skipRequested(double seconds);
     /// Pause (true) or resume (false) the film.
     void pauseRequested(bool paused);
+    /// A hold has just become a scrub; the picture should start following it.
+    void scrubStarted();
+    /// The scrub reached a new target: show the film there. Not the final
+    /// seek, which only seekRequested carries.
+    void previewRequested(double seconds);
+    /// A hold ended without a seek (cancel): the picture goes back to where
+    /// the hold began.
+    void scrubCancelled();
 
 private:
     [[nodiscard]] qint64 now() const;

@@ -77,6 +77,46 @@ bool writeSplitFieldClip(const QString &path, int frames = 20, int framesPerSeco
     return file.error() == QFileDevice::NoError;
 }
 
+/// An uncompressed one-frame-a-second clip whose whole picture gets brighter
+/// by a fixed step every second, so a rendered frame says which second of the
+/// film it shows.
+constexpr int kRampFrames = 200;
+constexpr int kRampFirstLuma = 40;
+constexpr int kRampLastLuma = 235;
+
+bool writeBrightnessRampClip(const QString &path)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    file.write(QStringLiteral("YUV4MPEG2 W%1 H%2 F1:1 Ip A1:1 C420mpeg2\n")
+                   .arg(kClipWidth)
+                   .arg(kClipHeight)
+                   .toUtf8());
+    const QByteArray chromaPlane((kClipWidth / 2) * (kClipHeight / 2), '\x80');
+    for (int frame = 0; frame < kRampFrames; ++frame) {
+        const int luma = kRampFirstLuma
+            + frame * (kRampLastLuma - kRampFirstLuma) / (kRampFrames - 1);
+        file.write("FRAME\n");
+        file.write(QByteArray(kClipWidth * kClipHeight, static_cast<char>(luma)));
+        file.write(chromaPlane);
+        file.write(chromaPlane);
+    }
+    file.close();
+    return file.error() == QFileDevice::NoError;
+}
+
+/// The grey the scene shows for the ramp clip at `seconds` (limited-range luma
+/// drawn as full-range RGB).
+double rampGreyAt(double seconds)
+{
+    const double frame = std::clamp(std::floor(seconds), 0.0, double(kRampFrames - 1));
+    const double luma = kRampFirstLuma
+        + frame * (kRampLastLuma - kRampFirstLuma) / (kRampFrames - 1);
+    return (luma - 16.0) * 255.0 / 219.0;
+}
+
 /// A QQuickFramebufferObject only renders under the OpenGL scene graph, which
 /// needs a display-backed platform plugin. Hosts without one skip those cases.
 bool rendersWithOpenGl(QQuickWindow *window)
@@ -835,6 +875,82 @@ private slots:
         QCOMPARE(video->property("errorMessage").toString(), QString{});
 
         AppPaths::clearRuntimeRoot();
+    }
+
+    // PlayerView.swift:478-523: while a hold scrubs, the picture shows the
+    // frame the clock points at, not the frame the hold began on; letting go
+    // lands exactly there and the film plays on from it.
+    void aScrubbingHoldShowsTheLiveFrameAndReleaseLandsThere()
+    {
+        QTemporaryDir runtimeRoot;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restorePaths = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        const QString clip = runtimeRoot.filePath(QStringLiteral("ramp.y4m"));
+        QVERIFY(writeBrightnessRampClip(clip));
+
+        ApplicationController controller;
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        QVERIFY2(window != nullptr, "qml/Main.qml did not load from the module");
+        if (!rendersWithOpenGl(window)) {
+            QSKIP("Scene graph is not running on OpenGL; the libmpv render path cannot run");
+        }
+
+        controller.playLocalFile(clip);
+        QPointer<MpvVideoItem> video = qobject_cast<MpvVideoItem *>(
+            window->findChild<QQuickItem *>(QStringLiteral("videoSurface")));
+        QObject *scrubber = window->findChild<QObject *>(QStringLiteral("seekScrubber"));
+        QVERIFY2(!video.isNull() && scrubber != nullptr, "PlayerScreen lacks its video or scrubber");
+
+        // Playing near the start: the first frames are the darkest ones.
+        QVERIFY2(!renderUntil(window, video, [video](const QImage &image) {
+                     return !video.isNull() && video->duration() > 100.0
+                         && video->position() > 0.5
+                         && averageBrightness(image, video, 0.5, 0.25) < rampGreyAt(8.0);
+                 }).isNull(),
+                 "The ramp clip never reached its first frames");
+        QVERIFY2(!video.isNull(), kSurfaceReleased);
+        QCOMPARE(video->propertyForTest(QStringLiteral("hr-seek")), QStringLiteral("absolute"));
+        QSignalSpy seeks(scrubber, SIGNAL(seekRequested(double)));
+
+        QTest::keyPress(window, Qt::Key_Right);
+        const double scrubGrey = rampGreyAt(25.0);
+        const QImage scrubbed = renderUntil(window, video, [&](const QImage &image) {
+            return !video.isNull() && scrubber->property("scrubbing").toBool()
+                && averageBrightness(image, video, 0.5, 0.25) > scrubGrey;
+        }, 10000);
+        QVERIFY2(!video.isNull(), kSurfaceReleased);
+        QVERIFY2(!scrubbed.isNull(),
+                 "The picture stayed on the frame the hold began on while the scrub moved on");
+        // The clock the session stores has not followed the previews.
+        QVERIFY2(video->position() < 8.0,
+                 qPrintable(QStringLiteral("The playback position followed a preview: %1")
+                                .arg(video->position())));
+        QCOMPARE(video->propertyForTest(QStringLiteral("hr-seek")), QStringLiteral("no"));
+        QVERIFY(video->scrubbing());
+
+        QTest::keyRelease(window, Qt::Key_Right);
+        QTRY_COMPARE(seeks.count(), 1);
+        const double landing = seeks.at(0).at(0).toDouble();
+        QVERIFY(landing > 25.0);
+        QVERIFY(!scrubber->property("scrubbing").toBool());
+        QVERIFY(!video->scrubbing());
+
+        // The film plays on from the landing and the picture is the landing's.
+        QVERIFY2(!renderUntil(window, video, [&](const QImage &image) {
+                     if (video.isNull()) {
+                         return false;
+                     }
+                     const double position = video->position();
+                     return position >= landing - 0.3 && position < landing + 6.0
+                         && std::abs(averageBrightness(image, video, 0.5, 0.25)
+                                     - rampGreyAt(position)) < 12.0;
+                 }).isNull(),
+                 qPrintable(QStringLiteral("The film did not land at %1").arg(landing)));
+        QVERIFY2(!video.isNull(), kSurfaceReleased);
+        QTRY_COMPARE(video->propertyForTest(QStringLiteral("hr-seek")), QStringLiteral("absolute"));
+        QTRY_VERIFY(!video->paused());
+        QCOMPARE(video->errorMessage(), QString{});
     }
 
     void repeatedPlayerTeardownKeepsPlaybackHealthy()

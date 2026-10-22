@@ -1006,11 +1006,25 @@ FocusScope {
             }
         }
         onSeekRequested: seconds => {
-            if (video.seekAbsolute(seconds)) {
+            // The end of a hold: the item takes the exact seek to the landing
+            // and puts its scrub-time seek mode back.
+            if (video.finishScrub(seconds)) {
                 root.startupSeeking = true
             }
         }
         onPauseRequested: paused => paused ? video.pause() : video.play()
+        // The picture follows the hold (PlayerView.swift:478-523); the item
+        // owns the preview seeks and their restore.
+        onScrubStarted: video.beginScrub()
+        onPreviewRequested: seconds => video.previewScrub(seconds)
+        onScrubCancelled: video.cancelScrub()
+    }
+
+    // A menu taking the remote ends a hold that is still scrubbing.
+    onMenuOpenChanged: {
+        if (root.menuOpen) {
+            scrubber.cancel()
+        }
     }
 
     // A key-up that never arrives (the window lost focus mid-hold) must not
@@ -1124,6 +1138,7 @@ FocusScope {
             video.pause()
             break
         case Qt.Key_MediaStop:
+            scrubber.cancel()
             video.stop()
             // The oracle's .stopped branch draws no startup copy (:112,
             // :121): the session is over even though the item's latch never

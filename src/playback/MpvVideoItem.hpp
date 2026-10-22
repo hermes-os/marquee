@@ -2,11 +2,13 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 
 #include <QMetaType>
 #include <QList>
 #include <QQuickFramebufferObject>
 #include <QString>
+#include <QTimer>
 #include <QUrl>
 #include <QVariantList>
 #include <QtQml/qqmlregistration.h>
@@ -105,6 +107,11 @@ class MpvVideoItem : public QQuickFramebufferObject
     /// The speeds the HUD menu and the `[` and `]` keys step through
     /// (PlayerView.swift:15).
     Q_PROPERTY(QVariantList speedSteps READ speedSteps CONSTANT)
+    /// True from beginScrub until the hold ends (finished or cancelled). While
+    /// it is true the picture follows previewScrub and `position` stays where
+    /// the hold began: only the landing is ever a position the session may
+    /// store.
+    Q_PROPERTY(bool scrubbing READ scrubbing NOTIFY scrubbingChanged)
 
 public:
     explicit MpvVideoItem(QQuickItem *parent = nullptr);
@@ -212,6 +219,24 @@ public:
     /// shows, otherwise the first subtitle the file lists.
     Q_INVOKABLE void toggleSubtitles();
 
+    /// A Left or Right hold that scrubs (MPVPlayerService.swift:3050-3085).
+    /// beginScrub relaxes libmpv's `hr-seek` to `no` so previews land on
+    /// keyframes quickly; previewScrub shows the frame at `seconds`, one
+    /// preview seek in flight at a time with only the newest target queued
+    /// behind it; finishScrub seeks exactly to the landing and restores
+    /// `hr-seek`; cancelScrub returns the picture to where the hold began and
+    /// restores it. None of them blocks on libmpv, and none moves `position`
+    /// to a previewed time. finishScrub returns whether the seek was issued
+    /// and, with no scrub running, is a plain absolute seek.
+    Q_INVOKABLE void beginScrub();
+    Q_INVOKABLE void previewScrub(double seconds);
+    Q_INVOKABLE bool finishScrub(double seconds);
+    Q_INVOKABLE void cancelScrub();
+    [[nodiscard]] bool scrubbing() const;
+    /// How many preview seeks have been handed to libmpv, so a test can show
+    /// that a flood of previews is coalesced. Test-only, like the others.
+    [[nodiscard]] int previewSeeksIssuedForTest() const;
+
     [[nodiscard]] double volume() const;
     [[nodiscard]] bool muted() const;
     [[nodiscard]] double speed() const;
@@ -251,6 +276,7 @@ signals:
     void volumeChanged();
     void mutedChanged();
     void speedChanged();
+    void scrubbingChanged();
 
 private slots:
     void drainEvents();
@@ -353,6 +379,16 @@ private:
     void addSidecarSubtitles();
     void applySubtitleScale();
     void resetPlaybackControls();
+    // The scrub helpers: all asynchronous, so the GUI thread never waits on
+    // libmpv's core thread.
+    void setHrSeek(const char *value);
+    void issuePreview(double seconds);
+    void beginSettle(double landing);
+    void endSettle();
+    void leaveScrub();
+    void previewTimedOut();
+    void handlePlaybackRestart();
+    void handleCommandReply(uint64_t replyId, int error);
 
     std::shared_ptr<mpv_handle> m_core;
     std::shared_ptr<MpvNotifier> m_notifier;
@@ -454,4 +490,23 @@ private:
     // proof, so a reload that itself fails still reports genuine.
     bool m_playedBeforeReload{false};
     QString m_errorMessage;
+
+    // Scrub state. `m_scrubHolding` runs from beginScrub to the end of the
+    // hold; `m_scrubSettling` from then until libmpv confirms the exact seek
+    // that ends it, during which libmpv's position reports (still those of
+    // previews) are ignored so the clock never shows a previewed time.
+    bool m_scrubHolding{false};
+    bool m_scrubSettling{false};
+    bool m_hrSeekRelaxed{false};
+    bool m_previewIssued{false};
+    bool m_previewInFlight{false};
+    std::optional<double> m_previewPending;
+    double m_scrubOrigin{0.0};
+    double m_settleLanding{0.0};
+    uint64_t m_settleSerial{0};
+    int m_previewSeeksIssued{0};
+    // libmpv can drop the restart report of a seek that a newer one replaced,
+    // or never raise it without a video output; neither may wedge the scrub.
+    QTimer m_previewWatchdog;
+    QTimer m_settleWatchdog;
 };

@@ -30,6 +30,17 @@ constexpr uint64_t kSubtitleIdProperty = 7;
 constexpr uint64_t kVolumeProperty = 8;
 constexpr uint64_t kMuteProperty = 9;
 constexpr uint64_t kSpeedProperty = 10;
+// Reply ids of the asynchronous scrub commands, kept apart from the observed
+// property ids above.
+constexpr uint64_t kPreviewReply = 101;
+constexpr uint64_t kSettleReplyBase = 1000;
+constexpr uint64_t kHrSeekReply = 103;
+constexpr uint64_t kSettleTimeReplyBase = 1'000'000;
+// The released app keeps hr-seek at absolute outside a scrub
+// (MPVPlayerService.swift:3079); libmpv's own default differs.
+constexpr const char *kNormalHrSeek = "absolute";
+constexpr const char *kScrubHrSeek = "no";
+constexpr int kScrubWatchdogMs = 1500;
 
 // PlayerView.swift:15.
 constexpr std::array<double, 7> kSpeedSteps{0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0};
@@ -208,6 +219,7 @@ MpvVideoItem::MpvVideoItem(QQuickItem *parent)
     // `SettingsStore::hardwareDecodingEnabled`.
     mpv_set_option_string(core, "hwdec", m_hardwareDecodingEnabled ? "auto-safe" : "no");
     mpv_set_option_string(core, "keep-open", "yes");
+    mpv_set_option_string(core, "hr-seek", kNormalHrSeek);
     // Subtitles start Off and a language setting or the viewer turns one on
     // (`MPVPlayerService.swift:2435` sets sid=no). The sidecar files beside
     // the video are found by `SubtitleDiscovery` and added at the start of
@@ -241,6 +253,13 @@ MpvVideoItem::MpvVideoItem(QQuickItem *parent)
                      .arg(mpvErrorText(initialized)));
         return;
     }
+
+    m_previewWatchdog.setSingleShot(true);
+    m_previewWatchdog.setInterval(kScrubWatchdogMs);
+    connect(&m_previewWatchdog, &QTimer::timeout, this, &MpvVideoItem::previewTimedOut);
+    m_settleWatchdog.setSingleShot(true);
+    m_settleWatchdog.setInterval(kScrubWatchdogMs);
+    connect(&m_settleWatchdog, &QTimer::timeout, this, &MpvVideoItem::endSettle);
 
     mpv_observe_property(core, kPausedProperty, "pause", MPV_FORMAT_FLAG);
     mpv_observe_property(core, kTimePositionProperty, "time-pos", MPV_FORMAT_DOUBLE);
@@ -318,6 +337,9 @@ void MpvVideoItem::setSource(const QUrl &source)
     if (m_source == source) {
         m_loadedSource.clear();
     }
+    // A hold scrubbing the previous file has nothing left to scrub, and its
+    // relaxed seek mode must not carry into the next file.
+    leaveScrub();
     m_source = source;
     // PlayerView.swift:62, :108-124: the startup cover belongs to a one-time
     // start-of-session state. A new source — or a same-source replay, which
@@ -503,6 +525,7 @@ void MpvVideoItem::stop()
         return;
     }
 
+    leaveScrub();
     const char *command[] = {"stop", nullptr};
     const int result = mpv_command(m_core.get(), command);
     if (result < 0) {
@@ -568,6 +591,220 @@ bool MpvVideoItem::seekRelative(double seconds)
         return false;
     }
     return true;
+}
+
+int MpvVideoItem::previewSeeksIssuedForTest() const
+{
+    return m_previewSeeksIssued;
+}
+
+bool MpvVideoItem::scrubbing() const
+{
+    return m_scrubHolding;
+}
+
+void MpvVideoItem::setHrSeek(const char *value)
+{
+    if (!m_core) {
+        return;
+    }
+    // Asynchronous: a synchronous property write waits for libmpv's core
+    // thread, which can be busy tearing audio down.
+    const char *text = value;
+    const int result = mpv_set_property_async(m_core.get(), kHrSeekReply, "hr-seek",
+                                              MPV_FORMAT_STRING, &text);
+    if (result < 0) {
+        qCWarning(logPlayback) << QStringLiteral("Could not change the seek mode: %1")
+                                      .arg(mpvErrorText(result));
+    }
+}
+
+void MpvVideoItem::beginScrub()
+{
+    if (!m_core || !m_fileLoaded || m_scrubHolding) {
+        return;
+    }
+    // A hold that starts while the last one's exact seek is still settling
+    // supersedes it: libmpv replaces a seek in progress, and the new hold
+    // ends in its own exact seek.
+    m_settleWatchdog.stop();
+    m_scrubSettling = false;
+    m_scrubHolding = true;
+    m_scrubOrigin = m_position;
+    m_previewIssued = false;
+    m_previewInFlight = false;
+    m_previewPending.reset();
+    m_hrSeekRelaxed = true;
+    setHrSeek(kScrubHrSeek);
+    emit scrubbingChanged();
+}
+
+void MpvVideoItem::previewScrub(double seconds)
+{
+    if (!m_scrubHolding || !std::isfinite(seconds)) {
+        return;
+    }
+    const double target = qMax(0.0, seconds);
+    // One preview seek runs at a time. Anything asked meanwhile replaces the
+    // single queued target, so a long hold leaves at most one seek behind it
+    // however many steps it took.
+    if (m_previewInFlight) {
+        m_previewPending = target;
+        return;
+    }
+    issuePreview(target);
+}
+
+void MpvVideoItem::issuePreview(double seconds)
+{
+    const QByteArray target = QByteArray::number(seconds, 'f', 3);
+    const char *command[] = {"seek", target.constData(), "absolute", nullptr};
+    const int result = mpv_command_async(m_core.get(), kPreviewReply, command);
+    if (result < 0) {
+        // A preview is a courtesy: its refusal is not a playback failure.
+        qCWarning(logPlayback) << QStringLiteral("Could not preview a seek: %1")
+                                      .arg(mpvErrorText(result));
+        return;
+    }
+    ++m_previewSeeksIssued;
+    m_previewIssued = true;
+    m_previewInFlight = true;
+    m_previewWatchdog.start();
+}
+
+void MpvVideoItem::previewTimedOut()
+{
+    handlePlaybackRestart();
+}
+
+void MpvVideoItem::handlePlaybackRestart()
+{
+    if (!m_scrubHolding || !m_previewInFlight) {
+        return;
+    }
+    m_previewInFlight = false;
+    m_previewWatchdog.stop();
+    if (m_previewPending.has_value() && m_core) {
+        const double next = *m_previewPending;
+        m_previewPending.reset();
+        issuePreview(next);
+    }
+}
+
+void MpvVideoItem::handleCommandReply(uint64_t replyId, int error)
+{
+    if (replyId == kSettleReplyBase + m_settleSerial && m_scrubSettling) {
+        // libmpv has taken the exact seek, so the position reports that follow
+        // are the landing's own and the clock may follow them again.
+        if (error < 0) {
+            qCWarning(logPlayback) << QStringLiteral("The seek ending a scrub failed: %1")
+                                          .arg(mpvErrorText(error));
+            endSettle();
+            return;
+        }
+        // The seek is queued ahead of this read on libmpv's own thread, and
+        // libmpv answers `time-pos` with a pending seek's target, so the
+        // answer is where the film landed. Position reports that were
+        // already on their way when the seek was issued are older than it.
+        const int read = m_core ? mpv_get_property_async(m_core.get(),
+                                                        kSettleTimeReplyBase + m_settleSerial,
+                                                        "time-pos", MPV_FORMAT_DOUBLE)
+                                : MPV_ERROR_UNINITIALIZED;
+        if (read < 0) {
+            endSettle();
+        }
+        return;
+    }
+    if (error >= 0) {
+        return;
+    }
+    if (replyId == kPreviewReply) {
+        qCWarning(logPlayback) << QStringLiteral("A preview seek failed: %1")
+                                      .arg(mpvErrorText(error));
+        // Nothing will restart: let the newest target through.
+        handlePlaybackRestart();
+    }
+}
+
+void MpvVideoItem::beginSettle(double landing)
+{
+    m_scrubHolding = false;
+    m_previewInFlight = false;
+    m_previewPending.reset();
+    m_previewWatchdog.stop();
+    // The exact seek is explicit, so it does not depend on whether the
+    // restore of hr-seek below has been applied yet.
+    const QByteArray target = QByteArray::number(landing, 'f', 3);
+    const char *command[] = {"seek", target.constData(), "absolute+exact", nullptr};
+    ++m_settleSerial;
+    const int result =
+        mpv_command_async(m_core.get(), kSettleReplyBase + m_settleSerial, command);
+    m_hrSeekRelaxed = false;
+    setHrSeek(kNormalHrSeek);
+    emit scrubbingChanged();
+    if (result < 0) {
+        setError(QStringLiteral("Could not seek: %1").arg(mpvErrorText(result)));
+        m_scrubSettling = false;
+        return;
+    }
+    m_scrubSettling = true;
+    m_settleLanding = landing;
+    // The clock moves to the landing at once; previews' own reports stay out
+    // until libmpv confirms the seek.
+    setPositionValue(landing);
+    m_settleWatchdog.start();
+}
+
+void MpvVideoItem::endSettle()
+{
+    m_settleWatchdog.stop();
+    m_scrubSettling = false;
+}
+
+bool MpvVideoItem::finishScrub(double seconds)
+{
+    if (!m_scrubHolding) {
+        return seekAbsolute(seconds);
+    }
+    if (!m_core || !std::isfinite(seconds)) {
+        leaveScrub();
+        return false;
+    }
+    beginSettle(qMax(0.0, seconds));
+    return m_scrubSettling;
+}
+
+void MpvVideoItem::cancelScrub()
+{
+    if (!m_scrubHolding) {
+        return;
+    }
+    if (m_previewIssued && m_core) {
+        // The picture is on a previewed frame: put it back where the hold
+        // began.
+        beginSettle(m_scrubOrigin);
+        return;
+    }
+    leaveScrub();
+}
+
+void MpvVideoItem::leaveScrub()
+{
+    const bool wasHolding = m_scrubHolding;
+    m_scrubHolding = false;
+    m_scrubSettling = false;
+    m_previewInFlight = false;
+    m_previewIssued = false;
+    m_previewPending.reset();
+    m_previewWatchdog.stop();
+    m_settleWatchdog.stop();
+    if (m_hrSeekRelaxed) {
+        m_hrSeekRelaxed = false;
+        setHrSeek(kNormalHrSeek);
+    }
+    if (wasHolding) {
+        emit scrubbingChanged();
+    }
 }
 
 void MpvVideoItem::setVolume(double percent)
@@ -1055,7 +1292,10 @@ void MpvVideoItem::applyEvent(mpv_event *event)
                 // entry's own FILE_LOADED: a stale position would clear the
                 // startup latch at once, and a stale end would end a file
                 // that has not begun.
-                if (m_fileLoaded) {
+                // While a scrub holds the clock, or its exact seek has not
+                // settled, the reports describe previews: the session must
+                // not take one as where the film is.
+                if (m_fileLoaded && !m_scrubHolding && !m_scrubSettling) {
                     setPositionValue(*static_cast<double *>(property->data));
                 }
             } else if (name == "eof-reached" && property->format == MPV_FORMAT_FLAG
@@ -1128,6 +1368,31 @@ void MpvVideoItem::applyEvent(mpv_event *event)
         }
         case MPV_EVENT_FILE_LOADED:
             handleFileLoaded();
+            break;
+        case MPV_EVENT_PLAYBACK_RESTART:
+            handlePlaybackRestart();
+            break;
+        case MPV_EVENT_COMMAND_REPLY:
+            handleCommandReply(event->reply_userdata, event->error);
+            break;
+        case MPV_EVENT_GET_PROPERTY_REPLY: {
+            const auto *property = static_cast<mpv_event_property *>(event->data);
+            if (event->reply_userdata == kSettleTimeReplyBase + m_settleSerial
+                && m_scrubSettling) {
+                if (event->error >= 0 && property != nullptr
+                    && property->format == MPV_FORMAT_DOUBLE && property->data != nullptr) {
+                    setPositionValue(*static_cast<double *>(property->data));
+                }
+                endSettle();
+                break;
+            }
+            break;
+        }
+        case MPV_EVENT_SET_PROPERTY_REPLY:
+            if (event->error < 0) {
+                qCWarning(logPlayback) << QStringLiteral("Could not change the seek mode: %1")
+                                              .arg(mpvErrorText(event->error));
+            }
             break;
         case MPV_EVENT_END_FILE: {
             const auto *endFile = static_cast<mpv_event_end_file *>(event->data);
@@ -1515,6 +1780,8 @@ void MpvVideoItem::onRenderContextReady()
 void MpvVideoItem::onRenderContextLost()
 {
     m_renderContextReady = false;
+    // The frames a scrub previews go with the surface.
+    leaveScrub();
     // Without video there are no frames to schedule a repaint, so the item has
     // to ask for one itself or the scene graph never builds another surface.
     update();

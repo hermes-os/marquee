@@ -150,8 +150,12 @@ void SeekScrubber::cancel()
     if (m_direction == 0) {
         return;
     }
-    const bool resume = m_scrubbing && !m_wasPausedBeforeScrub;
+    const bool wasScrubbing = m_scrubbing;
+    const bool resume = wasScrubbing && !m_wasPausedBeforeScrub;
     endHold();
+    if (wasScrubbing) {
+        emit scrubCancelled();
+    }
     if (resume) {
         emit pauseRequested(false);
     }
@@ -189,6 +193,7 @@ void SeekScrubber::poll()
     }
     if (m_target != before) {
         emit targetChanged();
+        emit previewRequested(m_target);
     }
 }
 
@@ -200,6 +205,7 @@ void SeekScrubber::beginScrub()
     m_wasPausedBeforeScrub = m_paused;
     m_target = m_position;
     emit scrubbingChanged();
+    emit scrubStarted();
     emit pauseRequested(true);
 }
 
