@@ -356,6 +356,11 @@ Where: `tests/playback/tst_playback.cpp:831` ("No decoded video reached the Qt Q
 What happens: about 1 in 10 full `tst_playback` runs under xvfb/xcb fail this case. It fails the same way on the 4da0105 source, so 9cc342b did not introduce it. 15 of 16 targeted reruns of the case passed.
 Found: round 3 review of 4da0105..9cc342b.
 
+## tst_player_window still crashes now and then under xvfb on the basic render loop
+Where: `tests/playback/tst_player_window.cpp` (every case builds and tears down its own `QQmlApplicationEngine` and window); `tests/CMakeLists.txt` runs it with `QSG_RENDER_LOOP=basic`.
+What happens: `QSG_RENDER_LOOP=basic` removed the render-thread crash in the glyph cache but not the heap corruption: 1 of 3 `ctest --repeat until-fail:15` runs went 10 passes then "corrupted double-linked list" in `~Env` (`QV4::MemoryManager::~MemoryManager`) after `theTitleBlockMatchesTheReleasedSpacingAndShadow`, and the watchdog's stack dump then hung the process until the 300 s limit. A sanitizer build (address, basic loop, xvfb) segfaulted in 1 of 3 runs on the GUI thread in `QRawFont::pixelSize()` <- `QSGInternalTextNode::addGlyphs` <- `QQuickText::updatePaintNode` during `load()` of `thePointerHidesWithTheHudAndReturnsOnMovement`, a read of a garbage pointer, not a reported use-after-free. The shipped app builds one window. The cause is not known.
+Found: round 3 fix run on e57c731, `--repeat until-fail:15` under xvfb after the basic-loop change.
+
 ## A source can stay in startup after a reload of the same file
 Where: `src/playback/MpvVideoItem.cpp:306-308` with `:1195-1196`.
 What happens: play A, call `setSource(B)` while B's loadfile is not issued (no render context) or is rejected, then call `setSource(A)` again. The second call returns early with `m_fileLoaded` already false, so A's positions are ignored and `startupPending` stays set until the surface comes back. Reachable only with a lost surface or a rejected loadfile.
