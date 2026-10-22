@@ -14,6 +14,7 @@
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScopeGuard>
+#include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QTest>
 
@@ -299,7 +300,9 @@ private slots:
         QQuickItem *bar = itemNamed(env.window, "playerProgress");
         QQuickItem *restart = itemNamed(env.window, "restartControl");
         QQuickItem *screen = itemNamed(env.window, "playerScreen");
-        QVERIFY(bar != nullptr && restart != nullptr && screen != nullptr);
+        auto *scrubber = screen != nullptr
+            ? screen->findChild<QObject *>(QStringLiteral("seekScrubber")) : nullptr;
+        QVERIFY(bar != nullptr && restart != nullptr && screen != nullptr && scrubber != nullptr);
         QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
         const auto barPoint = [&](qreal fraction) {
             return bar->mapToScene(QPointF(bar->width() * fraction, bar->height() / 2)).toPoint();
@@ -313,9 +316,15 @@ private slots:
         QTest::mouseMove(env.window, center + QPoint(5, 0));
         QTest::mouseMove(env.window, center);
         QTest::mousePress(env.window, Qt::LeftButton, Qt::NoModifier, center);
-        // Held on the bar is not a HUD control holding: Down reaches the
-        // controls as it does from the picture.
+        // Held on the bar is not a HUD control holding: Right seeks and Down
+        // reaches the controls, as from the picture. Right comes first because
+        // with a control focused it walks the controls instead.
         QVERIFY(!screen->property("hudHeld").toBool());
+        QSignalSpy skipped(scrubber, SIGNAL(skipRequested(double)));
+        QTest::keyClick(env.window, Qt::Key_Right);
+        QTRY_COMPARE(skipped.count(), 1);
+        QCOMPARE(skipped.at(0).at(0).toDouble(), 30.0);
+        QVERIFY(screen->property("pointerHolding").toBool());
         QTest::keyClick(env.window, Qt::Key_Down);
         QTRY_VERIFY(restart->hasActiveFocus());
         QVERIFY(screen->property("pointerHolding").toBool());
