@@ -254,7 +254,94 @@ struct Migration
          // which the (profile_id, media_id) key cannot.
          {},
          profileWatchProgressStatements,
-         true}
+         true},
+        {6,
+         // TMDB enrichment (TMDBEnrichmentService.swift). A movie is keyed by
+         // its media item id and a show by `show:<name>|<year>`, because the
+         // catalog stores episodes and a show exists only as the name they
+         // share. Only a movie row is tied to media_items, by the trigger: a
+         // show's metadata outlives its episodes, so an unplugged or
+         // rescanned drive never costs a refetch (and a missing root never
+         // deletes rows). Episodes cascade with their media item.
+         //
+         // fetch_state is matched, unmatched or failed; fetched_at is the last
+         // attempt. Image columns hold TMDB's own path (`/abc.jpg`) and where
+         // the cached thumbnail landed, so a failed download is retried
+         // without asking TMDB about the title again.
+         {QStringLiteral(R"SQL(
+            CREATE TABLE title_metadata (
+                owner_key TEXT PRIMARY KEY NOT NULL,
+                kind TEXT NOT NULL,
+                fetch_state TEXT NOT NULL,
+                fetched_at TEXT NOT NULL,
+                tmdb_id INTEGER,
+                overview TEXT,
+                genres TEXT NOT NULL DEFAULT '[]',
+                director TEXT,
+                certification TEXT,
+                vote_average REAL,
+                vote_count INTEGER,
+                popularity REAL,
+                collection_id INTEGER,
+                collection_name TEXT,
+                similar_tmdb_ids TEXT NOT NULL DEFAULT '[]',
+                recommended_tmdb_ids TEXT NOT NULL DEFAULT '[]',
+                release_date TEXT,
+                runtime_minutes INTEGER,
+                poster_remote_path TEXT,
+                backdrop_remote_path TEXT,
+                poster_cache_path TEXT,
+                backdrop_cache_path TEXT
+            )
+         )SQL"),
+          QStringLiteral(R"SQL(
+            CREATE TABLE title_cast (
+                owner_key TEXT NOT NULL,
+                ordinal INTEGER NOT NULL,
+                person_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                profile_path TEXT,
+                character TEXT NOT NULL,
+                PRIMARY KEY (owner_key, ordinal),
+                FOREIGN KEY (owner_key)
+                    REFERENCES title_metadata(owner_key)
+                    ON DELETE CASCADE
+            )
+         )SQL"),
+          QStringLiteral(R"SQL(
+            CREATE TABLE title_keyword (
+                owner_key TEXT NOT NULL,
+                keyword_id INTEGER NOT NULL,
+                name TEXT NOT NULL,
+                PRIMARY KEY (owner_key, keyword_id),
+                FOREIGN KEY (owner_key)
+                    REFERENCES title_metadata(owner_key)
+                    ON DELETE CASCADE
+            )
+         )SQL"),
+          QStringLiteral(R"SQL(
+            CREATE TABLE episode_metadata (
+                media_id TEXT PRIMARY KEY NOT NULL,
+                fetched_at TEXT NOT NULL,
+                tmdb_episode_id INTEGER,
+                title TEXT,
+                overview TEXT,
+                air_date TEXT,
+                vote_average REAL,
+                still_remote_path TEXT,
+                still_cache_path TEXT,
+                FOREIGN KEY (media_id)
+                    REFERENCES media_items(id)
+                    ON DELETE CASCADE
+            )
+         )SQL"),
+          QStringLiteral(R"SQL(
+            CREATE TRIGGER media_items_metadata_cleanup
+            AFTER DELETE ON media_items
+            BEGIN
+                DELETE FROM title_metadata WHERE owner_key = old.id;
+            END
+         )SQL")}}
     };
 }
 }
