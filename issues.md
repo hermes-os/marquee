@@ -13,11 +13,6 @@ appearance and interaction; a "released" comparison below means that source.
 "Not run on a display" means the finding comes from reading the source and the
 headless CTest suites, not from the theater host.
 
-## A scrubbing hold shows no live frame
-Where: `src/playback/MpvVideoItem.cpp`, `src/playback/SeekScrubber.*`, `qml/screens/PlayerScreen.qml`.
-What happens: while Left or Right is held past half a second the film is paused and the clock and progress bar show where letting go would land, but the picture stays on the frame where the hold began until the key is let go. The released app sets mpv's `hr-seek` to `no` and previews the target (`PlayerView.swift:478-523`, `MPVPlayerService.swift:3050-3059`).
-Found: implementing the hold-to-scrub; `SeekScrubber` emits only the final seek.
-
 ## libmpv core is still owned by the render item
 Where: `src/playback/MpvVideoItem.cpp` (`mpv_create`, hwdec, play/seek commands), `src/playback/PlayerController.*`.
 What happens: the render item owns the libmpv handle and every playback command; `PlayerController` holds session state only. `docs/ARCHITECTURE_V3.md` (Player-facing API and spike ownership) puts the core behind `PlayerController` once the spike is proven, and HUD features (Restart) already drive playback through the item.
@@ -361,7 +356,7 @@ Found: review of 0e91322..ba2fc10.
 ## A track query can block the GUI thread on libmpv's audio teardown
 Where: `src/playback/MpvVideoItem.cpp:946` (`applyDefaultTracks`).
 What happens: `applyDefaultTracks` called `mpv_get_property` on the GUI thread, which blocked until the 300 s test watchdog fired while libmpv's core thread waited in `pw_thread_loop_stop`. Seen under xvfb with an empty `XDG_RUNTIME_DIR` on the base build.
-Found: review of ba2fc10.
+Also: `seekAbsolute` and `seekRelative` (`src/playback/MpvVideoItem.cpp`) call `mpv_command` synchronously on the GUI thread, so a Left or Right tap, a progress-bar click or Restart waits for libmpv's core thread the same way. They predate the scrub work. Found: review of 2cf77ff..2db00b3.
 
 ## playerRouteRendersDecodedVideoRightSideUp fails about 1 run in 10 under xvfb
 Where: `tests/playback/tst_playback.cpp:831` ("No decoded video reached the Qt Quick scene").
@@ -402,3 +397,8 @@ Found: comparing the HUD with `PlayerControlsOverlay.swift` and `PlayerView.swif
 Where: `qml/screens/PlayerScreen.qml` (the `playbackStatus` row in the controls column under the progress bar).
 What happens: under the progress bar the Linux HUD shows a "Playing"/"Paused" label and a line of key hints. The released bar has neither (`PlayerControlsOverlay.swift:261-267`); the space under its bar is the 8 (14 in lean-back) padding (`:301`). The row adds height to the controls and the gradient.
 Found: review of 95952b7..4efbbe8, comparing the HUD with the released overlay.
+
+## tst_media_details aRowScrolledOutMidFadeComesBackAtRest fails offscreen
+Where: `tests/details/tst_media_details.cpp:459` (`aRowScrolledOutMidFadeComesBackAtRest`).
+What happens: under `QT_QPA_PLATFORM=offscreen` the wait for the focused episode row's scale to sit between 1.0005 and 1.03 times out, and the case fails (3 of 3 runs on 95952b7 and 3 of 3 on the scrub commit; the other 31 cases pass, the run takes about 63 s).
+Found: the live-frame scrub work, running the test on the base commit in a scratch copy and on its head.

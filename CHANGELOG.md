@@ -48,6 +48,22 @@ intermediate version bump.
   block carries the released black shadow instead), the title and the episode
   line sit the released 2 (4 in lean-back) apart, and a speed of 1.25 reads
   "1.2x" as in the released app.
+- While Left or Right is held past half a second the picture now follows the
+  scrub: the player sets libmpv's `hr-seek` to `no` for the hold, previews the
+  frame the clock points at (one preview seek at a time, only the newest target
+  queued behind it, so a long hold leaves no backlog) and, on release, seeks
+  exactly to the landing time and puts `hr-seek` back to `absolute`. Cancelling
+  the hold (a menu opening, Media Stop, the player closing, a new file, a lost
+  render surface) restores the seek mode and puts the picture back where the
+  hold began. After a release the clock and progress bar go to the landing and
+  stay there (on a film with a long keyframe interval they briefly jumped back
+  to a preview's keyframe time), and the watch-progress position and the
+  next-episode card never take a preview time, only the landing. A tap, a
+  progress-bar click or Restart in the moment after a release moves the clock
+  to where it goes (it stayed on the old landing, for good while paused, when
+  the release landed where the film already was, for example a Left hold
+  clamped at 0), and a playing film's clock follows it at once after such a
+  release instead of after a second and a half.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the

@@ -246,6 +246,65 @@ private slots:
         QCOMPARE(seeks.count(), 0);
     }
 
+    // The picture follows the hold: one signal when the scrub starts, one per
+    // new target, and a late timer that missed many ticks asks for the newest
+    // target once, not for every tick it missed.
+    void aScrubAsksForEveryNewTargetAndAHoldEndingWithASeekAsksForNoCancel()
+    {
+        SeekScrubber scrubber;
+        startAt(scrubber, 100.0);
+        QSignalSpy started(&scrubber, &SeekScrubber::scrubStarted);
+        QSignalSpy previews(&scrubber, &SeekScrubber::previewRequested);
+        QSignalSpy cancelled(&scrubber, &SeekScrubber::scrubCancelled);
+
+        scrubber.press(1);
+        m_now = 499;
+        scrubber.poll();
+        QCOMPARE(started.count(), 0);
+        QCOMPARE(previews.count(), 0);
+
+        m_now = 500;
+        scrubber.poll();
+        QCOMPARE(started.count(), 1);
+        QCOMPARE(previews.count(), 1);
+        QCOMPARE(previews.at(0).at(0).toDouble(), 101.0);
+
+        // Nothing new is due: no preview.
+        m_now = 550;
+        scrubber.poll();
+        QCOMPARE(previews.count(), 1);
+
+        m_now = 500 + 44 * 100;
+        scrubber.poll();
+        QCOMPARE(previews.count(), 2);
+        QCOMPARE(previews.at(1).at(0).toDouble(), 100.0 + scrubbedAfter(45));
+
+        scrubber.release(1);
+        QCOMPARE(cancelled.count(), 0);
+    }
+
+    void cancellingAScrubAsksThePictureToGoBackAndATapDoesNot()
+    {
+        SeekScrubber scrubber;
+        startAt(scrubber, 100.0);
+        QSignalSpy cancelled(&scrubber, &SeekScrubber::scrubCancelled);
+
+        scrubber.press(1);
+        m_now = 100;
+        scrubber.cancel();
+        QCOMPARE(cancelled.count(), 0);
+
+        m_now = 1000;
+        scrubber.press(-1);
+        m_now = 1700;
+        scrubber.poll();
+        QVERIFY(scrubber.scrubbing());
+        scrubber.cancel();
+        QCOMPARE(cancelled.count(), 1);
+        scrubber.cancel();
+        QCOMPARE(cancelled.count(), 1);
+    }
+
     void aButtonSkipIsIgnoredWhileAHoldScrubs()
     {
         SeekScrubber scrubber;
