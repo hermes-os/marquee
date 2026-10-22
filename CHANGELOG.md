@@ -6,6 +6,13 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Choosing a profile now starts Home from its first target, as the released
+  app rebuilds Home after a choice. Before, the remote's place on Home
+  survived the choice: after the remote had rested on Home's Play Something
+  capsule, or deep in the rows, the first Return after choosing a profile acted
+  on that stale place (Play Something, or nothing when nothing was playable)
+  instead of opening the first card. A switch made with the pointer, or to the
+  same profile, is covered too.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's

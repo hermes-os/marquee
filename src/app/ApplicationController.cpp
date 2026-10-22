@@ -494,6 +494,10 @@ bool ApplicationController::chooseProfile(const QString &profileId)
     // once, whichever maturity it carries.
     setActiveProfile(profile);
     m_profiles.selectProfile(profile->id);
+    // ContentView.swift:391-407 rebuilds Home at its top after a choice, so
+    // the first Return acts on Home's first target whatever the last viewer
+    // left focused, including when the same profile is chosen again.
+    m_homeRows.resetFocus();
     qCInfo(logApp) << "profile selected id=" << profile->id
                    << "maturity=" << profile->maturityLevel;
 

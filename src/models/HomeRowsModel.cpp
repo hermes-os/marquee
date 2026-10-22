@@ -590,6 +590,12 @@ void HomeRowsModel::focusCard(int row, int column)
     m_focus.setPosition(row, column);
 }
 
+void HomeRowsModel::resetFocus()
+{
+    setPlaySomethingFocused(false);
+    m_focus.reset();
+}
+
 QStringList HomeRowsModel::playSomethingCandidates() const
 {
     // A fresh salt per press (AppState.swift:239), so consecutive presses

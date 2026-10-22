@@ -124,15 +124,19 @@ void FocusNavigator::reset()
     if (empty()) {
         return;
     }
-    if (m_row == 0 && m_column == 0) {
-        return;
+    // A rebuilt surface starts at its top left with no memory of the columns
+    // it was left on, so a later Down does not return to a stale one.
+    const auto firstNonEmpty = std::find_if(
+        m_rowLengths.cbegin(), m_rowLengths.cend(), [](int count) { return count > 0; });
+    const int firstRow = static_cast<int>(std::distance(m_rowLengths.cbegin(), firstNonEmpty));
+    const bool moved = m_row != firstRow || m_column != 0;
+    m_rememberedColumns.fill(-1);
+    m_row = firstRow;
+    m_column = 0;
+    m_rememberedColumns[m_row] = m_column;
+    if (moved) {
+        emit focusChanged();
     }
-    m_row = 0;
-    m_column = clampedColumn(0, 0);
-    if (!m_rememberedColumns.isEmpty()) {
-        m_rememberedColumns[0] = m_column;
-    }
-    emit focusChanged();
 }
 
 bool FocusNavigator::moveVertical(int delta)

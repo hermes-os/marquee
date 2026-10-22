@@ -186,6 +186,12 @@ public:
     Q_INVOKABLE bool moveRight();
     /// Puts the remote on a card a pointer touched, off the capsule.
     Q_INVOKABLE void focusCard(int row, int column);
+    /// Home's first focus target: the remote off the capsule, on the first
+    /// card of the first row, with no column remembered for any row. A profile
+    /// choice rebuilds Home at the top (ContentView.swift:391-407), so what
+    /// the last viewer left focused is not carried over. The one place that
+    /// names the first target, so a Home that starts elsewhere changes it here.
+    Q_INVOKABLE void resetFocus();
     /// The ids one press of Play Something may play, best first: a fresh
     /// shuffle of the unwatched movies the profile may see (AppState.swift:
     /// 238-247). Empty when there is none. It plays nothing itself.

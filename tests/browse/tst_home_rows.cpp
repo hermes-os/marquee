@@ -583,6 +583,39 @@ private slots:
         QCOMPARE(model.rowCount(), 0);
     }
 
+    // A profile choice rebuilds Home at the top (ContentView.swift:391-407):
+    // off the capsule, on the first card, with no column kept for any row.
+    void resetFocusReturnsTheRemoteToTheFirstCard()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kNow; });
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021), movie(QStringLiteral("Tenet"), 2020)});
+        QVERIFY(model.rowCount() >= 2);
+
+        // On the capsule: Up from the first row reaches it.
+        QVERIFY(model.moveUp());
+        QVERIFY(model.playSomethingFocused());
+        model.resetFocus();
+        QVERIFY(!model.playSomethingFocused());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 0);
+
+        // Deep in the rows, with a remembered column on the row left behind.
+        model.focus()->setPosition(model.rowCount() - 1, 2);
+        model.focus()->setPosition(1, 3);
+        model.resetFocus();
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 0);
+        QVERIFY(model.moveDown());
+        QCOMPARE(model.focus()->column(), 0);
+
+        // Empty Home: nothing to address, and no capsule to rest on.
+        model.replaceItems({});
+        model.resetFocus();
+        QVERIFY(!model.playSomethingFocused());
+    }
+
     // BrowseSnapshotStore.swift:369-385 and HomeDetailView.swift:668: the row
     // holds up to twelve candidates, Home draws eight of them, and the row
     // counts twelve. Episodes never appear (docs/ARCHITECTURE_V3.md).

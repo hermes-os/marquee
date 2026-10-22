@@ -72,6 +72,42 @@ private slots:
         QVERIFY(!navigator.moveRight());
         QVERIFY(!navigator.moveDown());
     }
+
+    void resetReturnsToTheFirstCardAndForgetsRememberedColumns()
+    {
+        FocusNavigator navigator;
+        navigator.setRows({5, 5, 5});
+        navigator.setPosition(1, 3);
+        navigator.setPosition(2, 4);
+        QSignalSpy spy(&navigator, &FocusNavigator::focusChanged);
+
+        navigator.reset();
+        QCOMPARE(navigator.row(), 0);
+        QCOMPARE(navigator.column(), 0);
+        QCOMPARE(spy.count(), 1);
+
+        // Row 1 was left on column 3; a rebuilt surface carries the column
+        // of the card it came from, not the old memory.
+        QVERIFY(navigator.moveDown());
+        QCOMPARE(navigator.column(), 0);
+
+        // Already first: nothing is announced, memory is still cleared.
+        navigator.setPosition(2, 4);
+        navigator.reset();
+        navigator.reset();
+        // reset, moveDown, setPosition, and one reset that moved.
+        QCOMPARE(spy.count(), 4);
+    }
+
+    void resetSkipsALeadingEmptyRow()
+    {
+        FocusNavigator navigator;
+        navigator.setRows({0, 3});
+        navigator.setPosition(1, 2);
+        navigator.reset();
+        QCOMPARE(navigator.row(), 1);
+        QCOMPARE(navigator.column(), 0);
+    }
 };
 
 QTEST_MAIN(FocusNavigatorTest)

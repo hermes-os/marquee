@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include <QCursor>
 #include <QDir>
 #include <QFile>
 #include <QQmlApplicationEngine>
@@ -16,6 +17,7 @@
 #include "catalog/CatalogStore.hpp"
 #include "catalog/LibraryScanner.hpp"
 #include "navigation/NavigationController.hpp"
+#include "models/HomeRowsModel.hpp"
 #include "profiles/ProfileStore.hpp"
 
 namespace
@@ -38,15 +40,17 @@ namespace
     return item;
 }
 
-// A catalog holding one scanned movie, so Home has a card to take the remote.
-[[nodiscard]] bool seedOneMovie(const QString &moviesDir)
+// A catalog holding scanned movies, so Home has cards to take the remote.
+[[nodiscard]] bool seedMovies(const QString &moviesDir, int count = 1)
 {
     AppPaths::ensureDirectories();
-    QFile file(moviesDir + QStringLiteral("/Arrival (2016).mkv"));
-    if (!file.open(QIODevice::WriteOnly) || file.write("media") != 5) {
-        return false;
+    for (int index = 0; index < count; ++index) {
+        QFile file(moviesDir + QStringLiteral("/Arrival %1 (%2).mkv").arg(index).arg(2016 + index));
+        if (!file.open(QIODevice::WriteOnly) || file.write("media") != 5) {
+            return false;
+        }
+        file.close();
     }
-    file.close();
     CatalogDatabase catalog(AppPaths::catalogFile());
     catalog.migrate();
     CatalogStore store(AppPaths::catalogFile());
@@ -57,6 +61,20 @@ namespace
         store.applyScan(root, LibraryScanner::scan(root));
     }
     return !roots.isEmpty();
+}
+
+// Where the sidebar's Home entry sits in its own list, so a test does not
+// assume Home is first.
+[[nodiscard]] int homeEntryIndex(QQuickItem *sidebar)
+{
+    const QVariantList entries = sidebar->property("entries").toList();
+    for (int index = 0; index < entries.size(); ++index) {
+        if (entries.at(index).toMap().value(QStringLiteral("route")).toInt()
+            == static_cast<int>(NavigationController::Route::Home)) {
+            return index;
+        }
+    }
+    return -1;
 }
 
 [[nodiscard]] QString focusKind(QQuickItem *picker)
@@ -77,6 +95,10 @@ class ProfilePickerTest final : public QObject
 private:
     QQuickWindow *loadMainWindow(ApplicationController &controller, QQmlApplicationEngine &engine)
     {
+        // A pointer resting over the picker's cards hovers one into the
+        // remote's focus (xvfb parks it mid-screen); park it outside the
+        // window so the keys alone decide.
+        QCursor::setPos(QPoint(1900, 1070));
         controller.setStartFullscreen(false);
         engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
         engine.loadFromModule(QStringLiteral("Marquee"), QStringLiteral("Main"));
@@ -272,7 +294,9 @@ private slots:
         QVERIFY(sidebar != nullptr && content != nullptr);
         QTRY_VERIFY(content->hasActiveFocus());
         QVERIFY(!sidebar->hasActiveFocus());
-        QCOMPARE(sidebar->property("focusedIndex").toInt(), 0);
+        const int homeIndex = homeEntryIndex(sidebar);
+        QVERIFY(homeIndex >= 0);
+        QCOMPARE(sidebar->property("focusedIndex").toInt(), homeIndex);
 
         auto *loader = itemNamed(window, QStringLiteral("screenLoader"));
         QVERIFY(loader != nullptr);
@@ -305,7 +329,7 @@ private slots:
         QTemporaryDir movies;
         AppPaths::setRuntimeRoot(runtimeRoot.path());
         const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
-        QVERIFY(seedOneMovie(movies.path()));
+        QVERIFY(seedMovies(movies.path()));
 
         ApplicationController controller;
         controller.setTemporaryLibraryRoot(movies.path());
@@ -340,8 +364,132 @@ private slots:
 
         // Return on Home opens the focused card; it does not reopen the picker.
         QTest::keyClick(window, Qt::Key_Return);
-        QVERIFY(controller.navigation()->route() != NavigationController::Route::ProfilePicker);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
         QVERIFY(pickerOf(window) == nullptr);
+    }
+
+    // The owner's loop on a real session: choose, Return opens Details, back
+    // to Home, Left to the sidebar, Down to the profile control, Return, choose
+    // again, wait, Return. The first Return after the second choice must open
+    // the first card, not vanish.
+    void theFirstReturnAfterAReChoiceOpensTheFirstCard()
+    {
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(seedMovies(movies.path()));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        QVERIFY(window != nullptr);
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Home);
+        QQuickItem *sidebar = itemNamed(window, QStringLiteral("sidebar"));
+        QVERIFY(sidebar != nullptr);
+        QTest::keyClick(window, Qt::Key_Left);
+        QTRY_VERIFY(sidebar->hasActiveFocus());
+        const int profileIndex = sidebar->property("profileIndex").toInt();
+        for (int step = 0; step < profileIndex; ++step) {
+            QTest::keyClick(window, Qt::Key_Down);
+        }
+        QTest::keyClick(window, Qt::Key_Return);
+        QCOMPARE(controller.navigation()->route(), NavigationController::Route::ProfilePicker);
+
+        QQuickItem *reopened = pickerOf(window);
+        QVERIFY(reopened != nullptr);
+        QTRY_VERIFY(reopened->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+
+        QTest::qWait(5000);
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+    }
+
+    // Home is rebuilt at its first target on every profile choice
+    // (ContentView.swift:391-407). The remote may have left Home standing on
+    // the Play Something capsule or deep in the rows, and the viewer reaches
+    // the avatar by pointer from there; the pointer or the keys then choose
+    // again, and the first Return must open the first card, not act on what
+    // the last visit left behind (the capsule plays something, or does
+    // nothing when nothing is playable).
+    void aProfileChoiceReturnsHomeToItsFirstTarget_data()
+    {
+        QTest::addColumn<bool>("onCapsule");
+        QTest::newRow("capsule") << true;
+        QTest::newRow("deep in the rows") << false;
+    }
+
+    void aProfileChoiceReturnsHomeToItsFirstTarget()
+    {
+        QFETCH(bool, onCapsule);
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(seedMovies(movies.path(), 3));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        // Nothing is playable: a Return on the capsule is silent, as the
+        // owner saw it.
+        controller.setPlayableFileCheckForTest([](const QString &) { return false; });
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        QVERIFY(window != nullptr);
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+
+        if (onCapsule) {
+            QTest::keyClick(window, Qt::Key_Up);
+            QVERIFY(home->playSomethingFocused());
+        } else {
+            QTest::keyClick(window, Qt::Key_Right);
+            QTest::keyClick(window, Qt::Key_Down);
+            QCOMPARE(home->focus()->row(), 1);
+            QVERIFY(home->focus()->column() > 0);
+        }
+
+        QQuickItem *sidebar = itemNamed(window, QStringLiteral("sidebar"));
+        QQuickItem *avatar = itemNamed(sidebar, QStringLiteral("sidebarProfile"));
+        QVERIFY(avatar != nullptr);
+        const QPoint avatarPoint = avatar->mapToScene(QPointF(avatar->width() / 2, avatar->height() / 2)).toPoint();
+        QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, avatarPoint);
+        QCOMPARE(controller.navigation()->route(), NavigationController::Route::ProfilePicker);
+
+        QQuickItem *reopened = pickerOf(window);
+        QVERIFY(reopened != nullptr);
+        QTRY_VERIFY(reopened->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+
+        QVERIFY(!home->playSomethingFocused());
+        QCOMPARE(home->focus()->row(), 0);
+        QCOMPARE(home->focus()->column(), 0);
+        const QString firstCard = home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!firstCard.isEmpty());
+
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+        QCOMPARE(controller.navigation()->selectedMediaId(), firstCard);
     }
 
     // The same loop through the pointer: the sidebar's remembered stop is
@@ -353,7 +501,7 @@ private slots:
         QTemporaryDir movies;
         AppPaths::setRuntimeRoot(runtimeRoot.path());
         const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
-        QVERIFY(seedOneMovie(movies.path()));
+        QVERIFY(seedMovies(movies.path()));
 
         ApplicationController controller;
         controller.setTemporaryLibraryRoot(movies.path());
@@ -389,7 +537,7 @@ private slots:
         verifyHomeHoldsTheRemote(window, controller);
 
         QTest::keyClick(window, Qt::Key_Return);
-        QVERIFY(controller.navigation()->route() != NavigationController::Route::ProfilePicker);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
         QVERIFY(pickerOf(window) == nullptr);
     }
 
