@@ -6,6 +6,10 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Settings' Clear Watch History text reads as the released app's does ("Clears
+  Continue Watching, Recently Watched, and all saved playback positions.");
+  it no longer says watched titles return to Recently Added, which keeps them
+  already.
 - Home no longer scores every movie's holiday words, groups the decades or ranks
   the library against itself for each progress record while a film plays: they
   are built when the library or its metadata changes. With 2000 movies a

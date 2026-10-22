@@ -427,14 +427,6 @@ Where: `tests/details/tst_media_details.cpp:459` (`aRowScrolledOutMidFadeComesBa
 What happens: under `QT_QPA_PLATFORM=offscreen` the wait for the focused episode row's scale to sit between 1.0005 and 1.03 times out, and the case fails (3 of 3 runs on 95952b7 and 3 of 3 on the scrub commit; the other 31 cases pass, the run takes about 63 s).
 Found: the live-frame scrub work, running the test on the base commit in a scratch copy and on its head.
 
-## Settings still says watched titles return to Recently Added
-Where: `qml/screens/SettingsScreen.qml` (the Watch History description).
-What happens: the text says "Watched titles show in Recently Added again", but
-Recently Added no longer hides watched titles (the released rule,
-`BrowseSnapshotStore.swift:2871-2874`), so clearing history does not change that
-row. The task that fixed the row could not touch QML.
-Found: Home taste rows task, comparing `home_rows::recentlyAdded` with the released row.
-
 ## A finished title replayed part-way leaves the profile's taste
 Where: `src/models/TasteModel.cpp` (`build` reads `MediaItem::watched`),
 `src/catalog/CatalogStore.cpp` (`recordWatchProgress` overwrites `completed`).
