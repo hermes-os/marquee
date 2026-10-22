@@ -6,6 +6,11 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Play Something favours what the profile is likely to enjoy, as the released
+  app does: titles like the ones the profile finished (genres, director, cast,
+  keywords), better rated and more popular titles, and titles with a backdrop
+  or a poster, in the Home row and for the capsule. Titles with no online
+  metadata weigh by their artwork alone, as before. No migration.
 - Home shows a Holiday Movies row after Recently Added, as the released app
   does, once two movies qualify: a holiday word in the title, in TMDB's genres
   or in its overview, or a named holiday film. No migration.

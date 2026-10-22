@@ -1,42 +1,37 @@
 #include "models/PlaySomething.hpp"
 
 #include "models/BrowseSemantics.hpp"
+#include "models/StableRandom.hpp"
 
-#include <QByteArray>
 #include <QSet>
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
 #include <utility>
 
 namespace
 {
-// BrowseSnapshotStore.swift:701-708: FNV-1a over the UTF-8 bytes.
-[[nodiscard]] std::uint64_t stableHash(const QString &value)
+// :581-589. The taste term is the clamped affinity (:334-336) over thirty, so
+// a title like the finished ones is favoured by at most about nine steps; the
+// rating adds up to five, popularity up to four, and artwork a step and a half.
+// A title with no metadata weighs what its artwork weighs.
+[[nodiscard]] double playWeight(const MediaItem &item, const std::optional<browse::TasteModel> &taste)
 {
-    std::uint64_t hash = 1'469'598'103'934'665'603ULL;
-    const QByteArray bytes = value.toUtf8();
-    for (const char byte : bytes) {
-        hash ^= static_cast<std::uint8_t>(byte);
-        hash *= 1'099'511'628'211ULL;
+    double weight = 1.0;
+    if (taste) {
+        weight += taste->clampedAffinityScore(item) / 30.0;
     }
-    return hash;
-}
-
-// :696-699: a number in (0, 1) fixed by the text, so one salt always shuffles
-// the same titles the same way.
-[[nodiscard]] double deterministicUnitInterval(const QString &value)
-{
-    return (static_cast<double>(stableHash(value) % 1'000'000ULL) + 1.0) / 1'000'001.0;
-}
-
-// :577-585 without the signals the v3 catalog does not hold yet (taste
-// affinity, vote average, popularity, backdrop): a title with a poster is
-// favoured by the same half step.
-[[nodiscard]] double playWeight(const MediaItem &item)
-{
-    return 1.0 + (item.posterAbsolutePath.isEmpty() ? 0.0 : 0.5);
+    if (item.metadata) {
+        weight += item.metadata->voteAverage.value_or(0.0) / 2.0;
+        weight += std::min(4.0, item.metadata->popularity.value_or(0.0) / 25.0);
+    }
+    if (!item.displayBackdropPath().isEmpty()) {
+        weight += 1.0;
+    }
+    if (!item.displayPosterPath().isEmpty()) {
+        weight += 0.5;
+    }
+    return weight;
 }
 
 // compareMoviesForBrowsing (BrowseSnapshotStore.swift:2044-2046) breaks equal
@@ -55,6 +50,13 @@ namespace
 
 QVector<MediaItem> play_something::candidates(const QVector<MediaItem> &items, const QString &salt)
 {
+    return candidates(items, salt, browse::TasteModel::build(items));
+}
+
+QVector<MediaItem> play_something::candidates(const QVector<MediaItem> &items,
+                                              const QString &salt,
+                                              const std::optional<browse::TasteModel> &taste)
+{
     struct Keyed
     {
         const MediaItem *item;
@@ -70,8 +72,9 @@ QVector<MediaItem> play_something::candidates(const QVector<MediaItem> &items, c
             continue;
         }
         seen.insert(item.id);
-        const double random = deterministicUnitInterval(item.id + QLatin1Char('|') + salt);
-        keyed.push_back(Keyed{.item = &item, .key = std::pow(random, 1.0 / std::max(playWeight(item), 1.0))});
+        const double random
+            = stable_random::deterministicUnitInterval(item.id + QLatin1Char('|') + salt);
+        keyed.push_back(Keyed{.item = &item, .key = std::pow(random, 1.0 / std::max(playWeight(item, taste), 1.0))});
     }
     std::stable_sort(keyed.begin(), keyed.end(), [](const Keyed &left, const Keyed &right) {
         if (left.key != right.key) {

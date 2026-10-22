@@ -146,6 +146,8 @@ qt_add_qml_module(marquee_core
         src/models/PlaySomething.cpp
         src/models/ShowsModel.hpp
         src/models/ShowsModel.cpp
+        src/models/StableRandom.hpp
+        src/models/StableRandom.cpp
         src/models/TasteModel.hpp
         src/models/TasteModel.cpp
         src/models/TitleMetadataView.hpp

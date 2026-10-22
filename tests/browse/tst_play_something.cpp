@@ -3,6 +3,9 @@
 #include <QLocale>
 #include <QSet>
 
+#include <memory>
+#include <optional>
+
 #include "catalog/MediaItem.hpp"
 #include "models/PlaySomething.hpp"
 #include "profiles/ContentPolicy.hpp"
@@ -44,9 +47,32 @@ namespace
     return result;
 }
 
+[[nodiscard]] MediaItem withMetadata(MediaItem item,
+                                     const QStringList &genres,
+                                     std::optional<double> voteAverage = std::nullopt,
+                                     std::optional<double> popularity = std::nullopt)
+{
+    auto metadata = std::make_shared<TitleMetadata>();
+    metadata->tmdbId = 1;
+    metadata->genres = genres;
+    metadata->voteAverage = voteAverage;
+    metadata->popularity = popularity;
+    item.metadata = metadata;
+    return item;
+}
+
 [[nodiscard]] QString saltNumber(int n)
 {
     return QStringLiteral("press-%1").arg(n);
+}
+
+[[nodiscard]] int wins(const QVector<MediaItem> &items, const QString &id, int presses)
+{
+    int count = 0;
+    for (int press = 0; press < presses; ++press) {
+        count += play_something::pick(items, saltNumber(press))->id == id ? 1 : 0;
+    }
+    return count;
 }
 }
 
@@ -140,6 +166,55 @@ private slots:
 
         QVERIFY2(postedWins > 200, qPrintable(QString::number(postedWins)));
         QVERIFY2(postedWins < 400, qPrintable(QString::number(postedWins)));
+    }
+
+    // :584-585: half the vote average, and popularity over 25 up to four.
+    void aBetterRatedAndMorePopularTitleIsFavoured()
+    {
+        const MediaItem plain = withMetadata(movie(QStringLiteral("Plain")), {}, 0.0, 0.0);
+        const MediaItem rated = withMetadata(movie(QStringLiteral("Rated")), {}, 8.0, 0.0);
+        const MediaItem popular = withMetadata(movie(QStringLiteral("Popular")), {}, 0.0, 400.0);
+
+        // Weights 1 and 5 (a vote of 8), so about 5 presses in 6; 1 and 5 again
+        // for a popularity capped at four.
+        const int ratedWins = wins({plain, rated}, rated.id, 600);
+        QVERIFY2(ratedWins > 450 && ratedWins < 560, qPrintable(QString::number(ratedWins)));
+        const int popularWins = wins({plain, popular}, popular.id, 600);
+        QVERIFY2(popularWins > 450 && popularWins < 560, qPrintable(QString::number(popularWins)));
+    }
+
+    // :583, :586: a backdrop weighs a whole step.
+    void aTitleWithABackdropIsFavoured()
+    {
+        MediaItem backdrop = movie(QStringLiteral("Backdrop"));
+        backdrop.tmdbBackdropAbsolutePath = QStringLiteral("/cache/backdrop.jpg");
+        const int count = wins({backdrop, movie(QStringLiteral("Plain"))}, backdrop.id, 600);
+        // Weights 2 and 1: two presses in three.
+        QVERIFY2(count > 340 && count < 460, qPrintable(QString::number(count)));
+    }
+
+    // :583: a profile that finished dramas is offered dramas more often, and
+    // another profile with no history is not steered.
+    void theProfilesOwnTasteSteersThePick()
+    {
+        QVector<MediaItem> history;
+        for (int index = 0; index < 3; ++index) {
+            MediaItem seen = withMetadata(movie(QStringLiteral("Seen %1").arg(index)),
+                                          {QStringLiteral("Drama")});
+            seen.watched = true;
+            history.push_back(seen);
+        }
+        const MediaItem drama = withMetadata(movie(QStringLiteral("Drama Pick")), {QStringLiteral("Drama")});
+        const MediaItem comedy = withMetadata(movie(QStringLiteral("Comedy Pick")), {QStringLiteral("Comedy")});
+
+        QVector<MediaItem> withHistory = history;
+        withHistory << drama << comedy;
+        // 3 x 80 of affinity: weight 1 + 240/30 against 1, nine presses in ten.
+        const int steered = wins(withHistory, drama.id, 600);
+        QVERIFY2(steered > 500, qPrintable(QString::number(steered)));
+
+        const int unsteered = wins({drama, comedy}, drama.id, 600);
+        QVERIFY2(unsteered > 240 && unsteered < 360, qPrintable(QString::number(unsteered)));
     }
 
     void anEmptyOrExhaustedLibraryPicksNothing()
