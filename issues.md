@@ -349,7 +349,7 @@ Found: review of 0e91322..ba2fc10.
 ## A track query can block the GUI thread on libmpv's audio teardown
 Where: `src/playback/MpvVideoItem.cpp:946` (`applyDefaultTracks`).
 What happens: `applyDefaultTracks` called `mpv_get_property` on the GUI thread, which blocked until the 300 s test watchdog fired while libmpv's core thread waited in `pw_thread_loop_stop`. Seen under xvfb with an empty `XDG_RUNTIME_DIR` on the base build.
-Found: review of ba2fc10.
+Also: `seekAbsolute` and `seekRelative` (`src/playback/MpvVideoItem.cpp`) call `mpv_command` synchronously on the GUI thread, so a Left or Right tap, a progress-bar click or Restart waits for libmpv's core thread the same way. They predate the scrub work. Found: review of 2cf77ff..2db00b3.
 
 ## playerRouteRendersDecodedVideoRightSideUp fails about 1 run in 10 under xvfb
 Where: `tests/playback/tst_playback.cpp:831` ("No decoded video reached the Qt Quick scene").
