@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include <QLocale>
 #include <QSignalSpy>
 
 #include "catalog/MediaItem.hpp"
@@ -53,6 +54,14 @@ class TestSearchSession : public QObject
     Q_OBJECT
 
 private slots:
+    // The localized collator is built from the default locale on first use. A
+    // process with no LANG would collate by code point, so pin the locale the
+    // ordering cases are written for before any of them runs.
+    void initTestCase()
+    {
+        QLocale::setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
+    }
+
     void normalisesLikeTheReleasedIndex()
     {
         // BrowseSnapshotStore.swift:1784-1802: folded, lowercased, one space

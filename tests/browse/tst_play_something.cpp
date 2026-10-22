@@ -1,5 +1,6 @@
 #include <QtTest>
 
+#include <QLocale>
 #include <QSet>
 
 #include "catalog/MediaItem.hpp"
@@ -54,6 +55,14 @@ class PlaySomethingTest final : public QObject
     Q_OBJECT
 
 private slots:
+    // The family collator is built from the default locale on first use. A
+    // process with no LANG would collate by code point, so pin the locale the
+    // collation cases are written for before any of them runs.
+    void initTestCase()
+    {
+        QLocale::setDefault(QLocale(QLocale::English, QLocale::UnitedStates));
+    }
+
     void onlyUnwatchedMoviesAreEligible()
     {
         MediaItem seen = movie(QStringLiteral("Seen"));

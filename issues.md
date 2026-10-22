@@ -139,6 +139,11 @@ Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, the `QDir::entryInfoList
 What happens: when a filesystem driver gives no entry type in the directory listing and the stat then fails, Qt's listing drops the entry outright, so the scanner never sees it and cannot report it in `unreadableIds`. A `Complete` walk then deletes the entry's row, or every row under it when it is a folder. This was already true on 95952b7.
 Found: review of ef055ea, by reading Qt's directory listing code, not by a run.
 
+## Sorting and search order use code-point collation when the process has no UTF-8 locale
+Where: `QCollator` default-constructed in `src/models/PlaySomething.cpp` (`browsesBefore`), `src/models/LibraryModel.cpp`, `src/models/HomeRowsModel.cpp`, `src/models/ShowsModel.cpp` (`caseInsensitiveBefore`) and `src/search/SearchSession.cpp` (`localizedCollator`); `src/main.cpp` sets only `LC_NUMERIC`.
+What happens: a `QCollator` takes the process locale. With no `LANG`, or `LANG=C`, `C.UTF-8` or `POSIX` (a bare ssh session, a service unit), the locale is C and titles collate by code point, not as the released `localizedCaseInsensitiveCompare` does: "\u00C6on Flux" sorts after "Zebra", and "Alien\u00B3" after "Aliens". Movies, Home rows, Shows, Play Something order and Search order differ from the same library under `en_US.UTF-8`. The app does not set a locale of its own.
+Found: `tst_play_something` and `tst_search_session` failed 3 cases under `env -u LANG -u LC_ALL` and passed with `LANG=en_US.UTF-8`; a probe `QCollator` gave Æ after Zebra under C and before it under en_US. The tests now pin en_US; the app was not changed.
+
 ## A library scan stats each file more than once
 Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, `folderArtworkIn`).
 What happens: each media file is stat'ed afresh by path once; a season folder
