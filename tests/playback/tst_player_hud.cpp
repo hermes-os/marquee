@@ -605,12 +605,12 @@ private slots:
         // A tap outside an open menu dismisses it and changes nothing.
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centreOf(audioButton));
         QTRY_VERIFY(audioMenu->isVisible());
-        // The top left of the picture: the sidebar beside the player is not
-        // the player's to dismiss with.
+        // The picture, clear of the HUD's controls above and below it.
         QQuickItem *screen = itemNamed(window, "playerScreen");
         QVERIFY(screen != nullptr);
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          screen->mapToScene(QPointF(40, 40)).toPoint());
+                          screen->mapToScene(QPointF(screen->width() / 2,
+                                                     screen->height() / 3)).toPoint());
         QTRY_VERIFY(!audioMenu->isVisible());
         QCOMPARE(video->audioTrackId(), 2);
         QCOMPARE(controller.navigation()->route(), NavigationController::Route::Player);
@@ -678,7 +678,8 @@ private slots:
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, centreOf(audioButton));
         QTRY_VERIFY(audioMenu->isVisible());
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier,
-                          screen->mapToScene(QPointF(40, 40)).toPoint());
+                          screen->mapToScene(QPointF(screen->width() / 2,
+                                                     screen->height() / 3)).toPoint());
         QTRY_VERIFY(!audioMenu->isVisible());
         QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
         QCOMPARE(video->audioTrackId(), 2);
@@ -874,11 +875,13 @@ private slots:
         QCOMPARE(player.video->speed(), 1.25);
         QCOMPARE(player.video->propertyForTest(QStringLiteral("speed")).toDouble(), 1.25);
 
-        QVERIFY(player.window->visibility() != QWindow::FullScreen);
-        QTest::keyClick(player.window, Qt::Key_F);
+        // Playback has already taken the window fullscreen; the key gives it
+        // back and takes it again.
         QTRY_COMPARE(player.window->visibility(), QWindow::FullScreen);
         QTest::keyClick(player.window, Qt::Key_F);
         QTRY_VERIFY(player.window->visibility() != QWindow::FullScreen);
+        QTest::keyClick(player.window, Qt::Key_F);
+        QTRY_COMPARE(player.window->visibility(), QWindow::FullScreen);
     }
 
     // A key with Control, Alt or Meta is never the player's.
@@ -995,10 +998,11 @@ private slots:
                  QStringLiteral("1.5x"));
 
         QVERIFY(focusControl(player.window, "fullscreenControl"));
-        QTest::keyClick(player.window, Qt::Key_Return);
         QTRY_COMPARE(player.window->visibility(), QWindow::FullScreen);
         QTest::keyClick(player.window, Qt::Key_Return);
         QTRY_VERIFY(player.window->visibility() != QWindow::FullScreen);
+        QTest::keyClick(player.window, Qt::Key_Return);
+        QTRY_COMPARE(player.window->visibility(), QWindow::FullScreen);
     }
 
     // Up from the picture lands on the close control; Enter on it leaves.
@@ -1079,10 +1083,11 @@ private slots:
         QTRY_COMPARE(player.video->speed(), 1.5);
         QTRY_VERIFY(!menu->isVisible());
 
-        click("fullscreenControl");
         QTRY_COMPARE(player.window->visibility(), QWindow::FullScreen);
         click("fullscreenControl");
         QTRY_VERIFY(player.window->visibility() != QWindow::FullScreen);
+        click("fullscreenControl");
+        QTRY_COMPARE(player.window->visibility(), QWindow::FullScreen);
 
         click("closeControl");
         QTRY_VERIFY(player.controller.navigation()->route()

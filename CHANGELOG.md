@@ -6,6 +6,16 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- The player covers the whole window. While a film or episode plays, the
+  sidebar is gone and the picture and the controls use the full window width,
+  as in the released app; closing the player brings the shell back on the same
+  route with the remote on the content, as before.
+- Playback goes fullscreen. Starting a film (a card, Play Something, Continue
+  Watching, `--play`) puts the window fullscreen if it is not already; closing
+  the player puts it back to windowed unless you changed fullscreen yourself
+  during playback (the Fullscreen control, F or F11), in which case the window
+  stays as you left it. Moving to the next episode changes nothing. This
+  differs from the released macOS app on purpose.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the

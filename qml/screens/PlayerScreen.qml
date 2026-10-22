@@ -11,6 +11,9 @@ FocusScope {
     property bool reduceMotion: appController.settings.reduceMotion
     property bool leanBack: appController.settings.leanBackMode
     property bool controlsVisible: true
+    // The window's fullscreen state belongs to the shell (Main.qml), which
+    // tells the viewer's toggle from the one playback made on entry.
+    signal fullscreenRequested()
     // Where a drag along the progress bar would land, as a fraction of the
     // film; -1 when none is under way.
     property real barDragFraction: -1
@@ -1389,15 +1392,7 @@ FocusScope {
     }
 
     function toggleFullscreen() {
-        const window = root.Window.window
-        if (!window) {
-            return
-        }
-        if (window.visibility === Window.FullScreen) {
-            window.showNormal()
-        } else {
-            window.showFullScreen()
-        }
+        root.fullscreenRequested()
         root.revealHud()
     }
 

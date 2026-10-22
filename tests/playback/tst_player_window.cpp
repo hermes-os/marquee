@@ -1,0 +1,244 @@
+#include <clocale>
+
+#include <QCursor>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QGuiApplication>
+#include <QPointF>
+#include <QQmlApplicationEngine>
+#include <QQmlContext>
+#include <QQuickItem>
+#include <QQuickWindow>
+#include <QScopeGuard>
+#include <QTemporaryDir>
+#include <QTest>
+
+#include "app/AppPaths.hpp"
+#include "app/ApplicationController.hpp"
+#include "models/LibraryModel.hpp"
+#include "navigation/NavigationController.hpp"
+
+namespace
+{
+constexpr auto kFilmRelativePath = "Arrival (2016)/Arrival (2016).mkv";
+
+// A ten-minute 16x16 y4m at one frame a second: it outlasts every case and
+// needs no decoder beyond what libmpv has.
+[[nodiscard]] bool writeMediaFile(const QString &root)
+{
+    const QFileInfo target(QDir(root).filePath(QLatin1String(kFilmRelativePath)));
+    if (!QDir().mkpath(target.absolutePath())) {
+        return false;
+    }
+    QFile file(target.absoluteFilePath());
+    if (!file.open(QIODevice::WriteOnly)) {
+        return false;
+    }
+    constexpr int kSide = 16;
+    file.write(QByteArrayLiteral("YUV4MPEG2 W16 H16 F1:1 Ip A1:1 C420mpeg2\n"));
+    const QByteArray frame = QByteArrayLiteral("FRAME\n")
+        + QByteArray(kSide * kSide, '\x80') + QByteArray(kSide * kSide / 2, '\x80');
+    for (int index = 0; index < 600; ++index) {
+        file.write(frame);
+    }
+    file.close();
+    return file.error() == QFileDevice::NoError;
+}
+}
+
+// How the player sits in the window: over the whole of it, fullscreen while
+// it plays, with the pointer hidden alongside the HUD.
+class PlayerWindowTest final : public QObject
+{
+    Q_OBJECT
+
+private:
+    struct Env
+    {
+        struct RuntimeRootScope
+        {
+            explicit RuntimeRootScope(const QString &path) { AppPaths::setRuntimeRoot(path); }
+            ~RuntimeRootScope() { AppPaths::clearRuntimeRoot(); }
+            RuntimeRootScope(const RuntimeRootScope &) = delete;
+            RuntimeRootScope &operator=(const RuntimeRootScope &) = delete;
+        };
+
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir library;
+        RuntimeRootScope paths{runtimeRoot.path()};
+        ApplicationController controller;
+        QQmlApplicationEngine engine;
+        QQuickWindow *window{nullptr};
+    };
+
+    [[nodiscard]] static QQuickItem *itemNamed(QQuickWindow *window, const char *name)
+    {
+        return window->findChild<QQuickItem *>(QLatin1String(name));
+    }
+
+    /// Loads the shipped Main.qml; `startFullscreen` is the start option the
+    /// window is shown with.
+    [[nodiscard]] bool load(Env &env, bool startFullscreen)
+    {
+        if (!writeMediaFile(env.library.path())) {
+            return false;
+        }
+        env.controller.setStartFullscreen(startFullscreen);
+        env.engine.rootContext()->setContextProperty(
+            QStringLiteral("appController"), &env.controller);
+        env.engine.loadFromModule(QStringLiteral("Marquee"), QStringLiteral("Main"));
+        if (env.engine.rootObjects().size() != 1) {
+            return false;
+        }
+        env.window = qobject_cast<QQuickWindow *>(env.engine.rootObjects().front());
+        if (env.window == nullptr) {
+            return false;
+        }
+        env.window->requestActivate();
+        return QTest::qWaitForWindowActive(env.window);
+    }
+
+    [[nodiscard]] bool play(Env &env)
+    {
+        env.controller.setTemporaryLibraryRoot(env.library.path());
+        constexpr int kSceneWaitMs = 30000;
+        if (!QTest::qWaitFor([&env] { return env.controller.library()->rowCount() == 1; },
+                             kSceneWaitMs)) {
+            return false;
+        }
+        env.controller.playMediaId(env.controller.library()
+                                       ->data(env.controller.library()->index(0, 0),
+                                              LibraryModel::IdRole)
+                                       .toString());
+        return QTest::qWaitFor([&env] { return itemNamed(env.window, "restartControl") != nullptr; },
+                               kSceneWaitMs);
+    }
+
+    static void closePlayer(Env &env)
+    {
+        env.controller.navigation()->goBack();
+    }
+
+private slots:
+    // ContentView.swift:52-62: the player is a layer over the whole shell.
+    void thePlayerSpansTheWindowWithNoSidebar()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        // The app opens on the profile picker, which has no shell.
+        env.controller.navigation()->goHome();
+        QQuickItem *sidebar = itemNamed(env.window, "sidebar");
+        QQuickItem *content = itemNamed(env.window, "contentFocus");
+        QVERIFY(sidebar != nullptr && content != nullptr);
+        QTRY_VERIFY(sidebar->isVisible());
+
+        QVERIFY(play(env));
+        QCOMPARE(env.controller.navigation()->route(), NavigationController::Route::Player);
+
+        QQuickItem *screen = itemNamed(env.window, "playerScreen");
+        QQuickItem *scrim = itemNamed(env.window, "playerScrim");
+        QVERIFY(screen != nullptr && scrim != nullptr);
+        QVERIFY2(!sidebar->isVisible(), "The sidebar stayed on screen during playback");
+        const qreal windowWidth = env.window->contentItem()->width();
+        QVERIFY(windowWidth > 0);
+        QCOMPARE(screen->mapToScene(QPointF(0, 0)).x(), 0.0);
+        QCOMPARE(screen->width(), windowWidth);
+        QCOMPARE(scrim->width(), windowWidth);
+        QCOMPARE(itemNamed(env.window, "videoSurface")->width(), windowWidth);
+
+        // Closing brings the shell back as it was: the Home route, the
+        // sidebar drawn, and the remote on the content, not the sidebar.
+        closePlayer(env);
+        QTRY_VERIFY(env.controller.navigation()->route() != NavigationController::Route::Player);
+        QTRY_VERIFY(sidebar->isVisible());
+        QTRY_VERIFY(content->hasActiveFocus());
+    }
+
+    void playbackGoesFullscreenAndWindowedAgainOnClose()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QCOMPARE(env.window->visibility(), QWindow::Windowed);
+
+        QVERIFY(play(env));
+        QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+        closePlayer(env);
+        QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
+    }
+
+    void aWindowThatWasFullscreenStaysFullscreenOnClose()
+    {
+        Env env;
+        QVERIFY(load(env, true));
+        QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+
+        QVERIFY(play(env));
+        QCOMPARE(env.window->visibility(), QWindow::FullScreen);
+        closePlayer(env);
+        QTRY_VERIFY(env.controller.navigation()->route() != NavigationController::Route::Player);
+        QCOMPARE(env.window->visibility(), QWindow::FullScreen);
+    }
+
+    // A fullscreen the viewer set during playback is theirs, however it ends.
+    void aViewerChangeDuringPlaybackIsLeftAsSet()
+    {
+        {
+            Env env;
+            QVERIFY(load(env, false));
+            QVERIFY(play(env));
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+
+            // F toggles the HUD's way, and F11 the window's: two changes
+            // that end on fullscreen again.
+            QTest::keyClick(env.window, Qt::Key_F);
+            QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
+            QTest::keyClick(env.window, Qt::Key_F11);
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+            closePlayer(env);
+            QTRY_VERIFY(env.controller.navigation()->route()
+                        != NavigationController::Route::Player);
+            QTest::qWait(300);
+            QCOMPARE(env.window->visibility(), QWindow::FullScreen);
+        }
+        {
+            Env env;
+            QVERIFY(load(env, false));
+            QVERIFY(play(env));
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+            QTest::keyClick(env.window, Qt::Key_F);
+            QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
+            closePlayer(env);
+            QTRY_VERIFY(env.controller.navigation()->route()
+                        != NavigationController::Route::Player);
+            QTest::qWait(300);
+            QCOMPARE(env.window->visibility(), QWindow::Windowed);
+        }
+    }
+
+    // `--play` opens the player before the window is shown.
+    void aPlayStartTakesTheWindowFullscreenToo()
+    {
+        Env env;
+        QVERIFY(writeMediaFile(env.library.path()));
+        env.controller.playLocalFile(env.library.filePath(QLatin1String(kFilmRelativePath)));
+        QCOMPARE(env.controller.navigation()->route(), NavigationController::Route::Player);
+        QVERIFY(load(env, false));
+        QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+        QVERIFY(!itemNamed(env.window, "sidebar")->isVisible());
+        closePlayer(env);
+        QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
+    }
+};
+
+int main(int argc, char *argv[])
+{
+    QGuiApplication app(argc, argv);
+    // The player surface builds a libmpv core, which refuses to start under a
+    // locale whose decimal separator is not a dot.
+    std::setlocale(LC_NUMERIC, "C");
+    PlayerWindowTest test;
+    return QTest::qExec(&test, argc, argv);
+}
+
+#include "tst_player_window.moc"

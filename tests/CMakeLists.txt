@@ -204,6 +204,10 @@ marquee_add_test(tst_player_tracks
     playback/tst_player_tracks.cpp
 )
 
+marquee_add_test(tst_player_window
+    playback/tst_player_window.cpp
+)
+
 marquee_add_test(tst_playback
     playback/tst_playback.cpp
 )
