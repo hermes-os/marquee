@@ -137,7 +137,7 @@ Found: source read at 81c8fa8.
 ## A listing entry with no type that fails stat is dropped, and a Complete walk deletes its row
 Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, the `QDir::entryInfoList` listing), `src/catalog/CatalogStore.cpp` (`applyScan`, `Complete`).
 What happens: when a filesystem driver gives no entry type in the directory listing and the stat then fails, Qt's listing drops the entry outright, so the scanner never sees it and cannot report it in `unreadableIds`. A `Complete` walk then deletes the entry's row, or every row under it when it is a folder. This was already true on 95952b7.
-Found: review of ef055ea, by reading Qt's directory listing code, not by a run.
+Found: review of the scan fix (75238b5..97a4b89), by reading Qt's directory listing code, not by a run.
 
 ## Sorting and search order use code-point collation when the process has no UTF-8 locale
 Where: `QCollator` default-constructed in `src/models/PlaySomething.cpp` (`browsesBefore`), `src/models/LibraryModel.cpp`, `src/models/HomeRowsModel.cpp`, `src/models/ShowsModel.cpp` (`caseInsensitiveBefore`) and `src/search/SearchSession.cpp` (`localizedCollator`); `src/main.cpp` sets only `LC_NUMERIC`.
@@ -146,7 +146,7 @@ Found: `tst_play_something` and `tst_search_session` failed 3 cases under `env -
 
 ## Hardware decoding shows black frames for H.264 on an AMD Radeon HD 6770M
 Where: `src/playback/MpvVideoItem.cpp` (`mpv_set_option_string(core, "hwdec", ...)`, default `hwdec=auto-safe`); `src/settings/SettingsStore.cpp` (default `playback/hardwareDecoding=true`).
-What happens: on an AMD Radeon HD 6770M (TeraScale 2, Mesa r600 VA-API) the default `auto-safe` picks VA-API and decodes H.264 to black frames: sound and clock run, the picture is black. HEVC 10-bit falls back to software on that machine and shows. Setting `[playback] hardwareDecoding=false` works around it.
+What happens: on an AMD Radeon HD 6770M (TeraScale 2, Mesa r600 VA-API) the default `auto-safe` picks VA-API and decodes H.264 to black frames: sound and clock run, the picture is black. HEVC 10-bit falls back to software on that machine and shows.
 Found: standalone mpv on that machine, not the app: a frame from `--hwdec=vaapi-copy` had mean brightness 0, and the same frame from `--hwdec=no` showed the picture.
 
 ## A library scan stats each file more than once
