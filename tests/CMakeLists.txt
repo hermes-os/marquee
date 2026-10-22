@@ -284,3 +284,12 @@ marquee_add_test(tst_metadata_client
 target_compile_definitions(tst_metadata_client PRIVATE
     MARQUEE_METADATA_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/metadata/fixtures"
 )
+
+# One enrichment run over a synthetic library: what it stores, what it skips,
+# what it does offline, without a key, with the switch off, and after a restart.
+marquee_add_test(tst_metadata_enrichment
+    metadata/tst_metadata_enrichment.cpp
+)
+target_compile_definitions(tst_metadata_enrichment PRIVATE
+    MARQUEE_METADATA_FIXTURES="${CMAKE_CURRENT_SOURCE_DIR}/metadata/fixtures"
+)

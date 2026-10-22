@@ -114,6 +114,8 @@ qt_add_qml_module(marquee_core
         src/catalog/LibraryScanner.hpp
         src/catalog/LibraryScanner.cpp
         src/catalog/MediaItem.hpp
+        src/catalog/MetadataStore.hpp
+        src/catalog/MetadataStore.cpp
         src/catalog/TitleMetadata.hpp
 
         src/metadata/ArtworkCache.hpp
@@ -121,6 +123,10 @@ qt_add_qml_module(marquee_core
         src/metadata/HttpTransport.hpp
         src/metadata/MetadataClient.hpp
         src/metadata/MetadataClient.cpp
+        src/metadata/MetadataEnrichment.hpp
+        src/metadata/MetadataEnrichment.cpp
+        src/metadata/MetadataSwitch.hpp
+        src/metadata/MetadataSwitch.cpp
         src/metadata/QtHttpTransport.hpp
         src/metadata/QtHttpTransport.cpp
         src/metadata/TmdbApiKey.hpp

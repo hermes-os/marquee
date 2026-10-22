@@ -838,8 +838,9 @@ private slots:
         QCOMPARE(rowCount(catalog, "library_roots"), 1);
         QCOMPARE(rowCount(catalog, "media_items"), 1);
         QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
-        for (const QString &table : {"title_metadata", "title_cast", "title_keyword",
-                                     "episode_metadata"}) {
+        const QStringList metadataTables{"title_metadata", "title_cast", "title_keyword",
+                                         "episode_metadata"};
+        for (const QString &table : metadataTables) {
             QVERIFY2(tableNames(catalog).contains(table), qPrintable(table));
             QCOMPARE(rowCount(catalog, table), 0);
         }

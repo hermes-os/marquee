@@ -9,6 +9,7 @@
 
 #include "catalog/LibraryRoot.hpp"
 #include "catalog/MediaItem.hpp"
+#include "metadata/MetadataEnrichment.hpp"
 
 class CatalogStore;
 
@@ -20,7 +21,10 @@ class CatalogWorker final : public QObject
     Q_OBJECT
 
 public:
-    explicit CatalogWorker(QString catalogPath);
+    /// `metadata` says how TMDB is reached and where its artwork is cached; the
+    /// default is the application's own, and tests replace it.
+    explicit CatalogWorker(QString catalogPath,
+                           MetadataSetup metadata = defaultMetadataSetup());
     ~CatalogWorker() override;
 
 public slots:
@@ -54,6 +58,11 @@ public slots:
     /// Stops the event loop after work queued before this call has run.
     void shutdown();
 
+    /// The Settings switch changed. Turning it on fills in what is missing
+    /// for the roots of the last refresh; turning it off stops a run after its
+    /// request in flight.
+    void metadataSwitchChanged(bool enabled);
+
 signals:
     void refreshStarted();
     /// The end of a `refresh`, with the profile whose progress it carries.
@@ -68,6 +77,8 @@ signals:
                                quint64 sequence);
     void scanFailed(QString message);
     void watchHistoryCleared();
+    /// A background TMDB run ended; carries what it did.
+    void metadataRunFinished(MetadataEnrichment::Summary summary);
 
     /// The configured roots that could not be reached by this refresh. Their
     /// rows are still projected, so this reports why the library may look stale
@@ -77,6 +88,16 @@ signals:
     void rootsUnavailable(QStringList paths, QStringList rootIds);
 
 private:
+    void startMetadataRun(const LibraryRootPaths &rootPaths);
+    void reloadAfterMetadata();
+    CatalogStore &store();
+
     QString m_catalogPath;
+    MetadataSetup m_metadataSetup;
     std::unique_ptr<CatalogStore> m_store;
+    // Created on the worker's thread by the first run, so the network object
+    // inside it belongs to the thread that uses it.
+    std::unique_ptr<MetadataEnrichment> m_enrichment;
+    LibraryRootPaths m_lastRootPaths;
+    QString m_activeProfileId;
 };

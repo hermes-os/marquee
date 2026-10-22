@@ -1,6 +1,7 @@
 #include "metadata/TmdbApiKey.hpp"
 
 #include <QFile>
+#include <QStandardPaths>
 #include <QUrlQuery>
 
 #include "app/AppPaths.hpp"
@@ -20,19 +21,41 @@ QString tmdb_key::resolve(const QString &environmentValue, const QString &keyFil
     return QString::fromUtf8(file.readLine(1024)).trimmed();
 }
 
-QString tmdb_key::load()
+namespace
 {
-    QString environmentValue;
-    if (!AppPaths::hasRuntimeRoot()) {
-        environmentValue = QString::fromLocal8Bit(qgetenv(environmentVariable));
-    }
-    QString keyFile;
+[[nodiscard]] QString keyFilePath()
+{
     try {
-        keyFile = AppPaths::tmdbKeyFile();
+        return AppPaths::tmdbKeyFile();
     } catch (const std::exception &) {
         // No config folder means no key file; the environment may still hold one.
+        return {};
     }
-    return resolve(environmentValue, keyFile);
+}
+
+// A test never reads the developer's real key, so it cannot reach TMDB.
+[[nodiscard]] bool environmentIsIgnored()
+{
+    return AppPaths::hasRuntimeRoot() || QStandardPaths::isTestModeEnabled();
+}
+}
+
+QString tmdb_key::load()
+{
+    return resolve(environmentIsIgnored() ? QString()
+                                          : QString::fromLocal8Bit(qgetenv(environmentVariable)),
+                   keyFilePath());
+}
+
+std::function<QString()> tmdb_key::provider()
+{
+    const bool ignoreEnvironment = environmentIsIgnored();
+    const QString keyFile = keyFilePath();
+    return [ignoreEnvironment, keyFile] {
+        return resolve(ignoreEnvironment ? QString()
+                                         : QString::fromLocal8Bit(qgetenv(environmentVariable)),
+                       keyFile);
+    };
 }
 
 QString tmdb_key::masked(const QUrl &url)

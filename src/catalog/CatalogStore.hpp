@@ -8,6 +8,7 @@
 #include "catalog/LibraryRoot.hpp"
 #include "catalog/LibraryScanner.hpp"
 #include "catalog/MediaItem.hpp"
+#include "catalog/MetadataStore.hpp"
 
 /// Reads and writes the library rows of an already migrated catalog. It owns
 /// the connection it queries, so one instance belongs to one thread. Every
@@ -49,7 +50,8 @@ public:
     void applyScan(const LibraryRoot &root, const LibraryScanner::ScanResult &result);
 
     /// Every stored item belonging to `roots`, ordered by sort title and then
-    /// identity so repeated projections agree. Each item carries the point
+    /// identity so repeated projections agree. Each carries the TMDB metadata
+    /// and cached artwork stored for it, when there is some. Each item carries the point
     /// playing it should start from and any recorded runtime, as `profileId`
     /// saw them; no other profile's progress is read. An empty `profileId`
     /// projects every title as unwatched.
@@ -72,6 +74,10 @@ public:
     /// the titles and every other profile's progress stay. Deleting a profile
     /// removes its progress with the same call.
     void clearWatchProgress(const QString &profileId);
+    /// Where cached TMDB artwork lives, so a projection can name the images
+    /// that exist. Without it no cached image is ever reported.
+    void setMetadataCache(const MetadataStore::CacheDirectories &cache);
+
     /// The roots the last `registerRoots` call named, so a projection can be
     /// rebuilt without scanning again.
     [[nodiscard]] QVector<LibraryRoot> knownRoots() const;
@@ -83,4 +89,5 @@ private:
 
     CatalogDatabase m_database;
     QVector<LibraryRoot> m_knownRoots;
+    MetadataStore::CacheDirectories m_metadataCache;
 };
