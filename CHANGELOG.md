@@ -24,7 +24,8 @@ intermediate version bump.
   the background, after the update.
 - Movie titles keep the dots of initials in a `Title (YYYY)` name, as the
   released app does: "E.T. the Extra-Terrestrial" and "L.A. Confidential" are
-  no longer shown as "E T the Extra-Terrestrial" and "L A Confidential".
+  no longer shown as "E T the Extra-Terrestrial" and "L A Confidential". A
+  dot-separated name such as "The.Matrix.(1999)" still shows as "The Matrix".
 - A `Title - (YYYY)` or `Title (YYYY) (YYYY)` movie name now shows and sorts as
   "Title" (not "Title -" or "Title (YYYY)"), and a `Title (2099)` name no longer
   takes 2099 as its release year.

@@ -491,8 +491,16 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
         static const QRegularExpression trailingGroup(QStringLiteral(R"(\s*[\[(][^\])]+[\])]$)"));
         QString plexTitle = plex.captured(1).trimmed();
         plexTitle.remove(trailingGroup);
-        // Dots stay: in a named title they are initials (`E.T.`, `L.A.`), as
-        // the released app shows them (FilenameParser.swift:246-251 trims only).
+        // Dots stay in a spaced title: they are initials (`E.T.`, `L.A.`) or
+        // an abbreviation (`Dr.`, `Vol.`), as the released app shows them
+        // (FilenameParser.swift:246-251 trims only). A title with no space at
+        // all and a word of two letters or more before a dot (`The.Matrix.`)
+        // uses the dots as separators, as the other paths read them.
+        static const QRegularExpression wordThenDot(QStringLiteral(R"(\w{2,}\.)"));
+        static const QRegularExpression noSpace(QStringLiteral(R"(^\S+$)"));
+        if (noSpace.match(plexTitle).hasMatch() && wordThenDot.match(plexTitle).hasMatch()) {
+            plexTitle.replace(separators, QStringLiteral(" "));
+        }
         plexTitle = chopTrailingIntroducer(plexTitle.replace(QLatin1Char('_'), QLatin1Char(' ')).simplified());
         if (!plexTitle.isEmpty()) {
             return {.title = plexTitle, .year = plex.captured(2).toInt()};

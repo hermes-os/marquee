@@ -191,6 +191,10 @@ private slots:
             // Initials keep their dots, as the released app shows them.
             {"E.T. the Extra-Terrestrial (1982).mkv", "E.T. the Extra-Terrestrial", 1982},
             {"L.A. Confidential (1997).mkv", "L.A. Confidential", 1997},
+            {"Dr. Strangelove (1964).mkv", "Dr. Strangelove", 1964},
+            {"Kill Bill Vol. 1 (2003).mkv", "Kill Bill Vol. 1", 2003},
+            // With no space at all the dots are separators.
+            {"The.Matrix.(1999).mkv", "The Matrix", 1999},
             {"The_Wild_Robot (2024).mkv", "The Wild Robot", 2024},
         };
         for (const auto &c : cases) {
