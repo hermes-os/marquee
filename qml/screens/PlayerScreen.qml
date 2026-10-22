@@ -74,8 +74,9 @@ FocusScope {
         video.startupPending && !root.startupTerminal
     readonly property bool showingFailureOverlay: video.failed
 
-    // The remote sits on a HUD control or inside a track menu, or a hold of
-    // Left or Right is scrubbing: the HUD stays up for as long as any of them
+    // The remote sits on a HUD control or inside a track menu, a hold of Left
+    // or Right is scrubbing, or the pointer is pressed on the progress bar
+    // (held still or dragging): the HUD stays up for as long as any of them
     // holds it.
     readonly property bool hasSubtitleMenu: video.subtitleTracks.length > 0
     readonly property bool hasAudioMenu: video.audioTracks.length > 1
@@ -87,6 +88,7 @@ FocusScope {
         || audioButton.activeFocus || speedButton.activeFocus || muteControl.activeFocus
         || volumeControl.activeFocus || fullscreenControl.activeFocus
         || root.menuOpen || scrubber.scrubbing
+        || progressTap.pressed || root.barDragFraction >= 0
     // While a hold scrubs, the clock and the bar show where letting go would
     // land rather than the frozen picture's position.
     readonly property real shownPosition:
@@ -553,8 +555,16 @@ FocusScope {
                 }
 
                 TapHandler {
+                    id: progressTap
                     onTapped: eventPoint => root.seekToFraction(
                         eventPoint.position.x / progressHit.width)
+                    // Whatever ends the press, the wait for hiding starts
+                    // again from there; a cancelled press seeks nothing.
+                    onPressedChanged: {
+                        if (!pressed) {
+                            root.revealHud()
+                        }
+                    }
                 }
 
                 DragHandler {
@@ -570,6 +580,9 @@ FocusScope {
                             const fraction = root.barDragFraction
                             root.barDragFraction = -1
                             root.seekToFraction(fraction)
+                        }
+                        if (!active) {
+                            root.revealHud()
                         }
                     }
                 }

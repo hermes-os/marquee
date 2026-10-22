@@ -23,6 +23,9 @@ intermediate version bump.
   app. It stays visible over "Still watching?" and the failure card, and a
   failed player keeps its controls up instead of hiding them after three
   seconds.
+- The player controls and the mouse pointer stay up while the progress bar is
+  pressed or dragged, including a press held still for longer than three
+  seconds; they hide three seconds after it ends.
 - The player controls match the released HUD more closely: the bottom bar
   fades from clear to black at 0.8 instead of a flat 0.72 slab, the progress
   bar is the released 4 (7 in lean-back) capsule over a dim track, the slash

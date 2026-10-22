@@ -304,6 +304,46 @@ private slots:
         QTRY_COMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
     }
 
+    // A press on the progress bar holds the controls and the pointer up, still
+    // or dragging, and the wait starts again once it ends.
+    void aPressOnTheProgressBarHoldsTheControlsAndPointer()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *scrim = itemNamed(env.window, "playerScrim");
+        QQuickItem *bar = itemNamed(env.window, "playerProgress");
+        QVERIFY(scrim != nullptr && bar != nullptr);
+
+        const QPoint center = bar->mapToScene(QPointF(bar->width() / 2, bar->height() / 2)).toPoint();
+        const QPoint left = bar->mapToScene(QPointF(bar->width() / 4, bar->height() / 2)).toPoint();
+        QTest::mouseMove(env.window, center + QPoint(5, 0));
+        QTest::mouseMove(env.window, center);
+        QTest::mousePress(env.window, Qt::LeftButton, Qt::NoModifier, center);
+        // Still, for longer than the three seconds the controls wait.
+        QTest::qWait(3500);
+        QVERIFY(scrim->isVisible());
+        QCOMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+        QTest::mouseRelease(env.window, Qt::LeftButton, Qt::NoModifier, center);
+
+        // The press ended: the controls wait three seconds more and go.
+        QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::BlankCursor);
+
+        // A drag that stops moving holds them just the same.
+        QTest::mouseMove(env.window, center + QPoint(5, 0));
+        QTest::mouseMove(env.window, center);
+        QTRY_VERIFY(scrim->isVisible());
+        QTest::mousePress(env.window, Qt::LeftButton, Qt::NoModifier, center);
+        QTest::mouseMove(env.window, center - QPoint(20, 0));
+        QTest::mouseMove(env.window, left);
+        QTest::qWait(3500);
+        QVERIFY(scrim->isVisible());
+        QCOMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+        QTest::mouseRelease(env.window, Qt::LeftButton, Qt::NoModifier, left);
+        QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
+    }
+
     // PlayerView.swift:226-233: a failed player keeps its controls and its
     // pointer however long the pointer moves and waits.
     void aFailedPlayerKeepsItsControlsAndPointer()
