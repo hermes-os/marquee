@@ -352,8 +352,15 @@ private slots:
         // Five cards are mounted around the front one (:48-61), of which only
         // the nearest are seen.
         QCOMPARE(allNamed(hero, QStringLiteral("heroCard")).size(), 5);
-        QVERIFY(centerCard(shell) != nullptr);
-        QVERIFY(firstNamed(hero, QStringLiteral("heroWatchNow"))->isVisible());
+        QQuickItem *front = centerCard(shell);
+        QVERIFY(front != nullptr);
+        // The front card offers Watch Now: the button, and over it the item
+        // that hears the click, since on a GPU scene graph the card's content
+        // is drawn through an effect and is itself not visible.
+        QVERIFY(firstNamed(front, QStringLiteral("heroWatchNow")) != nullptr);
+        QQuickItem *hit = firstNamed(front, QStringLiteral("heroWatchNowHit"));
+        QVERIFY(hit != nullptr);
+        QTRY_VERIFY(hit->isVisible());
         // :194-239: arrows and dots for a carousel of more than one.
         QVERIFY(firstNamed(hero, QStringLiteral("heroArrowLeft")) != nullptr);
         QVERIFY(firstNamed(hero, QStringLiteral("heroDots"))->isVisible());
