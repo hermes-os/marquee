@@ -21,6 +21,9 @@ intermediate version bump.
   and returns during one film is treated as untouched, so the window goes
   back. Moving to the next episode changes nothing. This differs from the
   released macOS app on purpose.
+- Holding the mouse button on the progress bar no longer stops Left, Right and
+  Down from working; the held button still keeps the controls and the pointer
+  up.
 - The mouse pointer hides with the player controls: when they fade out after
   three seconds (or Back hides them) the pointer disappears over the picture,
   and any pointer movement brings it and the controls back, as in the released

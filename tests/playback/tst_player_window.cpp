@@ -289,6 +289,40 @@ private slots:
         }
     }
 
+    // The held button keeps the controls up; it is not a focused control, so
+    // the arrow keys still mean what they mean on the picture.
+    void theArrowKeysWorkWhileTheButtonIsHeldOnTheBar()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *bar = itemNamed(env.window, "playerProgress");
+        QQuickItem *restart = itemNamed(env.window, "restartControl");
+        QQuickItem *screen = itemNamed(env.window, "playerScreen");
+        QVERIFY(bar != nullptr && restart != nullptr && screen != nullptr);
+        QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+        const auto barPoint = [&](qreal fraction) {
+            return bar->mapToScene(QPointF(bar->width() * fraction, bar->height() / 2)).toPoint();
+        };
+        QTRY_VERIFY(QRect(QPoint(0, 0), env.window->size()).contains(barPoint(0.5)));
+        QTest::qWait(300);
+        QTRY_VERIFY(QRect(QPoint(0, 0), env.window->size()).contains(barPoint(0.5)));
+        const QPoint center = barPoint(0.5);
+        QVERIFY(!restart->hasActiveFocus());
+
+        QTest::mouseMove(env.window, center + QPoint(5, 0));
+        QTest::mouseMove(env.window, center);
+        QTest::mousePress(env.window, Qt::LeftButton, Qt::NoModifier, center);
+        // Held on the bar is not a HUD control holding: Down reaches the
+        // controls as it does from the picture.
+        QVERIFY(!screen->property("hudHeld").toBool());
+        QTest::keyClick(env.window, Qt::Key_Down);
+        QTRY_VERIFY(restart->hasActiveFocus());
+        QVERIFY(screen->property("pointerHolding").toBool());
+        QTest::mouseRelease(env.window, Qt::LeftButton, Qt::NoModifier, center);
+        QTRY_VERIFY(!screen->property("pointerHolding").toBool());
+    }
+
     // `--play` opens the player before the window is shown.
     void aPlayStartTakesTheWindowFullscreenToo()
     {

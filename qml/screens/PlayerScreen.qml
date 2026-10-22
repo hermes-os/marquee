@@ -23,7 +23,7 @@ FocusScope {
     // button is for the pointer too, and the toast sits outside this screen.
     readonly property bool pointerHidden:
         !root.controlsVisible && !root.stillWatching && !video.failed
-        && !appController.hasError
+        && !appController.hasError && !root.pointerHolding
     // Where a drag along the progress bar would land, as a fraction of the
     // film; -1 when none is under way.
     property real barDragFraction: -1
@@ -91,7 +91,10 @@ FocusScope {
         || audioButton.activeFocus || speedButton.activeFocus || muteControl.activeFocus
         || volumeControl.activeFocus || fullscreenControl.activeFocus
         || root.menuOpen || scrubber.scrubbing
-        || progressTap.pressed || root.barDragFraction >= 0
+    // A press or drag on the progress bar keeps the controls and the pointer
+    // up, but it is not a focused control: the arrow keys keep their own
+    // meaning while the button is held, so this stays out of hudHeld.
+    readonly property bool pointerHolding: progressTap.pressed || root.barDragFraction >= 0
     // While a hold scrubs, the clock and the bar show where letting go would
     // land rather than the frozen picture's position.
     readonly property real shownPosition:
@@ -1059,7 +1062,7 @@ FocusScope {
             // Hiding the scrim under a focused control, or under an open
             // track menu, would leave the remote pointed at something the
             // viewer can no longer see.
-            if (!root.hudHeld && !video.failed) {
+            if (!root.hudHeld && !root.pointerHolding && !video.failed) {
                 root.controlsVisible = false
             }
         }
