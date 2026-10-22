@@ -44,8 +44,9 @@ ApplicationWindow {
     }
 
     // Playback takes the window fullscreen and gives it back when the player
-    // closes, unless the viewer changed it meanwhile. F11 and the HUD control
-    // go through the same object so the viewer's choice is told from ours.
+    // closes if it is still fullscreen and the viewer did not toggle it; F11
+    // and the HUD control go through toggle() so the viewer's choice is told
+    // from ours.
     PlaybackFullscreen {
         id: playbackFullscreen
         objectName: "playbackFullscreen"
