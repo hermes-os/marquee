@@ -268,18 +268,15 @@ QVector<home_rows::Card> home_rows::recentlyWatched(const QVector<MediaItem> &it
 
 QVector<home_rows::Card> home_rows::recentlyAdded(const QVector<MediaItem> &items)
 {
+    // :2871-2874 sorts every movie and every show by file date and hides
+    // nothing, watched or not.
     QVector<Dated> dated;
     for (const MediaItem &item : items) {
-        if (item.isMovie() && !item.watched) {
+        if (item.isMovie()) {
             dated.push_back(Dated{.when = item.modifiedAt, .card = movieCard(item)});
         }
     }
     for (const Show &show : groupShows(items)) {
-        // A show watched through is hidden; one episode left keeps it.
-        if (std::all_of(show.episodes.cbegin(), show.episodes.cend(),
-                        [](const MediaItem &episode) { return episode.watched; })) {
-            continue;
-        }
         QDateTime newest;
         for (const MediaItem &episode : show.episodes) {
             if (newer(episode.modifiedAt, newest)) {

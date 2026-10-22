@@ -6,6 +6,9 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home's Recently Added keeps the movies and shows a profile has watched, as the
+  released app does: it lists every movie and show by file date. Before, it hid
+  watched movies and shows watched through. No migration.
 - Home shows the released app's taste and seasonal rows, each only with metadata
   to judge by, so with no key and no metadata Home shows the rows it showed
   before. After Play Something: "Because You Watched ..." (up to three rows, one

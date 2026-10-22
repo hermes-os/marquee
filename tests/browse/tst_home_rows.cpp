@@ -315,7 +315,9 @@ private slots:
         QCOMPARE(cards.at(2).mediaId, oldMovie.id);
     }
 
-    void recentlyAddedHidesWhatTheProfileHasWatched()
+    // BrowseSnapshotStore.swift:2871-2874: the released row sorts every movie
+    // and show by file date and filters nothing.
+    void recentlyAddedKeepsWatchedTitles()
     {
         MediaItem seen = movie(QStringLiteral("Arrival"), 2016, daysAgo(1));
         watched(seen, daysAgo(1));
@@ -336,9 +338,8 @@ private slots:
             names.push_back(card.title);
         }
         names.sort();
-        // The watched movie and the show watched through are hidden; one
-        // episode left keeps its show.
-        QCOMPARE(names, (QStringList{QStringLiteral("Dune"), QStringLiteral("Part")}));
+        QCOMPARE(names, (QStringList{QStringLiteral("Arrival"), QStringLiteral("Done"),
+                                     QStringLiteral("Dune"), QStringLiteral("Part")}));
     }
 
     void decadeRowsNeedTwoMoviesAndRunNewestDecadeFirst()
@@ -835,10 +836,9 @@ private slots:
         QVERIFY(rowNamed(forB, QStringLiteral("continue-watching")) == nullptr);
         QCOMPARE(ids(rowNamed(forB, QStringLiteral("recently-watched"))->cards),
                  QStringList{coco});
-        // B has watched Coco, so it is not offered as new to B, and A has not.
-        QCOMPARE(ids(rowNamed(forB, QStringLiteral("recently-added"))->cards),
-                 QStringList{arrival});
-        // Arrival is only part-way through for A, so it is still new to A.
+        // Recently Added hides nothing (BrowseSnapshotStore.swift:2871-2874),
+        // so it holds both titles for every profile.
+        QCOMPARE(rowNamed(forB, QStringLiteral("recently-added"))->totalCount, 2);
         QCOMPARE(rowNamed(forA, QStringLiteral("recently-added"))->totalCount, 2);
         QCOMPARE(rowIds(forC), (QStringList{QStringLiteral("play-something"),
                                             QStringLiteral("recently-added"),

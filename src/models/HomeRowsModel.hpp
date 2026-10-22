@@ -92,8 +92,8 @@ struct Row
 /// One card per movie and per show, newest file date first
 /// (BrowseSnapshotStore.swift:2871-2874, :2639). A show is dated by its newest
 /// episode file, where the oracle uses its first episode, so a new episode
-/// brings a long-running show back to the front. Titles fully watched are
-/// left out; a show is left out once every episode is watched.
+/// brings a long-running show back to the front. Nothing is hidden for being
+/// watched, as in the oracle.
 [[nodiscard]] QVector<Card> recentlyAdded(const QVector<MediaItem> &items);
 
 /// BrowseSnapshotStore.swift:3126-3144: one row per decade of at least two
