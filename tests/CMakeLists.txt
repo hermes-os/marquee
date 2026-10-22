@@ -204,6 +204,39 @@ marquee_add_test(tst_player_tracks
     playback/tst_player_tracks.cpp
 )
 
+# The window system's state reports are fed in by hand, as a compositor sends
+# them; the minimal platform adds none of its own. QWindowSystemInterface is Qt's
+# own private GUI API, so the test needs Qt's private development files, which
+# some distributions ship separately; without them only this test is left out.
+set(QT_NO_PRIVATE_MODULE_WARNING ON)
+find_package(Qt6 6.8 QUIET COMPONENTS GuiPrivate)
+if(TARGET Qt6::GuiPrivate)
+    marquee_add_test(tst_playback_fullscreen
+        playback/tst_playback_fullscreen.cpp
+    )
+    target_link_libraries(tst_playback_fullscreen PRIVATE Qt6::GuiPrivate)
+    set_tests_properties(tst_playback_fullscreen PROPERTIES
+        ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORMTHEME=none"
+    )
+else()
+    message(STATUS "tst_playback_fullscreen skipped: Qt6::GuiPrivate not found")
+endif()
+
+marquee_add_test(tst_player_window
+    playback/tst_player_window.cpp
+)
+
+# The title shadow needs the OpenGL scene graph, which the offscreen platform
+# does not provide, so the binary builds the same platform fallback chain as
+# tst_playback and the shell's own QT_QPA_PLATFORM must not reach it. Every
+# other case here runs on whichever platform connects. Each case builds and
+# tears down its own window; the threaded render loop crashed in the glyph cache
+# across those windows, so the basic loop is used.
+set_tests_properties(tst_player_window PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORMTHEME=none;QSG_RENDER_LOOP=basic"
+    ENVIRONMENT_MODIFICATION "QT_QPA_PLATFORM=unset:"
+)
+
 marquee_add_test(tst_playback
     playback/tst_playback.cpp
 )

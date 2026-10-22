@@ -18,11 +18,6 @@ Where: `src/playback/MpvVideoItem.cpp`, `src/playback/SeekScrubber.*`, `qml/scre
 What happens: while Left or Right is held past half a second the film is paused and the clock and progress bar show where letting go would land, but the picture stays on the frame where the hold began until the key is let go. The released app sets mpv's `hr-seek` to `no` and previews the target (`PlayerView.swift:478-523`, `MPVPlayerService.swift:3050-3059`).
 Found: implementing the hold-to-scrub; `SeekScrubber` emits only the final seek.
 
-## The player never hides the pointer with the HUD
-Where: `qml/screens/PlayerScreen.qml`.
-What happens: the released HUD hides the mouse cursor when its controls auto-hide and shows it again on movement (`PlayerView.swift:222-257`); the Linux player leaves the cursor visible over the film.
-Found: comparing the new HUD with `PlayerView.swift` after adding pointer reveal.
-
 ## libmpv core is still owned by the render item
 Where: `src/playback/MpvVideoItem.cpp` (`mpv_create`, hwdec, play/seek commands), `src/playback/PlayerController.*`.
 What happens: the render item owns the libmpv handle and every playback command; `PlayerController` holds session state only. `docs/ARCHITECTURE_V3.md` (Player-facing API and spike ownership) puts the core behind `PlayerController` once the spike is proven, and HUD features (Restart) already drive playback through the item.
@@ -373,6 +368,11 @@ Where: `tests/playback/tst_playback.cpp:831` ("No decoded video reached the Qt Q
 What happens: about 1 in 10 full `tst_playback` runs under xvfb/xcb fail this case. It fails the same way on the 4da0105 source, so 9cc342b did not introduce it. 15 of 16 targeted reruns of the case passed.
 Found: round 3 review of 4da0105..9cc342b.
 
+## tst_player_window still crashes now and then under xvfb on the basic render loop
+Where: `tests/playback/tst_player_window.cpp` (every case builds and tears down its own `QQmlApplicationEngine` and window); `tests/CMakeLists.txt` runs it with `QSG_RENDER_LOOP=basic`.
+What happens: `QSG_RENDER_LOOP=basic` removed the render-thread crash in the glyph cache but not the heap corruption: 1 of 3 `ctest --repeat until-fail:15` runs went 10 passes then "corrupted double-linked list" in `~Env` (`QV4::MemoryManager::~MemoryManager`) after `theTitleBlockMatchesTheReleasedSpacingAndShadow`, and the watchdog's stack dump then hung the process until the 300 s limit. A sanitizer build (address, basic loop, xvfb) segfaulted in 1 of 3 runs on the GUI thread in `QRawFont::pixelSize()` <- `QSGInternalTextNode::addGlyphs` <- `QQuickText::updatePaintNode` during `load()` of `thePointerHidesWithTheHudAndReturnsOnMovement`, a read of a garbage pointer, not a reported use-after-free. The shipped app builds one window. The cause is not known.
+Found: round 3 fix run on e57c731, `--repeat until-fail:15` under xvfb after the basic-loop change.
+
 ## A source can stay in startup after a reload of the same file
 Where: `src/playback/MpvVideoItem.cpp:306-308` with `:1195-1196`.
 What happens: play A, call `setSource(B)` while B's loadfile is not issued (no render context) or is rejected, then call `setSource(A)` again. The second call returns early with `m_fileLoaded` already false, so A's positions are ignored and `startupPending` stays set until the surface comes back. Reachable only with a lost surface or a rejected loadfile.
@@ -388,7 +388,17 @@ Where: `THIRD_PARTY_LICENSES.md`, `Libdovi` section.
 What happens: `Libdovi` is a Rust static library built with `-Zbuild-std`, so it contains the Rust standard library (archive members `std`, `core`, `alloc`, `compiler_builtins`, `hashbrown`, `gimli`, `addr2line`, `miniz_oxide`, `object`, `memchr`, `rustc_demangle` and others). libdovi-build does not record the nightly toolchain it used, so those crates' versions and license texts are not in the file; only the `dolby_vision` crate and its Cargo.lock dependencies are.
 Found: listing the arm64 archive members of `Libdovi.xcframework` from libdovi-build release 3.3.2 while writing `THIRD_PARTY_LICENSES.md`.
 
-## The sidebar stays on screen during playback
-Where: `qml/Main.qml` (the `Player` route loads in `screenLoader`, inside the content column beside `Sidebar`).
-What happens: while a film plays, the navigation sidebar (about 78 px at 1280x800) stays drawn at the left edge and the picture fills only the rest of the window. The released app presents `PlayerView` as a layer over the whole shell, sidebar included (`ContentView.swift:52-62`).
-Found: frames 25-34 s of a Release-build screen recording (`--test-mode --windowed`, 1280x800 headless sway) made for the portfolio site, 2026-10-21.
+## The player does not keep the screen awake
+Where: `src/playback/MpvVideoItem.cpp`, `qml/screens/PlayerScreen.qml`.
+What happens: nothing holds off the idle screen blanker while a film plays. The released app holds a display-sleep assertion while unpaused (`MPVPlayerService.swift:3486-3502`); libmpv's own `stop-screensaver` does nothing without a VO window under the render API.
+Found: comparing the HUD with `PlayerControlsOverlay.swift` and `PlayerView.swift`; neither exists in `qml/` or `src/`.
+
+## The player does not tell the viewer audio is unavailable
+Where: `src/playback/MpvVideoItem.cpp`, `qml/screens/PlayerScreen.qml`.
+What happens: when libmpv cannot open an audio output the film plays silently with no word to the viewer. The released HUD shows a "speaker.slash" badge top right with the notice (`PlayerView.swift:147-157`, `:549-570`, `MPVPlayerService.swift:1697`, `:1711`).
+Found: comparing the HUD with `PlayerControlsOverlay.swift` and `PlayerView.swift`; neither exists in `qml/` or `src/`.
+
+## The player HUD has a status-and-hint row the released app does not
+Where: `qml/screens/PlayerScreen.qml` (the `playbackStatus` row in the controls column under the progress bar).
+What happens: under the progress bar the Linux HUD shows a "Playing"/"Paused" label and a line of key hints. The released bar has neither (`PlayerControlsOverlay.swift:261-267`); the space under its bar is the 8 (14 in lean-back) padding (`:301`). The row adds height to the controls and the gradient.
+Found: review of 95952b7..4efbbe8, comparing the HUD with the released overlay.

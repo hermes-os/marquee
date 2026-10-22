@@ -14,6 +14,40 @@ intermediate version bump.
   files really deleted from the same root are still removed. A folder that
   cannot be read leaves the root partly read: what was read is stored and no
   row is removed until a scan reads every folder.
+- The player covers the whole window. While a film or episode plays, the
+  sidebar is gone and the picture and the controls use the full window width,
+  as in the released app; closing the player brings the shell back on the same
+  route with the remote on the content, as before.
+- Playback goes fullscreen. Starting a film (a card, Play Something, Continue
+  Watching, `--play`) puts the window fullscreen if it is not already. When the
+  player closes, the window is decided from how it is then: if you used the
+  Fullscreen control, F or F11 during playback, it stays as you left it; if
+  your window manager took it out of fullscreen (its own fullscreen or
+  maximize key), it stays where the manager put it; if it is still fullscreen,
+  it goes back the way it was (windowed or maximized). A window that was
+  already fullscreen stays fullscreen. A window manager that leaves fullscreen
+  and returns during one film is treated as untouched, so the window goes
+  back. Moving to the next episode changes nothing. This differs from the
+  released macOS app on purpose.
+- The mouse pointer hides with the player controls: when they fade out after
+  three seconds (or Back hides them) the pointer disappears over the picture,
+  and any pointer movement brings it and the controls back, as in the released
+  app. It stays visible over "Still watching?", the failure card and an error
+  message, and a failed player keeps its controls up instead of hiding them
+  after three seconds.
+- The player controls and the mouse pointer stay up while the progress bar is
+  pressed or dragged, including a press held still for longer than three
+  seconds; they hide three seconds after it ends, and the arrow keys keep
+  working while it is held.
+- The player controls match the released HUD more closely: the bottom bar
+  fades from clear to black at 0.8 instead of a flat 0.72 slab, the progress
+  bar is the released 4 (7 in lean-back) capsule over a dim track, the slash
+  in the clock is dimmed, the side and bottom margins are the released 24/16
+  (40/28 in lean-back) and the top bar's 20/16 (36/28). The gradient no longer
+  adds a 48 px fade above the bar, the top bar has no dark gradient (the title
+  block carries the released black shadow instead), the title and the episode
+  line sit the released 2 (4 in lean-back) apart, and a speed of 1.25 reads
+  "1.2x" as in the released app.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the

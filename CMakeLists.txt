@@ -138,6 +138,8 @@ qt_add_qml_module(marquee_core
         src/playback/MpvVideoItem.cpp
         src/playback/NextEpisodeCard.hpp
         src/playback/NextEpisodeCard.cpp
+        src/playback/PlaybackFullscreen.hpp
+        src/playback/PlaybackFullscreen.cpp
         src/playback/PlayerController.hpp
         src/playback/PlayerController.cpp
         src/playback/SeekScrubber.hpp

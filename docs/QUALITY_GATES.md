@@ -58,7 +58,7 @@ Run one target with `ctest --test-dir build/v3-debug -R '<regex>'
 | Play Something (the pick, then the controls) | `^tst_play_something$`, `^tst_home_rows$`, `^tst_home_screen$`, `^tst_sidebar_navigation` |
 | Movies and TV routes | `^tst_movies_route` (also runs `_hidpi`), `^tst_tv_route$` |
 | Details | `^tst_media_details$` |
-| Player, HUD, watch progress | `^tst_playback$`, `^tst_player_hud$`, `^tst_next_episode$`, `^tst_next_episode_flow$`, `^tst_player_tracks$`, `^tst_subtitle_discovery$`, `^tst_track_selection$`, `^tst_watch_progress$`, `^tst_watch_progress_process$` |
+| Player, HUD, watch progress | `^tst_playback$`, `^tst_playback_fullscreen$`, `^tst_player_window$`, `^tst_player_hud$`, `^tst_next_episode$`, `^tst_next_episode_flow$`, `^tst_player_tracks$`, `^tst_subtitle_discovery$`, `^tst_track_selection$`, `^tst_watch_progress$`, `^tst_watch_progress_process$` |
 | Profiles and Kids content filtering | `^tst_profile_store$`, `^tst_profile_picker$`, `^tst_kids_content$` |
 | Search | `^tst_search_session$`, `^tst_search_screen$` |
 
@@ -90,7 +90,9 @@ Change-specific additions:
   platform fallback chain from the live session's display variables and skips
   its render cases when nothing connects. A skip is not a pass and is not render
   proof. The OpenGL branch of `FocusRing` and the libmpv render path are only
-  exercised on a display-backed OpenGL session.
+  exercised on a display-backed OpenGL session. `tst_player_window` builds the
+  same chain so its title-shadow case, which needs the OpenGL scene graph, runs
+  under an X display (xvfb) and skips on a headless offscreen run.
 - Browse fixtures that need a window narrower than the compositor grants skip as
   an unsupported fixture rather than passing. Count skips; do not call a run
   with skips acceptance.

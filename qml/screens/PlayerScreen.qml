@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Marquee 3.0
 
@@ -11,6 +12,18 @@ FocusScope {
     property bool reduceMotion: appController.settings.reduceMotion
     property bool leanBack: appController.settings.leanBackMode
     property bool controlsVisible: true
+    // The window's fullscreen state belongs to the shell (Main.qml), which
+    // tells the viewer's toggle from the one playback made on entry.
+    signal fullscreenRequested()
+    // PlayerView.swift:243-257 hides the mouse cursor when the controls
+    // auto-hide and shows it again on movement. "Still watching?" keeps it:
+    // its buttons are for the pointer. A failed player keeps its pointer and
+    // its controls too (:226-233): the failure card's Close is a pointer
+    // target. So does an error toast raised over the player: its dismiss
+    // button is for the pointer too, and the toast sits outside this screen.
+    readonly property bool pointerHidden:
+        !root.controlsVisible && !root.stillWatching && !video.failed
+        && !appController.hasError && !root.pointerHolding
     // Where a drag along the progress bar would land, as a fraction of the
     // film; -1 when none is under way.
     property real barDragFraction: -1
@@ -64,8 +77,9 @@ FocusScope {
         video.startupPending && !root.startupTerminal
     readonly property bool showingFailureOverlay: video.failed
 
-    // The remote sits on a HUD control or inside a track menu, or a hold of
-    // Left or Right is scrubbing: the HUD stays up for as long as any of them
+    // The remote sits on a HUD control or inside a track menu, a hold of Left
+    // or Right is scrubbing, or the pointer is pressed on the progress bar
+    // (held still or dragging): the HUD stays up for as long as any of them
     // holds it.
     readonly property bool hasSubtitleMenu: video.subtitleTracks.length > 0
     readonly property bool hasAudioMenu: video.audioTracks.length > 1
@@ -77,6 +91,10 @@ FocusScope {
         || audioButton.activeFocus || speedButton.activeFocus || muteControl.activeFocus
         || volumeControl.activeFocus || fullscreenControl.activeFocus
         || root.menuOpen || scrubber.scrubbing
+    // A press or drag on the progress bar keeps the controls and the pointer
+    // up, but it is not a focused control: the arrow keys keep their own
+    // meaning while the button is held, so this stays out of hudHeld.
+    readonly property bool pointerHolding: progressTap.pressed || root.barDragFraction >= 0
     // While a hold scrubs, the clock and the bar show where letting go would
     // land rather than the frozen picture's position.
     readonly property real shownPosition:
@@ -402,7 +420,7 @@ FocusScope {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        implicitHeight: topColumn.implicitHeight + Theme.outerPadding(root.leanBack)
+        implicitHeight: topColumn.implicitHeight + Theme.scaled(16, 28, root.leanBack)
         height: implicitHeight
         opacity: root.controlsVisible ? 1.0 : 0.0
         visible: opacity > 0
@@ -415,21 +433,18 @@ FocusScope {
             }
         }
 
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.72) }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
-            }
-        }
-
+        // PlayerView.swift:170-196 puts nothing behind the top bar: the title
+        // block carries its own shadow (:216) to stay readable over bright
+        // pictures.
         ColumnLayout {
             id: topColumn
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            anchors.leftMargin: Theme.outerPadding(root.leanBack)
-            anchors.rightMargin: Theme.outerPadding(root.leanBack)
+            // PlayerView.swift:194-195: 20 (36 in lean-back) at the sides, 16 (28)
+            // above.
+            anchors.leftMargin: Theme.scaled(20, 36, root.leanBack)
+            anchors.rightMargin: Theme.scaled(20, 36, root.leanBack)
             anchors.topMargin: Theme.scaled(16, 28, root.leanBack)
             spacing: Theme.scaled(10, 16, root.leanBack)
 
@@ -448,26 +463,63 @@ FocusScope {
                 onActivated: root.close()
             }
 
-            Text {
-                objectName: "playerTitle"
-                text: root.title
-                color: Theme.textPrimary
-                font.pixelSize: Theme.scaled(18, 27, root.leanBack)
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
+            // :199-217: the title and the episode line sit 2 (4 in
+            // lean-back) apart, as one block with a black-at-0.7 shadow of
+            // radius 6, 1 down. The shadow is a layer effect on a GPU scene
+            // graph, which has room around the text for the blur; the
+            // software one (the offscreen test platform) has no shader
+            // effects and draws the block plain.
+            Item {
+                id: titleBlock
+                objectName: "playerTitleBlock"
+                readonly property real pad: 10
+                readonly property bool shadowed:
+                    titleBlock.GraphicsInfo.api !== GraphicsInfo.Software
+                    && titleBlock.GraphicsInfo.api !== GraphicsInfo.Unknown
                 Layout.fillWidth: true
-            }
+                // The room for the blur is taken back from the layout.
+                Layout.margins: -titleBlock.pad
+                implicitHeight: titleColumn.implicitHeight + 2 * titleBlock.pad
+                layer.enabled: titleBlock.shadowed
+                layer.effect: MultiEffect {
+                    objectName: "playerTitleShadow"
+                    autoPaddingEnabled: false
+                    shadowEnabled: true
+                    shadowColor: "black"
+                    shadowOpacity: 0.7
+                    shadowVerticalOffset: 1
+                    // SoftShadow.qml's mapping of a SwiftUI radius to a blur.
+                    shadowBlur: Math.min(1, 6 * 1.9 / 64)
+                }
 
-            // :207-213: the episode line beneath the show.
-            Text {
-                objectName: "playerSubtitle"
-                visible: root.subtitle.length > 0
-                text: root.subtitle
-                color: Qt.rgba(1, 1, 1, 0.78)
-                font.pixelSize: Theme.scaled(13, 19, root.leanBack)
-                font.weight: Font.Medium
-                elide: Text.ElideRight
-                Layout.fillWidth: true
+                ColumnLayout {
+                    id: titleColumn
+                    anchors.fill: parent
+                    anchors.margins: titleBlock.pad
+                    spacing: Theme.scaled(2, 4, root.leanBack)
+
+                    Text {
+                        objectName: "playerTitle"
+                        text: root.title
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.scaled(18, 27, root.leanBack)
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+
+                    // :207-213: the episode line beneath the show.
+                    Text {
+                        objectName: "playerSubtitle"
+                        visible: root.subtitle.length > 0
+                        text: root.subtitle
+                        color: Qt.rgba(1, 1, 1, 0.78)
+                        font.pixelSize: Theme.scaled(13, 19, root.leanBack)
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                }
             }
         }
     }
@@ -480,8 +532,15 @@ FocusScope {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        implicitHeight: controls.implicitHeight + Theme.spacingXXL * 2
-        color: Qt.rgba(0, 0, 0, 0.72)
+        implicitHeight: controls.implicitHeight
+            + Theme.scaled(Theme.spacingMD, 28, root.leanBack)
+        // PlayerControlsOverlay.swift:574-581: clear at the top of the
+        // controls, black at 0.8 at the bottom. The gradient covers only the
+        // padded controls (:261-267), with no extra fade above the bar.
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
+            GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.8) }
+        }
         opacity: root.controlsVisible ? 1.0 : 0.0
         visible: opacity > 0
 
@@ -493,10 +552,15 @@ FocusScope {
             }
         }
 
+        // :266-267: 24 (40 in lean-back) at the sides and 16 (28) below.
         ColumnLayout {
             id: controls
-            anchors.fill: parent
-            anchors.margins: Theme.outerPadding(root.leanBack)
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            anchors.leftMargin: Theme.scaled(Theme.spacingLG, 40, root.leanBack)
+            anchors.rightMargin: Theme.scaled(Theme.spacingLG, 40, root.leanBack)
+            anchors.bottomMargin: Theme.scaled(Theme.spacingMD, 28, root.leanBack)
             spacing: Theme.spacingMD
 
             // PlayerControlsOverlay.swift:273-302: the bar answers a tap or a
@@ -509,12 +573,15 @@ FocusScope {
                 Layout.fillWidth: true
                 implicitHeight: Theme.scaled(24, 38, root.leanBack)
 
+                // :279-305: a capsule 4 (7 in lean-back) high, the tertiary
+                // text colour at 0.3 under the secondary accent's fill.
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                     width: parent.width
-                    height: Theme.scaled(6, 9, root.leanBack)
+                    height: Theme.scaled(4, 7, root.leanBack)
                     radius: height / 2
-                    color: Theme.surfaceLayer
+                    color: Qt.rgba(Theme.textTertiary.r, Theme.textTertiary.g,
+                                   Theme.textTertiary.b, 0.3)
 
                     Rectangle {
                         objectName: "playerProgressFill"
@@ -527,8 +594,16 @@ FocusScope {
                 }
 
                 TapHandler {
+                    id: progressTap
                     onTapped: eventPoint => root.seekToFraction(
                         eventPoint.position.x / progressHit.width)
+                    // Whatever ends the press, the wait for hiding starts
+                    // again from there; a cancelled press seeks nothing.
+                    onPressedChanged: {
+                        if (!pressed) {
+                            root.revealHud()
+                        }
+                    }
                 }
 
                 DragHandler {
@@ -544,6 +619,9 @@ FocusScope {
                             const fraction = root.barDragFraction
                             root.barDragFraction = -1
                             root.seekToFraction(fraction)
+                        }
+                        if (!active) {
+                            root.revealHud()
                         }
                     }
                 }
@@ -649,7 +727,11 @@ FocusScope {
                 // :415-424.
                 Text {
                     objectName: "playerClock"
-                    text: root.formatTime(root.shownPosition) + " / " + root.formatTime(video.duration)
+                    // :415-424: the slash is drawn in the tertiary colour.
+                    textFormat: Text.StyledText
+                    text: root.formatTime(root.shownPosition)
+                        + " <font color=\"" + Theme.textTertiary + "\">/</font> "
+                        + root.formatTime(video.duration)
                     color: Theme.textSecondary
                     font.pixelSize: Theme.scaled(12, 17, root.leanBack)
                     font.weight: Font.Medium
@@ -980,7 +1062,7 @@ FocusScope {
             // Hiding the scrim under a focused control, or under an open
             // track menu, would leave the remote pointed at something the
             // viewer can no longer see.
-            if (!root.hudHeld) {
+            if (!root.hudHeld && !root.pointerHolding && !video.failed) {
                 root.controlsVisible = false
             }
         }
@@ -1030,6 +1112,7 @@ FocusScope {
     // would bring itself back every time it faded.
     HoverHandler {
         id: pointerWatch
+        cursorShape: root.pointerHidden ? Qt.BlankCursor : Qt.ArrowCursor
         property point lastPlace: Qt.point(-1, -1)
         onPointChanged: {
             const place = point.scenePosition
@@ -1389,15 +1472,7 @@ FocusScope {
     }
 
     function toggleFullscreen() {
-        const window = root.Window.window
-        if (!window) {
-            return
-        }
-        if (window.visibility === Window.FullScreen) {
-            window.showNormal()
-        } else {
-            window.showFullScreen()
-        }
+        root.fullscreenRequested()
         root.revealHud()
     }
 
@@ -1412,9 +1487,18 @@ FocusScope {
     }
 
     // PlayerControlsOverlay.swift:517-522: whole speeds read "2x", the rest
-    // as their digits, "0.75x".
+    // as C's %.2g does, which rounds a tie to even: 1.25 reads "1.2x".
     function speedLabel(speed) {
-        return Number(speed.toFixed(2)) + "x"
+        if (speed === Math.floor(speed)) {
+            return Math.floor(speed) + "x"
+        }
+        const scale = Math.pow(10, 1 - Math.floor(Math.log10(Math.abs(speed))))
+        const scaled = speed * scale
+        let digits = Math.round(scaled)
+        if (Math.abs(scaled - Math.floor(scaled) - 0.5) < 1e-9) {
+            digits = 2 * Math.round(scaled / 2)
+        }
+        return (digits / scale) + "x"
     }
 
     // :546-556.
