@@ -18,9 +18,11 @@ FocusScope {
     // auto-hide and shows it again on movement. "Still watching?" keeps it:
     // its buttons are for the pointer. A failed player keeps its pointer and
     // its controls too (:226-233): the failure card's Close is a pointer
-    // target.
+    // target. So does an error toast raised over the player: its dismiss
+    // button is for the pointer too, and the toast sits outside this screen.
     readonly property bool pointerHidden:
         !root.controlsVisible && !root.stillWatching && !video.failed
+        && !appController.hasError
     // Where a drag along the progress bar would land, as a fraction of the
     // film; -1 when none is under way.
     property real barDragFraction: -1

@@ -344,6 +344,45 @@ private slots:
         QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
     }
 
+    // An error toast raised over a player whose controls are hidden has a
+    // button for the pointer, so the pointer shows while it is up.
+    void anErrorToastOverThePlayerShowsThePointer()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *scrim = itemNamed(env.window, "playerScrim");
+        QVERIFY(scrim != nullptr);
+        QTest::mouseMove(env.window, QPoint(300, 300));
+        QTest::mouseMove(env.window, QPoint(320, 310));
+        QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::BlankCursor);
+
+        env.controller.raiseError(QStringLiteral("Library scan"),
+                                  QStringLiteral("A root went away"));
+        QQuickItem *toast = itemNamed(env.window, "errorToast");
+        QVERIFY(toast != nullptr);
+        QTRY_VERIFY(toast->isVisible() && toast->width() > 0);
+        // Over the toast, and over the picture with the toast up.
+        const QPoint onToast = toast->mapToScene(QPointF(toast->width() / 2, toast->height() / 2))
+                                   .toPoint();
+        QTest::mouseMove(env.window, onToast + QPoint(4, 0));
+        QTest::mouseMove(env.window, onToast);
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+        QTest::mouseMove(env.window, QPoint(340, 330));
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+        QTest::mouseMove(env.window, onToast);
+        QTest::qWait(3500);
+        QCOMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+
+        // Dismissed, the player's own rule applies again.
+        env.controller.dismissError();
+        QTest::mouseMove(env.window, QPoint(300, 300));
+        QTest::mouseMove(env.window, QPoint(320, 310));
+        QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::BlankCursor);
+    }
+
     // PlayerView.swift:226-233: a failed player keeps its controls and its
     // pointer however long the pointer moves and waits.
     void aFailedPlayerKeepsItsControlsAndPointer()

@@ -20,9 +20,9 @@ intermediate version bump.
 - The mouse pointer hides with the player controls: when they fade out after
   three seconds (or Back hides them) the pointer disappears over the picture,
   and any pointer movement brings it and the controls back, as in the released
-  app. It stays visible over "Still watching?" and the failure card, and a
-  failed player keeps its controls up instead of hiding them after three
-  seconds.
+  app. It stays visible over "Still watching?", the failure card and an error
+  message, and a failed player keeps its controls up instead of hiding them
+  after three seconds.
 - The player controls and the mouse pointer stay up while the progress bar is
   pressed or dragged, including a press held still for longer than three
   seconds; they hide three seconds after it ends.

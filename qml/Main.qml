@@ -286,6 +286,7 @@ ApplicationWindow {
     }
 
     ErrorToast {
+        objectName: "errorToast"
         anchors.top: parent.top
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.topMargin: 24
