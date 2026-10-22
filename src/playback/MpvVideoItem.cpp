@@ -35,12 +35,16 @@ constexpr uint64_t kSpeedProperty = 10;
 constexpr uint64_t kPreviewReply = 101;
 constexpr uint64_t kSettleReplyBase = 1000;
 constexpr uint64_t kHrSeekReply = 103;
-constexpr uint64_t kSettleTimeReplyBase = 1'000'000;
 // The released app keeps hr-seek at absolute outside a scrub
 // (MPVPlayerService.swift:3079); libmpv's own default differs.
 constexpr const char *kNormalHrSeek = "absolute";
 constexpr const char *kScrubHrSeek = "no";
 constexpr int kScrubWatchdogMs = 1500;
+// How close a position report must be to a scrub's landing to be taken as
+// the exact seek having run. A frame is 0.04 s at film rates; the width
+// also bounds how far a preview's keyframe, when it lies just before the
+// landing, can pull the clock back.
+constexpr double kSettleLandingTolerance = 0.25;
 
 // PlayerView.swift:15.
 constexpr std::array<double, 7> kSpeedSteps{0.5, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0};
@@ -694,23 +698,14 @@ void MpvVideoItem::handlePlaybackRestart()
 void MpvVideoItem::handleCommandReply(uint64_t replyId, int error)
 {
     if (replyId == kSettleReplyBase + m_settleSerial && m_scrubSettling) {
-        // libmpv has taken the exact seek, so the position reports that follow
-        // are the landing's own and the clock may follow them again.
+        // The position reports that follow are not yet the landing's: libmpv
+        // runs the seek after it has answered the command, and reports from
+        // before it are still on their way. Only a report at the landing
+        // ends the settle (see the `time-pos` case in applyEvent); a refused
+        // seek has no landing to wait for.
         if (error < 0) {
             qCWarning(logPlayback) << QStringLiteral("The seek ending a scrub failed: %1")
                                           .arg(mpvErrorText(error));
-            endSettle();
-            return;
-        }
-        // The seek is queued ahead of this read on libmpv's own thread, and
-        // libmpv answers `time-pos` with a pending seek's target, so the
-        // answer is where the film landed. Position reports that were
-        // already on their way when the seek was issued are older than it.
-        const int read = m_core ? mpv_get_property_async(m_core.get(),
-                                                        kSettleTimeReplyBase + m_settleSerial,
-                                                        "time-pos", MPV_FORMAT_DOUBLE)
-                                : MPV_ERROR_UNINITIALIZED;
-        if (read < 0) {
             endSettle();
         }
         return;
@@ -1295,8 +1290,17 @@ void MpvVideoItem::applyEvent(mpv_event *event)
                 // While a scrub holds the clock, or its exact seek has not
                 // settled, the reports describe previews: the session must
                 // not take one as where the film is.
-                if (m_fileLoaded && !m_scrubHolding && !m_scrubSettling) {
-                    setPositionValue(*static_cast<double *>(property->data));
+                // libmpv reports the previews' keyframes, then the old position,
+                // until the exact seek has run, so while settling only a
+                // report at the landing counts and it ends the settle.
+                if (m_fileLoaded && !m_scrubHolding) {
+                    const double value = *static_cast<double *>(property->data);
+                    if (!m_scrubSettling) {
+                        setPositionValue(value);
+                    } else if (qAbs(value - m_settleLanding) < kSettleLandingTolerance) {
+                        setPositionValue(value);
+                        endSettle();
+                    }
                 }
             } else if (name == "eof-reached" && property->format == MPV_FORMAT_FLAG
                        && *static_cast<int *>(property->data) != 0) {
@@ -1375,19 +1379,6 @@ void MpvVideoItem::applyEvent(mpv_event *event)
         case MPV_EVENT_COMMAND_REPLY:
             handleCommandReply(event->reply_userdata, event->error);
             break;
-        case MPV_EVENT_GET_PROPERTY_REPLY: {
-            const auto *property = static_cast<mpv_event_property *>(event->data);
-            if (event->reply_userdata == kSettleTimeReplyBase + m_settleSerial
-                && m_scrubSettling) {
-                if (event->error >= 0 && property != nullptr
-                    && property->format == MPV_FORMAT_DOUBLE && property->data != nullptr) {
-                    setPositionValue(*static_cast<double *>(property->data));
-                }
-                endSettle();
-                break;
-            }
-            break;
-        }
         case MPV_EVENT_SET_PROPERTY_REPLY:
             if (event->error < 0) {
                 qCWarning(logPlayback) << QStringLiteral("Could not change the seek mode: %1")

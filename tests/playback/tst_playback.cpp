@@ -12,6 +12,7 @@
 #include <QLinearGradient>
 #include <QPainter>
 #include <QPointer>
+#include <QProcess>
 #include <QQmlApplicationEngine>
 #include <QQmlComponent>
 #include <QQmlContext>
@@ -20,6 +21,7 @@
 #include <QScopeGuard>
 #include <QSGRendererInterface>
 #include <QSignalSpy>
+#include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
 #include <QUrl>
@@ -115,6 +117,21 @@ double rampGreyAt(double seconds)
     const double luma = kRampFirstLuma
         + frame * (kRampLastLuma - kRampFirstLuma) / (kRampFrames - 1);
     return (luma - 16.0) * 255.0 / 219.0;
+}
+
+/// A 24 fps H.264 clip with a keyframe every two seconds and nothing else
+/// (no scene-cut keyframes), the shape of a real film: a seek that does not
+/// decode to the exact frame lands on a keyframe up to two seconds early.
+bool writeLongKeyframeIntervalClip(const QString &path, int seconds)
+{
+    QProcess ffmpeg;
+    ffmpeg.start(QStringLiteral("ffmpeg"),
+                 {"-v", "error", "-y", "-f", "lavfi", "-i",
+                  QStringLiteral("testsrc2=s=%1x%2:r=24:d=%3").arg(kClipWidth).arg(kClipHeight).arg(seconds),
+                  "-c:v", "libx264", "-preset", "ultrafast", "-pix_fmt", "yuv420p", "-g", "48",
+                  "-keyint_min", "48", "-sc_threshold", "0", path});
+    return ffmpeg.waitForFinished(120000) && ffmpeg.exitStatus() == QProcess::NormalExit
+        && ffmpeg.exitCode() == 0;
 }
 
 /// A QQuickFramebufferObject only renders under the OpenGL scene graph, which
@@ -951,6 +968,91 @@ private slots:
         QTRY_COMPARE(video->propertyForTest(QStringLiteral("hr-seek")), QStringLiteral("absolute"));
         QTRY_VERIFY(!video->paused());
         QCOMPARE(video->errorMessage(), QString{});
+    }
+
+    // After release the clock shows the landing and nothing else: libmpv
+    // answers reads and reports from before the exact seek ran with the
+    // previews' keyframe times, and none of them may reach the position the
+    // watch-progress writer and the next-episode card read.
+    void theClockNeverShowsAPreviewTimeAfterRelease()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("ffmpeg")).isEmpty()) {
+            QSKIP("ffmpeg is not installed, so the test clip cannot be made");
+        }
+        QTemporaryDir runtimeRoot;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restorePaths = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        const QString clip = runtimeRoot.filePath(QStringLiteral("keyframes.mp4"));
+        QVERIFY(writeLongKeyframeIntervalClip(clip, 150));
+
+        ApplicationController controller;
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        QVERIFY2(window != nullptr, "qml/Main.qml did not load from the module");
+        if (!rendersWithOpenGl(window)) {
+            QSKIP("Scene graph is not running on OpenGL; the libmpv render path cannot run");
+        }
+
+        controller.playLocalFile(clip);
+        QPointer<MpvVideoItem> video = qobject_cast<MpvVideoItem *>(
+            window->findChild<QQuickItem *>(QStringLiteral("videoSurface")));
+        QObject *scrubber = window->findChild<QObject *>(QStringLiteral("seekScrubber"));
+        QVERIFY2(!video.isNull() && scrubber != nullptr, "PlayerScreen lacks its video or scrubber");
+        QVERIFY2(!renderUntil(window, video, [video](const QImage &) {
+                     return !video.isNull() && video->duration() > 100.0
+                         && video->position() > 0.5;
+                 }).isNull(),
+                 "The clip never started");
+        QVERIFY2(!video.isNull(), kSurfaceReleased);
+        QSignalSpy seeks(scrubber, SIGNAL(seekRequested(double)));
+
+        // Hold and release several times with a different number of previews
+        // each: the stale report that slips through after the release depends
+        // on where libmpv is in the preview it was running, and it is the
+        // previews' keyframe, up to two seconds before the landing.
+        QStringList clockJumps;
+        for (int attempt = 0; attempt < 8; ++attempt) {
+            QTest::keyPress(window, Qt::Key_Right);
+            double target = 0.0;
+            QVERIFY2(!renderUntil(window, video, [&](const QImage &) {
+                         if (video.isNull() || !video->scrubbing()) {
+                             return false;
+                         }
+                         target = scrubber->property("target").toDouble();
+                         return video->previewSeeksIssuedForTest() >= 3 + attempt % 3;
+                     }, 10000).isNull(),
+                     "The hold never settled on a preview between two keyframes");
+            QVERIFY2(!video.isNull(), kSurfaceReleased);
+
+            QList<double> shown;
+            const QMetaObject::Connection recording = connect(
+                video.data(), &MpvVideoItem::positionChanged, this,
+                [&] { shown.append(video->position()); });
+            seeks.clear();
+            QTest::keyRelease(window, Qt::Key_Right);
+            QTRY_COMPARE(seeks.count(), 1);
+            const double landing = seeks.at(0).at(0).toDouble();
+
+            // Until the film plays on from the landing.
+            const bool playingOn = !renderUntil(window, video, [&](const QImage &) {
+                return !video.isNull() && !video->paused()
+                    && video->position() >= landing + 0.2;
+            }, 10000).isNull();
+            QVERIFY2(!video.isNull(), kSurfaceReleased);
+            disconnect(recording);
+
+            QVERIFY2(playingOn, qPrintable(QStringLiteral("The film did not play on from %1")
+                                               .arg(landing)));
+            QVERIFY(!shown.isEmpty());
+            for (const double position : shown) {
+                if (std::abs(position - landing) > 0.3) {
+                    clockJumps.append(QStringLiteral("The clock showed %1 after a release landing at %2")
+                                          .arg(position)
+                                          .arg(landing));
+                }
+            }
+        }
+        QVERIFY2(clockJumps.isEmpty(), qPrintable(clockJumps.join(QLatin1Char('\n'))));
     }
 
     void repeatedPlayerTeardownKeepsPlaybackHealthy()
