@@ -274,6 +274,8 @@ void MetadataEnrichment::searchThenDetails()
                 // anything else is asked again on the next run.
                 if (notFound) {
                     m_store->keepMatch(m_run->target.ownerKey);
+                } else {
+                    m_store->saveAttempt(m_run->target, metadata_state::failed, m_setup.now());
                 }
             } else {
                 m_store->saveAttempt(m_run->target,

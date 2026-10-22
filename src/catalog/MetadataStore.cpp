@@ -284,6 +284,12 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
     const auto isStale = [](const StoredTitle *stored) {
         return stored != nullptr && stored->matcherVersion < MetadataStore::matcherVersion;
     };
+    // A match that a newer matcher could not replace because TMDB failed
+    // answering is tried again after the failed-retry wait, not on every scan.
+    const auto isWaiting = [&](const StoredTitle *stored) {
+        return isStale(stored) && stored->state == QLatin1String("matched")
+            && !retryDue(stored->fetchedAt, MetadataStore::failedRetryDays, now);
+    };
     const auto fillFromRow = [&](MetadataTarget &target, const StoredTitle *row) {
         if (row == nullptr) {
             return;
@@ -322,6 +328,9 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
             // fills a gap that is always there; the poster only when the
             // folder has none (a local sidecar still wins).
             const bool sidecarPoster = !query.value(3).toString().isEmpty();
+            if (isWaiting(row)) {
+                continue;
+            }
             const Need need = needOf(isStale(row) ? nullptr : row, !sidecarPoster, true);
             if (!need.any()) {
                 continue;
@@ -412,6 +421,9 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
         MetadataTarget target = show.target;
         const auto stored = titles.constFind(key);
         const StoredTitle *row = stored == titles.constEnd() ? nullptr : &*stored;
+        if (isWaiting(row)) {
+            continue;
+        }
         const Need need =
             needOf(isStale(row) ? nullptr : row, !show.anySidecarPoster, !show.anySidecarBackdrop);
         const bool matched = row != nullptr && row->state == QLatin1String("matched");
@@ -584,6 +596,17 @@ void MetadataStore::saveAttempt(const MetadataTarget &target, const QString &sta
     query.addBindValue(optionalValue(tmdbId));
     query.addBindValue(matcherVersion);
     executeOrThrow(query);
+
+    // A match an older matcher made stays, with its data, when the new try
+    // fails; only the time moves so the retry wait applies.
+    QSqlQuery stale = prepared(
+        m_database.connection(),
+        QStringLiteral("UPDATE title_metadata SET fetched_at = ? WHERE owner_key = ? "
+                       "AND fetch_state = 'matched' AND matcher_version < ?"));
+    stale.addBindValue(formatTimestamp(now));
+    stale.addBindValue(target.ownerKey);
+    stale.addBindValue(matcherVersion);
+    executeOrThrow(stale);
 }
 
 void MetadataStore::keepMatch(const QString &ownerKey)

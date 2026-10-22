@@ -481,6 +481,38 @@ private slots:
         QCOMPARE(rowCount(catalog, "media_items"), 0);
     }
 
+    void migrationSevenMarksEveryStoredMatchWithMatcherVersionZero()
+    {
+        QTemporaryDir dataDirectory;
+        const QString path = QDir(dataDirectory.path()).filePath("catalog.sqlite");
+        {
+            // A schema 6 catalog: the current tables without the column that
+            // migration 7 adds, holding matched and unmatched titles.
+            CatalogDatabase seeded(path);
+            seeded.migrate();
+            QVERIFY(execute(seeded, "ALTER TABLE title_metadata DROP COLUMN matcher_version"));
+            QVERIFY(execute(seeded, "PRAGMA user_version = 6"));
+            QVERIFY(execute(seeded,
+                            "INSERT INTO title_metadata (owner_key, kind, fetch_state, fetched_at, tmdb_id) "
+                            "VALUES ('movie-a', 'movie', 'matched', '2026-01-01T00:00:00.000Z', 11), "
+                            "('movie-b', 'movie', 'unmatched', '2026-01-01T00:00:00.000Z', NULL), "
+                            "('show:Fixture Show|2015', 'show', 'matched', '2026-01-01T00:00:00.000Z', 22)"));
+        }
+
+        CatalogDatabase catalog(path);
+        catalog.migrate();
+
+        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(rowCount(catalog, "title_metadata"), 3);
+        QSqlQuery query(catalog.connection());
+        QVERIFY(query.exec("SELECT COUNT(*) FROM title_metadata WHERE matcher_version = 0"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 3);
+        QVERIFY(query.exec("SELECT tmdb_id FROM title_metadata WHERE owner_key = 'movie-a'"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 11);
+    }
+
     void upgradedVersionOneCatalogRejectsRowsWithoutAnIdentity()
     {
         QTemporaryDir dataDirectory;

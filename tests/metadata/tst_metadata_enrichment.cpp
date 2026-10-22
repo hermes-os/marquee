@@ -604,6 +604,8 @@ private slots:
         // right with data that must survive, and Obscure Nothing unmatched.
         const QString path = library.catalogPath();
         QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // The rows were written long ago, outside any retry wait.
+        m_state->clock = m_state->clock.addDays(2);
         QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 123, "
                                          "overview = 'Wrong film', fetched_at = '2020-01-01T00:00:00.000Z' "
                                          "WHERE owner_key = '%1'").arg(bareId)));
@@ -646,6 +648,12 @@ private slots:
                      "an unchanged match must not fetch its details again");
         }
 
+        // Nor were its images (already cached) asked for again.
+        for (qsizetype index = requestsBefore; index < m_transport->count(); ++index) {
+            QVERIFY2(m_transport->urls().at(index).host() != QLatin1String("image.tmdb.org"),
+                     "an unchanged match must not download its images again");
+        }
+
         // The title the old rules missed is matched now.
         const MediaItem obscure = library.movie(QStringLiteral("Obscure Nothing"));
         QVERIFY(obscure.metadata);
@@ -669,6 +677,12 @@ private slots:
         }
         const QString path = library.catalogPath();
         QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // The rows were written long ago, outside any retry wait.
+        m_state->clock = m_state->clock.addDays(2);
+        // Obscure Nothing was once matched by an older matcher whose details
+        // then failed: it keeps that matcher's id with the state failed.
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET fetch_state = 'failed', tmdb_id = 123 "
+                                         "WHERE owner_key = (SELECT id FROM media_items WHERE title = 'Obscure Nothing')")));
         // TMDB answers nothing for any search now.
         m_transport->setResponder([](const QUrl &url) {
             if (url.path().startsWith(QLatin1String("/3/search/"))) {
@@ -680,6 +694,15 @@ private slots:
         (void)runOnce(second, library.rootList());
         QVERIFY(library.movie(QStringLiteral("Synthetic Odyssey")).metadata);
         QCOMPARE(scalar(path, QStringLiteral("SELECT COUNT(*) FROM title_metadata WHERE matcher_version = 0")).toInt(), 0);
+        // The id the older matcher gave is gone, or the retry would go
+        // straight to that title.
+        QCOMPARE(scalar(path, QStringLiteral("SELECT fetch_state FROM title_metadata WHERE owner_key = "
+                                             "(SELECT id FROM media_items WHERE title = 'Obscure Nothing')"))
+                     .toString(),
+                 QStringLiteral("unmatched"));
+        QVERIFY(scalar(path, QStringLiteral("SELECT tmdb_id FROM title_metadata WHERE owner_key = "
+                                            "(SELECT id FROM media_items WHERE title = 'Obscure Nothing')"))
+                    .isNull());
     }
 
     void aShowMatchedToAnotherShowByAnOlderMatcherLosesItsEpisodeFacts()
@@ -693,6 +716,8 @@ private slots:
         const QString path = library.catalogPath();
         const QString showKey = QStringLiteral("show:Synthetic Harbor|2015");
         QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // The rows were written long ago, outside any retry wait.
+        m_state->clock = m_state->clock.addDays(2);
         QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 555, overview = 'Wrong show' "
                                          "WHERE owner_key = '%1'").arg(showKey)));
         QVERIFY(sql(path, QStringLiteral("UPDATE episode_metadata SET title = 'Wrong episode', "
@@ -702,6 +727,105 @@ private slots:
         (void)runOnce(second, library.rootList());
         QCOMPARE(library.episode(1).tmdbEpisodeTitle, QStringLiteral("Arrivals"));
         QCOMPARE(library.episode(1).metadata->tmdbId, 9101);
+    }
+
+    void aChangedShowLosesItsOldEpisodeFactsEvenWhenTheNewOnesCannotBeFetched()
+    {
+        Library library;
+        QVERIFY(library.build());
+        {
+            MetadataEnrichment first(library.catalogPath(), makeSetup(library, m_transport, m_state));
+            (void)runOnce(first, library.rootList());
+        }
+        const QString path = library.catalogPath();
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // The rows were written long ago, outside any retry wait.
+        m_state->clock = m_state->clock.addDays(2);
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 555 WHERE owner_key = '%1'")
+                              .arg(QStringLiteral("show:Synthetic Harbor|2015"))));
+        QVERIFY(sql(path, QStringLiteral("UPDATE episode_metadata SET title = 'Wrong episode', "
+                                         "overview = 'Wrong'")));
+        QCOMPARE(scalar(path, QStringLiteral("SELECT COUNT(*) FROM episode_metadata")).toInt(), 2);
+
+        // TMDB's season answer is refused, so the run ends after the show
+        // was saved and the episodes were not.
+        m_transport->setResponder([](const QUrl &url) {
+            if (url.path() == QLatin1String("/3/tv/9101/season/1")) {
+                return FakeTransport::status(401);
+            }
+            return tmdbAnswer(url);
+        });
+        MetadataEnrichment second(path, makeSetup(library, m_transport, m_state));
+        QCOMPARE(runOnce(second, library.rootList()).outcome, MetadataEnrichment::Outcome::Interrupted);
+
+        // The other show's episode facts are gone, not left under the new
+        // show for the next run to trust.
+        QCOMPARE(scalar(path, QStringLiteral("SELECT tmdb_id FROM title_metadata WHERE owner_key = '%1'")
+                                  .arg(QStringLiteral("show:Synthetic Harbor|2015"))).toInt(), 9101);
+        QCOMPARE(scalar(path, QStringLiteral("SELECT COUNT(*) FROM episode_metadata WHERE title = 'Wrong episode'"))
+                     .toInt(), 0);
+    }
+
+    void aRematchWhoseDetailsFailKeepsTheOldMatchAndWaitsADayBeforeTryingAgain()
+    {
+        Library library;
+        QVERIFY(library.build());
+        {
+            MetadataEnrichment first(library.catalogPath(), makeSetup(library, m_transport, m_state));
+            (void)runOnce(first, library.rootList());
+        }
+        const QString path = library.catalogPath();
+        const QString bareId = library.movie(QStringLiteral("Bare Synthetic")).id;
+        // Bare Synthetic was matched to another film by an older matcher.
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // The rows were written long ago, outside any retry wait.
+        m_state->clock = m_state->clock.addDays(2);
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 123, overview = 'Wrong film' "
+                                         "WHERE owner_key = '%1'").arg(bareId)));
+
+        // The search now finds the right film, whose details TMDB cannot give.
+        m_transport->setResponder([](const QUrl &url) {
+            if (url.path() == QLatin1String("/3/movie/9010")) {
+                return FakeTransport::status(404);
+            }
+            return tmdbAnswer(url);
+        });
+        const auto searches = [this] {
+            int count = 0;
+            for (const QUrl &url : m_transport->urls()) {
+                if (url.path() == QLatin1String("/3/search/movie")
+                    && FakeTransport::queryValue(url, QStringLiteral("query")) == QLatin1String("Bare Synthetic")) {
+                    ++count;
+                }
+            }
+            return count;
+        };
+        const int before = searches();
+        {
+            MetadataEnrichment second(path, makeSetup(library, m_transport, m_state));
+            (void)runOnce(second, library.rootList());
+        }
+        QCOMPARE(searches(), before + 1);
+        // The old match stays, and the attempt is on record.
+        QCOMPARE(scalar(path, QStringLiteral("SELECT overview FROM title_metadata WHERE owner_key = '%1'")
+                                  .arg(bareId)).toString(), QStringLiteral("Wrong film"));
+        QCOMPARE(scalar(path, QStringLiteral("SELECT fetched_at FROM title_metadata WHERE owner_key = '%1'")
+                                  .arg(bareId)).toString(),
+                 QStringLiteral("2026-01-03T12:00:00.000Z"));
+
+        // Within the day it is not asked again, after it is.
+        m_state->clock = m_state->clock.addSecs(3600);
+        {
+            MetadataEnrichment third(path, makeSetup(library, m_transport, m_state));
+            (void)runOnce(third, library.rootList());
+        }
+        QCOMPARE(searches(), before + 1);
+        m_state->clock = m_state->clock.addDays(2);
+        {
+            MetadataEnrichment fourth(path, makeSetup(library, m_transport, m_state));
+            (void)runOnce(fourth, library.rootList());
+        }
+        QCOMPARE(searches(), before + 2);
     }
 
     void aMalformedSearchAnswerCountsAsFailedAndIsStoredAsFailed()
