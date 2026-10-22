@@ -1,6 +1,5 @@
 #include <QtTest>
 
-#include <QCursor>
 #include <QDir>
 #include <QFile>
 #include <QQmlApplicationEngine>
@@ -95,10 +94,6 @@ class ProfilePickerTest final : public QObject
 private:
     QQuickWindow *loadMainWindow(ApplicationController &controller, QQmlApplicationEngine &engine)
     {
-        // A pointer resting over the picker's cards hovers one into the
-        // remote's focus (xvfb parks it mid-screen); park it outside the
-        // window so the keys alone decide.
-        QCursor::setPos(QPoint(1900, 1070));
         controller.setStartFullscreen(false);
         engine.rootContext()->setContextProperty(QStringLiteral("appController"), &controller);
         engine.loadFromModule(QStringLiteral("Marquee"), QStringLiteral("Main"));
@@ -281,6 +276,55 @@ private slots:
         QTRY_VERIFY(reopened->hasActiveFocus());
         QCOMPARE(focusProfileId(reopened), kids);
         QVERIFY(!sidebar->isVisible());
+    }
+
+    // The released picker only tints a hovered card (ProfilePickerView.swift
+    // :805-807). A pointer resting where the picker opens must not take the
+    // remote: Return still chooses the profile the remote stands on.
+    void aRestingPointerDoesNotMoveThePickersRemote()
+    {
+        QTemporaryDir runtimeRoot;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+
+        ApplicationController controller;
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        QVERIFY(window != nullptr);
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+
+        const QString main = controller.profiles()->profiles().at(0).id;
+        const QString kids = controller.profiles()->profiles().at(1).id;
+        QQuickItem *kidsCard = repeaterItem(picker, QStringLiteral("profileCards"), 1);
+        QVERIFY(kidsCard != nullptr);
+        QTRY_VERIFY(kidsCard->width() > 0 && kidsCard->height() > 0);
+        QTRY_VERIFY(window->isExposed());
+        QTRY_COMPARE(window->size(), QSize(1280, 800));
+        const QPoint overKids = kidsCard->mapToScene(QPointF(kidsCard->width() / 2, kidsCard->height() / 2)).toPoint();
+
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_VERIFY_WITH_TIMEOUT(!controller.profileExitInFlight(), 2000);
+        QCOMPARE(controller.activeProfileId(), main);
+
+        // The pointer comes to rest, then the picker opens beneath it.
+        QTest::mouseMove(window, overKids);
+        controller.switchProfile();
+        QCOMPARE(controller.navigation()->route(), NavigationController::Route::ProfilePicker);
+        QQuickItem *reopened = pickerOf(window);
+        QVERIFY(reopened != nullptr);
+        QTRY_VERIFY(reopened->hasActiveFocus());
+        QQuickItem *reopenedKids = repeaterItem(reopened, QStringLiteral("profileCards"), 1);
+        QVERIFY(reopenedKids != nullptr);
+        // The hover reached the card (it tints) but not the remote.
+        QTRY_VERIFY(reopenedKids->property("hovered").toBool());
+        QTest::qWait(200);
+        QCOMPARE(focusProfileId(reopened), main);
+
+        QTest::keyClick(window, Qt::Key_Return);
+        QCOMPARE(controller.activeProfileId(), main);
+        QVERIFY(controller.activeProfileId() != kids);
     }
 
     // The shared body of the two re-choice cases: Home's content must hold

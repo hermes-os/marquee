@@ -6,6 +6,11 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- A pointer resting over the profile picker no longer moves the remote. As in
+  the released app, hovering a card only tints it; a real pointer click still
+  chooses. Before, when the picker opened under a pointer that had not moved,
+  the card that appeared beneath it took the remote and the next Return chose
+  that profile (Kids included) instead of the active one.
 - Choosing a profile now starts Home from its first target, as the released
   app rebuilds Home after a choice. Before, the remote's place on Home
   survived the choice: after the remote had rested on Home's Play Something

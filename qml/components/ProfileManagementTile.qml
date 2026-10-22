@@ -25,7 +25,6 @@ Item {
     signal deleteRequested()
     signal moveLeftRequested()
     signal moveRightRequested()
-    signal pointerEntered()
 
     // :99-127: the buttons share the width inside a 16 inset, no larger than
     // 32 each and no closer than the spacing that keeps four at 26.
@@ -168,10 +167,6 @@ Item {
                 }
             }
         }
-    }
-
-    HoverHandler {
-        onHoveredChanged: if (hovered) root.pointerEntered()
     }
 
     Accessible.name: qsTr("Manage %1, %2").arg(root.title).arg(root.subtitle)

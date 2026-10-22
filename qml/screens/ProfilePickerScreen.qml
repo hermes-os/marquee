@@ -209,7 +209,6 @@ FocusScope {
                         selected: root.exitSelectionId === profileId
 
                         onActivated: root.chooseProfile(profileId)
-                        onPointerEntered: root.hoverFocus("profile", profileId)
                     }
                 }
 
@@ -234,7 +233,6 @@ FocusScope {
                     remoteFocused: root.focusKind === "add"
 
                     onActivated: root.openEditor("")
-                    onPointerEntered: root.hoverFocus("add", "")
                 }
             }
 
@@ -284,7 +282,6 @@ FocusScope {
                         onDeleteRequested: root.pendingDeleteId = profileId
                         onMoveLeftRequested: root.moveProfile(profileId, -1)
                         onMoveRightRequested: root.moveProfile(profileId, 1)
-                        onPointerEntered: root.hoverFocus("profile", profileId)
                     }
                 }
 
@@ -309,7 +306,6 @@ FocusScope {
                     remoteFocused: root.focusKind === "add"
 
                     onActivated: root.openEditor("")
-                    onPointerEntered: root.hoverFocus("add", "")
                 }
             }
         }
@@ -653,14 +649,6 @@ FocusScope {
             root.toggleManaging()
             return
         }
-    }
-
-    function hoverFocus(kind, profileId) {
-        if (root.exitInFlight || root.editorOpen) {
-            return
-        }
-        root.focusKind = kind
-        root.focusProfileId = profileId
     }
 
     function chooseProfile(profileId) {
