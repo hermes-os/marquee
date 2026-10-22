@@ -6,6 +6,10 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Kids, Family and Teen profiles judge a title by its TMDB certification when
+  it has one, as the released app does: a G or TV-Y title with no genre shows
+  for Kids, and an R or TV-MA title no longer shows there because of its
+  folder. Titles with no certification keep the genre rule. No migration.
 - Movies and TV Shows group titles as the released app does. A title's genre
   rows come from TMDB's genres when it named any (the folder and the title
   guess otherwise), so Movies gains a row per genre between Holiday Movies and
