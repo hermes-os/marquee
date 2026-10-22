@@ -388,6 +388,7 @@ private:
     void leaveScrub();
     void previewTimedOut();
     void handlePlaybackRestart();
+    void handlePlaybackRestartEvent();
     void handleCommandReply(uint64_t replyId, int error);
 
     std::shared_ptr<mpv_handle> m_core;
@@ -500,6 +501,9 @@ private:
     bool m_hrSeekRelaxed{false};
     bool m_previewIssued{false};
     bool m_previewInFlight{false};
+    // libmpv has taken the in-flight preview's seek (its command reply came).
+    bool m_previewAcknowledged{false};
+    uint64_t m_previewSerial{0};
     std::optional<double> m_previewPending;
     double m_scrubOrigin{0.0};
     double m_settleLanding{0.0};

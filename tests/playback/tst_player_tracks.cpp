@@ -861,6 +861,32 @@ private slots:
         QVERIFY(qAbs(video.position() - landing) < kLandingTolerance);
     }
 
+    // A hold that starts before the last landing has confirmed can see that
+    // landing's PLAYBACK_RESTART arrive after its own first preview was
+    // issued. It is not that preview's restart: counting it would let the
+    // queued target out beside the preview still running. The restart is
+    // delivered by hand, before libmpv has answered the preview's command, so
+    // the order is fixed.
+    void aLateRestartDoesNotReleaseTheFirstPreviewOfANewHold()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        video.beginScrub();
+        const int before = video.previewSeeksIssuedForTest();
+        video.previewScrub(30.0);
+        video.previewScrub(40.0);
+        QCOMPARE(video.previewSeeksIssuedForTest() - before, 1);
+
+        mpv_event restart{};
+        restart.event_id = MPV_EVENT_PLAYBACK_RESTART;
+        QVERIFY(QMetaObject::invokeMethod(&video, "applyEvent", Q_ARG(mpv_event *, &restart)));
+        QCOMPARE(video.previewSeeksIssuedForTest() - before, 1);
+
+        // The preview's own restart still releases the queued target.
+        QTRY_COMPARE_WITH_TIMEOUT(video.previewSeeksIssuedForTest() - before, 2, 5000);
+        video.cancelScrub();
+    }
+
     // Cancelling puts the picture back where the hold began and the seek mode
     // back to normal, without landing anywhere else.
     void cancellingAScrubRestoresThePictureAndTheSeekMode()

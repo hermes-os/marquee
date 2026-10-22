@@ -32,9 +32,11 @@ constexpr uint64_t kMuteProperty = 9;
 constexpr uint64_t kSpeedProperty = 10;
 // Reply ids of the asynchronous scrub commands, kept apart from the observed
 // property ids above.
-constexpr uint64_t kPreviewReply = 101;
 constexpr uint64_t kSettleReplyBase = 1000;
 constexpr uint64_t kHrSeekReply = 103;
+// One id per preview seek, so a late reply of an earlier hold's preview is
+// never taken for the current one's.
+constexpr uint64_t kPreviewReplyBase = uint64_t{1} << 40;
 // The released app keeps hr-seek at absolute outside a scrub
 // (MPVPlayerService.swift:3079); libmpv's own default differs.
 constexpr const char *kNormalHrSeek = "absolute";
@@ -637,6 +639,7 @@ void MpvVideoItem::beginScrub()
     m_scrubOrigin = m_position;
     m_previewIssued = false;
     m_previewInFlight = false;
+    m_previewAcknowledged = false;
     m_previewPending.reset();
     m_hrSeekRelaxed = true;
     setHrSeek(kScrubHrSeek);
@@ -663,7 +666,9 @@ void MpvVideoItem::issuePreview(double seconds)
 {
     const QByteArray target = QByteArray::number(seconds, 'f', 3);
     const char *command[] = {"seek", target.constData(), "absolute", nullptr};
-    const int result = mpv_command_async(m_core.get(), kPreviewReply, command);
+    ++m_previewSerial;
+    const int result =
+        mpv_command_async(m_core.get(), kPreviewReplyBase + m_previewSerial, command);
     if (result < 0) {
         // A preview is a courtesy: its refusal is not a playback failure.
         qCWarning(logPlayback) << QStringLiteral("Could not preview a seek: %1")
@@ -673,11 +678,26 @@ void MpvVideoItem::issuePreview(double seconds)
     ++m_previewSeeksIssued;
     m_previewIssued = true;
     m_previewInFlight = true;
+    m_previewAcknowledged = false;
     m_previewWatchdog.start();
 }
 
 void MpvVideoItem::previewTimedOut()
 {
+    handlePlaybackRestart();
+}
+
+void MpvVideoItem::handlePlaybackRestartEvent()
+{
+    // A restart that reaches us before libmpv has taken this preview's seek
+    // is the previous seek's (the last landing's, when a new hold starts
+    // before that landing confirms): libmpv posts a seek's restart after the
+    // reply of any command it ran before it, and drops the restart of a seek
+    // a newer one replaced. Counting it would let a second preview seek run
+    // beside the first.
+    if (m_previewInFlight && !m_previewAcknowledged) {
+        return;
+    }
     handlePlaybackRestart();
 }
 
@@ -710,15 +730,17 @@ void MpvVideoItem::handleCommandReply(uint64_t replyId, int error)
         }
         return;
     }
-    if (error >= 0) {
+    if (replyId != kPreviewReplyBase + m_previewSerial || !m_previewInFlight) {
         return;
     }
-    if (replyId == kPreviewReply) {
-        qCWarning(logPlayback) << QStringLiteral("A preview seek failed: %1")
-                                      .arg(mpvErrorText(error));
-        // Nothing will restart: let the newest target through.
-        handlePlaybackRestart();
+    if (error >= 0) {
+        m_previewAcknowledged = true;
+        return;
     }
+    qCWarning(logPlayback) << QStringLiteral("A preview seek failed: %1")
+                                  .arg(mpvErrorText(error));
+    // Nothing will restart: let the newest target through.
+    handlePlaybackRestart();
 }
 
 void MpvVideoItem::beginSettle(double landing)
@@ -1374,7 +1396,7 @@ void MpvVideoItem::applyEvent(mpv_event *event)
             handleFileLoaded();
             break;
         case MPV_EVENT_PLAYBACK_RESTART:
-            handlePlaybackRestart();
+            handlePlaybackRestartEvent();
             break;
         case MPV_EVENT_COMMAND_REPLY:
             handleCommandReply(event->reply_userdata, event->error);
