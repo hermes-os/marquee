@@ -10,8 +10,10 @@ intermediate version bump.
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the
   root is still added; before, one such file failed the catalog write and left
-  0 movies and 0 episodes. A root that skipped files, or could not read a
-  folder, is stored as far as it was read and never loses a row it already had.
+  0 movies and 0 episodes. A skipped file keeps the row it already had, and
+  files really deleted from the same root are still removed. A folder that
+  cannot be read leaves the root partly read: what was read is stored and no
+  row is removed until a scan reads every folder.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the
