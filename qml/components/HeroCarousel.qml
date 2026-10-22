@@ -71,10 +71,19 @@ Item {
         easing.type: Easing.OutCubic
     }
 
+    // A minimized or unexposed window keeps `visible` true on its items, and
+    // would still advance the carousel every 15 seconds for nobody.
+    WindowLiveness {
+        id: windowLiveness
+        objectName: "heroWindowLiveness"
+
+        window: root.Window.window
+    }
+
     Binding {
         target: root.hero
         property: "active"
-        value: root.visible
+        value: root.visible && windowLiveness.live
     }
 
     Binding {

@@ -173,6 +173,8 @@ qt_add_qml_module(marquee_core
 
         src/ui/FocusRing.hpp
         src/ui/FocusRing.cpp
+        src/ui/WindowLiveness.hpp
+        src/ui/WindowLiveness.cpp
 )
 
 qt_add_shaders(marquee_core "marquee_shaders"

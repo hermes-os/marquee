@@ -633,6 +633,30 @@ private slots:
         QTRY_VERIFY(!rows->hero()->timerRunning());
     }
 
+    // A window that is minimized or hidden leaves its items `visible`, so the
+    // carousel stops for the window as well as for the item.
+    void theCarouselStopsWhileTheWindowIsMinimizedOrHidden()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(false);
+        QTRY_VERIFY(rows->hero()->timerRunning());
+
+        shell.window->showMinimized();
+        QTRY_VERIFY(!rows->hero()->timerRunning());
+        QVERIFY(!rows->hero()->active());
+        shell.window->showNormal();
+        QTRY_VERIFY(rows->hero()->timerRunning());
+
+        shell.window->hide();
+        QTRY_VERIFY(!rows->hero()->timerRunning());
+        shell.window->show();
+        QTRY_VERIFY(rows->hero()->timerRunning());
+    }
+
     // The slide ends at the same place with motion reduced as with it, only
     // without the travel (:63-65, :19).
     void theSlideSettlesOnTheSamePositionWithAndWithoutMotion()

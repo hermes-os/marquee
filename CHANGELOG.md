@@ -27,6 +27,7 @@ intermediate version bump.
   terms of the released selection are left out (see `issues.md`). The next
   scan of an existing library picks up a movie's backdrop; no migration.
   A click on Watch Now reaches the button when the window is drawn by the GPU.
+  The carousel also stops advancing while the window is minimized or hidden.
   The title bar takes its own clicks, hover and drags: a hero arrow, dot or
   card scrolled under it no longer moves the carousel, takes the remote or
   scrolls the page.
