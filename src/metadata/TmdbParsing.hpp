@@ -16,7 +16,10 @@
 namespace tmdb
 {
 /// TMDBService.swift:274-281: lowercased, a leading "the", "a" or "an"
-/// dropped, "&" read as "and", punctuation removed, whitespace collapsed.
+/// dropped, "&" read as "and", punctuation removed, whitespace collapsed. Two
+/// changes to the released rules: single-letter initials compare equal with or
+/// without dots and spaces ("E.T.", "E T", "ET"), and the cent sign reads as
+/// "c" (TMDB lists "Ri¢hie Ri¢h" for "Richie Rich").
 [[nodiscard]] QString normalizeTitle(const QString &title);
 
 /// TMDBService.swift:283-290: shared words over all words of two normalized
@@ -27,11 +30,15 @@ namespace tmdb
 /// in three passes over TMDB's own order. First a result whose normalized
 /// title equals the query's. Then a result holding every word of the query.
 /// Last the top result, when it shares more than half its words with the
-/// query. The year is not consulted here: the released app only passes it to
-/// TMDB's search, which narrows what comes back.
+/// query. The released app never consults the year here, only TMDB's search
+/// does. One pass runs before the three: with a `year` and the `dateKey` of
+/// the result type, a result with an equal title released in that year wins
+/// over an equal title that TMDB ranked higher.
 [[nodiscard]] std::optional<int> bestMatch(const QJsonArray &results,
                                            const QString &query,
-                                           const QString &titleKey);
+                                           const QString &titleKey,
+                                           const QString &dateKey = {},
+                                           int year = 0);
 
 /// The results whose `dateKey` ("release_date", "first_air_date") names a year
 /// within `tolerance` of `year`. A result with no readable date is dropped.

@@ -10,6 +10,13 @@ intermediate version bump.
   name: "1917 (2019)" is now "1917" from 2019 and "2001 A Space Odyssey (1968)"
   is "2001 A Space Odyssey" from 1968, and the year is what online metadata
   searches with. The library shows the corrected titles after the next scan.
+- Online metadata matches more films correctly. "Hustle" (2022) is no longer
+  matched to the 2019 "The Hustle": an exactly named title released in the
+  file's year wins over a higher-ranked other year. "E T the Extra-Terrestrial",
+  "L A Confidential" and "Richie Rich" are found (initials compare equal with
+  or without dots, and TMDB's "Ri¢hie Ri¢h" reads as "Richie Rich"). Titles
+  matched or missed by the earlier rules are matched again once, in the
+  background.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's

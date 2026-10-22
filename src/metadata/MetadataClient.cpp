@@ -97,7 +97,8 @@ void MetadataClient::send(const QUrl &url, int attempt, std::function<void(HttpR
             }
             if (statusOf(reply) == Status::Throttled && attempt < self->m_config.throttleRetries) {
                 const int waitMs = reply.retryAfterSeconds >= 0
-                    ? std::min(reply.retryAfterSeconds * 1000, self->m_config.maxRetryDelayMs)
+                    ? static_cast<int>(std::min<qint64>(qint64(reply.retryAfterSeconds) * 1000,
+                                                      self->m_config.maxRetryDelayMs))
                     : self->m_config.defaultRetryDelayMs;
                 qCWarning(logMetadata) << "TMDB rate limited (429); retrying in" << waitMs << "ms";
                 QTimer::singleShot(waitMs, self.data(),
@@ -160,7 +161,7 @@ void MetadataClient::search(const SearchKind &kind, const QString &title, int ye
                 const QJsonArray candidates = yearInQuery
                     ? results
                     : tmdb::resultsNearYear(results, kind.dateKey, year, 1);
-                if (const std::optional<int> match = tmdb::bestMatch(candidates, title, kind.titleKey)) {
+                if (const std::optional<int> match = tmdb::bestMatch(candidates, title, kind.titleKey, kind.dateKey, year)) {
                     done({Status::Ok, *match});
                     return;
                 }

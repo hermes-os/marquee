@@ -124,6 +124,52 @@ private slots:
                  std::optional<int>(11));
     }
 
+    void initialsCompareEqualWithAndWithoutDotsAndSpaces()
+    {
+        const QString expected = QStringLiteral("et the extraterrestrial");
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("E.T. the Extra-Terrestrial")), expected);
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("E T the Extra-Terrestrial")), expected);
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("ET the Extra-Terrestrial")), expected);
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("L.A. Confidential")),
+                 tmdb::normalizeTitle(QStringLiteral("L A Confidential")));
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("L A Confidential")),
+                 QStringLiteral("la confidential"));
+        // A single letter among words is still a word, and the article rule
+        // keeps working for ordinary titles.
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("Vitamin C Daily")),
+                 QStringLiteral("vitamin c daily"));
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("A Quiet Place")),
+                 QStringLiteral("quiet place"));
+    }
+
+    void aLookAlikeSymbolReadsAsTheLetter()
+    {
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("Ri\u00A2hie Ri\u00A2h")),
+                 tmdb::normalizeTitle(QStringLiteral("Richie Rich")));
+        QCOMPARE(tmdb::bestMatch(results({{11011, QStringLiteral("Ri\u00A2hie Ri\u00A2h")}}),
+                                 QStringLiteral("Richie Rich"), QStringLiteral("title")),
+                 std::optional<int>(11011));
+    }
+
+    void anEqualTitleOfTheFilesYearBeatsAHigherRankedOtherYear()
+    {
+        // The year search for "Hustle" (2022) answers in this order.
+        const QJsonArray rows{
+            QJsonObject{{"id", 449562}, {"title", "The Hustle"}, {"release_date", "2019-05-09"}},
+            QJsonObject{{"id", 705861}, {"title", "Hustle"}, {"release_date", "2022-06-03"}},
+            QJsonObject{{"id", 958502}, {"title", "Parisian Hustle"}, {"release_date", "2023-02-01"}}};
+        QCOMPARE(tmdb::bestMatch(rows, QStringLiteral("Hustle"), QStringLiteral("title"),
+                                 QStringLiteral("release_date"), 2022),
+                 std::optional<int>(705861));
+        // Without a year the old order stands.
+        QCOMPARE(tmdb::bestMatch(rows, QStringLiteral("Hustle"), QStringLiteral("title")),
+                 std::optional<int>(449562));
+        // A year no result shares falls back to the order too.
+        QCOMPARE(tmdb::bestMatch(rows, QStringLiteral("Hustle"), QStringLiteral("title"),
+                                 QStringLiteral("release_date"), 2001),
+                 std::optional<int>(449562));
+    }
+
     void onlyTheTopResultIsTriedBySimilarity()
     {
         // 2 of 3 words shared out of 4 distinct: 0.5 is not above the bar.
@@ -365,6 +411,69 @@ private slots:
         QCOMPARE(answer->status, MetadataClient::Status::Ok);
         QCOMPARE(answer->value, 9001);
         QCOMPARE(transport.count(), 2);
+    }
+
+    void aHustleFileIsMatchedToTheFilmOfItsYear()
+    {
+        FakeTransport transport([](const QUrl &) {
+            return FakeTransport::json(QByteArrayLiteral(
+                R"({"results":[
+                    {"id":449562,"title":"The Hustle","release_date":"2019-05-09"},
+                    {"id":705861,"title":"Hustle","release_date":"2022-06-03"},
+                    {"id":958502,"title":"Parisian Hustle","release_date":"2023-02-01"}]})"));
+        });
+        MetadataClient client(transport, fastConfig());
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findMovie(QStringLiteral("Hustle"), 2022,
+                         [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY(answer.has_value());
+        QCOMPARE(answer->value, 705861);
+    }
+
+    void theSecondSearchStillPrefersTheFilmOfTheFilesYear()
+    {
+        // The year search found nothing; the search without it lists the
+        // title three times. The file's own year wins over the earlier
+        // listing one year off, and a listing two years off is out.
+        FakeTransport transport([](const QUrl &url) {
+            if (!FakeTransport::queryValue(url, QStringLiteral("year")).isEmpty()) {
+                return FakeTransport::json(QByteArrayLiteral(R"({"results":[]})"));
+            }
+            return FakeTransport::json(QByteArrayLiteral(
+                R"({"results":[
+                    {"id":1,"title":"Synthetic Odyssey","release_date":"2020-01-01"},
+                    {"id":2,"title":"Synthetic Odyssey","release_date":"2019-01-01"},
+                    {"id":3,"title":"Synthetic Odyssey","release_date":"2018-01-01"}]})"));
+        });
+        MetadataClient client(transport, fastConfig());
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findMovie(QStringLiteral("Synthetic Odyssey"), 2018,
+                         [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY(answer.has_value());
+        QCOMPARE(answer->value, 3);
+        QCOMPARE(transport.count(), 2);
+    }
+
+    void aHugeRetryAfterIsCappedWithoutOverflowing()
+    {
+        int calls = 0;
+        FakeTransport transport([&calls](const QUrl &) {
+            if (++calls == 1) {
+                HttpReply reply = FakeTransport::status(429);
+                reply.retryAfterSeconds = 4'000'000;
+                return reply;
+            }
+            return FakeTransport::json(QByteArrayLiteral(R"({"results":[]})"));
+        });
+        MetadataClient::Config config = fastConfig();
+        config.maxRetryDelayMs = 20;
+        MetadataClient client(transport, config);
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findMovie(QStringLiteral("Synthetic Odyssey"), 0,
+                         [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY_WITH_TIMEOUT(answer.has_value(), 3000);
+        QCOMPARE(answer->status, MetadataClient::Status::NotFound);
+        QCOMPARE(calls, 2);
     }
 
     void aFileNamedTwoYearsOffIsNotMatchedToAnotherFilm()

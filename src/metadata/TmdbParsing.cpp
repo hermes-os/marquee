@@ -116,8 +116,33 @@ QString tmdb::normalizeTitle(const QString &title)
         QStringLiteral(R"([^\w\s])"), QRegularExpression::UseUnicodePropertiesOption);
     static const QRegularExpression whitespace(
         QStringLiteral(R"(\s+)"), QRegularExpression::UseUnicodePropertiesOption);
+    // Two or more single letters in a row: the initials of `E.T.`, `E T`,
+    // `L.A.`. A folder name loses the dots that TMDB's title keeps.
+    static const QRegularExpression initials(
+        QStringLiteral(R"((?<![\p{L}\p{N}])\p{L}(?:[.\s]+\p{L})+(?![\p{L}\p{N}]))"),
+        QRegularExpression::UseUnicodePropertiesOption);
 
     QString normalized = title.toLower();
+    // Some titles spell a letter with a look-alike symbol (`Ri¢hie Ri¢h`).
+    normalized.replace(QChar(0x00A2), QLatin1Char('c'));
+
+    // Joined before the article is dropped, so `A I` stays `ai` instead of
+    // losing its first letter as an article.
+    qsizetype offset = 0;
+    QString joined;
+    QRegularExpressionMatchIterator runs = initials.globalMatch(normalized);
+    while (runs.hasNext()) {
+        const QRegularExpressionMatch run = runs.next();
+        joined += QStringView(normalized).mid(offset, run.capturedStart() - offset);
+        QString letters = run.captured();
+        letters.remove(QLatin1Char('.'));
+        letters.remove(whitespace);
+        joined += letters;
+        offset = run.capturedEnd();
+    }
+    joined += QStringView(normalized).mid(offset);
+    normalized = joined;
+
     normalized.remove(leadingArticle);
     normalized.replace(QLatin1Char('&'), QStringLiteral("and"));
     normalized.remove(punctuation);
@@ -140,6 +165,17 @@ namespace
 }
 }
 
+namespace
+{
+[[nodiscard]] int releaseYearOf(const QJsonObject &result, const QString &dateKey)
+{
+    const QString date = result.value(dateKey).toString();
+    bool numeric = false;
+    const int year = date.left(4).toInt(&numeric);
+    return numeric && date.size() >= 4 ? year : 0;
+}
+}
+
 double tmdb::titleSimilarity(const QString &left, const QString &right)
 {
     const QSet<QString> leftWords = wordsOf(left);
@@ -154,7 +190,9 @@ double tmdb::titleSimilarity(const QString &left, const QString &right)
 
 std::optional<int> tmdb::bestMatch(const QJsonArray &results,
                                    const QString &query,
-                                   const QString &titleKey)
+                                   const QString &titleKey,
+                                   const QString &dateKey,
+                                   int year)
 {
     const QString queryNormalized = normalizeTitle(query);
     const QSet<QString> queryWords = wordsOf(queryNormalized);
@@ -164,6 +202,22 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
         const QJsonValue title = result.value(titleKey);
         return title.isString() ? std::optional<QString>(title.toString()) : std::nullopt;
     };
+
+    // TMDB's `year` filter also lists titles of other years and ranks by
+    // popularity, so `Hustle` (2022) comes after the 2019 `The Hustle`. An
+    // equal title released in the file's own year is the file's film
+    // whatever its rank. The released app has no such pass.
+    if (year > 0 && !dateKey.isEmpty()) {
+        for (const QJsonValue &value : results) {
+            const QJsonObject result = value.toObject();
+            const auto id = resultId(result);
+            const auto title = resultTitle(result);
+            if (id && title && releaseYearOf(result, dateKey) == year
+                && normalizeTitle(*title) == queryNormalized) {
+                return id;
+            }
+        }
+    }
 
     for (const QJsonValue &value : results) {
         const QJsonObject result = value.toObject();
