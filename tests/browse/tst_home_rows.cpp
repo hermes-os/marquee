@@ -583,6 +583,34 @@ private slots:
         QCOMPARE(model.rowCount(), 0);
     }
 
+    // The repair announces one focus change, and the columns the remote
+    // remembers for the other rows survive it (HomeDetailView.swift:1128-1134
+    // touches only the focused target).
+    void theRepairAnnouncesOneChangeAndKeepsTheRememberedColumns()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kNow; });
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021)});
+        model.applyWatchProgress(QStringLiteral("root/Coco"), 0, 7'200'000, true);
+        model.applyWatchProgress(QStringLiteral("root/Arrival"), 600'000, 7'200'000, false);
+        QCOMPARE(model.data(model.index(1), HomeRowsModel::RowIdRole).toString(),
+                 QStringLiteral("recently-watched"));
+        model.focus()->setPosition(2, 1);
+        model.focus()->setPosition(1, 0);
+
+        QSignalSpy focusChanged(model.focus(), &FocusNavigator::focusChanged);
+        model.applyWatchProgress(QStringLiteral("root/Coco"), 0, 7'200'000, false);
+
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 0);
+        QCOMPARE(focusChanged.count(), 1);
+        QVERIFY(model.moveDown());
+        QVERIFY(model.moveDown());
+        QCOMPARE(model.focus()->row(), 2);
+        QCOMPARE(model.focus()->column(), 1);
+    }
+
     // A profile choice rebuilds Home at the top (ContentView.swift:391-407):
     // off the capsule, on the first card, with no column kept for any row.
     void resetFocusReturnsTheRemoteToTheFirstCard()

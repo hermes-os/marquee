@@ -238,9 +238,10 @@ private:
 
     void recompose();
     /// Home's first focus target, named once: the first card of the first row
-    /// that has one, no column remembered for any row. Whether the capsule
-    /// holds the remote is the caller's, so a repair keeps it. A Home whose
-    /// first target is elsewhere changes only this.
+    /// that has one, announced as one change. Whether the capsule holds the
+    /// remote, and whether remembered columns are forgotten, is the caller's,
+    /// so a repair keeps both. A Home whose first target is elsewhere changes
+    /// only this.
     void placeFirstTarget(QVector<int> rowLengths);
     void setPlaySomethingFocused(bool focused);
     [[nodiscard]] HomeCardModel *cardModelFor(const QString &rowId);

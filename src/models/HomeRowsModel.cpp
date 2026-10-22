@@ -599,12 +599,20 @@ void HomeRowsModel::resetFocus()
         rowLengths.push_back(row.cards->rowCount());
     }
     placeFirstTarget(std::move(rowLengths));
+    // A rebuilt Home keeps no column for any row; a repair after a vanished
+    // row keeps them, as the released one does.
+    m_focus.reset();
 }
 
 void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
 {
-    m_focus.setRows(std::move(rowLengths));
-    m_focus.reset();
+    const auto firstNonEmpty = std::find_if(rowLengths.cbegin(), rowLengths.cend(),
+                                            [](int count) { return count > 0; });
+    const int firstRow = firstNonEmpty == rowLengths.cend()
+        ? -1
+        : static_cast<int>(std::distance(rowLengths.cbegin(), firstNonEmpty));
+    // One placed call, so the move to the first target is one announcement.
+    m_focus.setRows(std::move(rowLengths), firstRow, 0);
 }
 
 QStringList HomeRowsModel::playSomethingCandidates() const

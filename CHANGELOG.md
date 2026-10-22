@@ -6,6 +6,11 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- When the row the remote rested on leaves Home (un-watching the last title
+  of Recently Watched), the remote moves to the first card as one step and the
+  other rows keep the columns they were left on, as in the released app.
+  Before, the repair moved twice and forgot every row's column, so the next
+  Down landed on the first card of each row.
 - Choosing a different profile now lands the remote on Home's top card even
   when that profile has progress. Before, a Continue Watching row that arrived
   above the rows after the choice left the remote on the card it had been on,
