@@ -58,7 +58,8 @@ struct ScanResult
 
 /// Replaces the fresh stat the walk makes of each media entry it lists, so a
 /// test can make one listed file fail it. Returning no value marks the entry
-/// unreadable. An empty function restores the real stat.
+/// unreadable. An empty function restores the real stat. The function is a
+/// plain static, so set it only while no catalog worker is scanning.
 using MediaStat = std::function<std::optional<QFileInfo>(const QFileInfo &)>;
 void setMediaStatForTest(MediaStat stat);
 
@@ -101,6 +102,7 @@ void setMediaStatForTest(MediaStat stat);
 /// their account, and `RootUnavailable` means the catalog preserves everything
 /// it already stored for this root. A media entry the filesystem lists but
 /// cannot stat is skipped, logged and reported in `unreadableIds` (the walk
-/// stays `Complete`); a sidecar that cannot be stat'ed is treated as missing.
+/// stays `Complete`); sidecars are adopted from the directory listing alone, whether or not they
+/// can be stat'ed.
 [[nodiscard]] ScanResult scan(const LibraryRoot &root);
 }

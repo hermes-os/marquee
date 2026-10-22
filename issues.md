@@ -126,13 +126,18 @@ to movies before `replaceItems`.
 
 ## A partially readable library root is only logged
 Where: `src/catalog/CatalogStore.cpp` (`applyScan`, `Incomplete`),
-`src/catalog/CatalogWorker.cpp`.
+`src/catalog/CatalogWorker.cpp`, `src/catalog/LibraryScanner.cpp` (`collectInto`).
 What happens: when a folder in a root cannot be read, what did scan is stored,
 its existing rows are kept and no row is removed, and a warning goes to the log.
 A file that is listed but cannot be stat'ed is skipped and logged the same way,
 but keeps its row and does not stop the removal of deleted files. The viewer is
 told nothing in either case, unlike an unavailable root.
 Found: source read at 81c8fa8.
+
+## A listing entry with no type that fails stat is dropped, and a Complete walk deletes its row
+Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, the `QDir::entryInfoList` listing), `src/catalog/CatalogStore.cpp` (`applyScan`, `Complete`).
+What happens: when a filesystem driver gives no entry type in the directory listing and the stat then fails, Qt's listing drops the entry outright, so the scanner never sees it and cannot report it in `unreadableIds`. A `Complete` walk then deletes the entry's row, or every row under it when it is a folder. This was already true on 95952b7.
+Found: review of ef055ea, by reading Qt's directory listing code, not by a run.
 
 ## A library scan stats each file more than once
 Where: `src/catalog/LibraryScanner.cpp` (`collectInto`, `folderArtworkIn`).

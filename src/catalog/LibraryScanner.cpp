@@ -59,7 +59,8 @@ const QStringList &imageExtensions()
     return {};
 }
 
-// Set only by tests, to make a listed media entry fail its stat.
+// Set only by tests, to make a listed media entry fail its stat. A plain
+// static: set it only while no catalog worker is scanning.
 LibraryScanner::MediaStat &mediaStatOverride()
 {
     static LibraryScanner::MediaStat override;

@@ -292,7 +292,7 @@ private slots:
         QCOMPARE(result.outcome, LibraryScanner::ScanOutcome::Incomplete);
     }
 
-    void scanSkipsAMediaEntryItCannotStatAndKeepsTheGoodFiles()
+    void scanDoesNotListABrokenSymlinkAndKeepsTheGoodFiles()
     {
         QTemporaryDir library;
         QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));

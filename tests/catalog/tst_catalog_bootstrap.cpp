@@ -17,6 +17,7 @@
 #include "app/AppPaths.hpp"
 #include "app/ApplicationController.hpp"
 #include "catalog/CatalogDatabase.hpp"
+#include "catalog/LibraryScanner.hpp"
 #include "profiles/ProfileStore.hpp"
 
 namespace
@@ -548,14 +549,8 @@ private slots:
             return QDir().mkpath(target.absolutePath()) && file.open(QIODevice::WriteOnly)
                 && file.write("media") == 5;
         };
-        const auto linkToNowhere = [](const QString &root, const QString &relativePath) {
-            const QFileInfo target(QDir(root).filePath(relativePath));
-            return QDir().mkpath(target.absolutePath())
-                && QFile::link(QDir(root).filePath(QStringLiteral("nowhere.mkv")),
-                               target.absoluteFilePath());
-        };
         QVERIFY(write(movies.path(), QStringLiteral("Moon.2009.mkv")));
-        QVERIFY(linkToNowhere(movies.path(), QStringLiteral("Broken Movie (2020).mkv")));
+        QVERIFY(write(movies.path(), QStringLiteral("Broken Movie (2020).mkv")));
         QVERIFY(write(movies.path(), QStringLiteral("Archive/Heat.1995.mkv")));
         const QString locked = QDir(movies.path()).filePath(QStringLiteral("Archive"));
         QVERIFY(QFile::setPermissions(locked, QFileDevice::ExeOwner));
@@ -565,7 +560,19 @@ private slots:
                                       | QFileDevice::ExeOwner);
         });
         QVERIFY(write(shows.path(), QStringLiteral("Show (2001)/Season 1/Show S01E02.mkv")));
-        QVERIFY(linkToNowhere(shows.path(), QStringLiteral("Show (2001)/Season 1/Show S01E01.mkv")));
+        QVERIFY(write(shows.path(), QStringLiteral("Show (2001)/Season 1/Show S01E01.mkv")));
+
+        // The listing names these two files and the stat refuses them. Set
+        // before the controller starts its worker and cleared after it is gone.
+        const auto restoreStat = qScopeGuard([] { LibraryScanner::setMediaStatForTest({}); });
+        LibraryScanner::setMediaStatForTest(
+            [](const QFileInfo &listed) -> std::optional<QFileInfo> {
+                if (listed.fileName() == QStringLiteral("Broken Movie (2020).mkv")
+                    || listed.fileName() == QStringLiteral("Show S01E01.mkv")) {
+                    return std::nullopt;
+                }
+                return QFileInfo(listed.absoluteFilePath());
+            });
 
         {
             ApplicationController controller;
