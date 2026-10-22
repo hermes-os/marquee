@@ -926,14 +926,18 @@ private slots:
             QTest::keyClick(player.window, Qt::Key_MediaStop);
             QTRY_VERIFY(player.controller.navigation()->route()
                         != NavigationController::Route::Player);
-            // The screen may already be gone; if it is not, nothing scrubs.
+            // Either the screen is gone with the item, or the item is still
+            // there with no scrub and libmpv's seek mode back to normal. One
+            // of the two must come true, so the case never passes with
+            // nothing checked.
+            QTRY_VERIFY_WITH_TIMEOUT(
+                video.isNull()
+                    || (!video->scrubbing()
+                        && video->propertyForTest(QStringLiteral("hr-seek"))
+                            == QStringLiteral("absolute")),
+                5000);
             if (!scrubber.isNull()) {
                 QVERIFY(!scrubber->scrubbing());
-            }
-            if (!video.isNull()) {
-                QVERIFY(!video->scrubbing());
-                QTRY_COMPARE_WITH_TIMEOUT(video->propertyForTest(QStringLiteral("hr-seek")),
-                                          QStringLiteral("absolute"), 5000);
             }
             QTest::keyRelease(player.window, Qt::Key_Right);
         }
