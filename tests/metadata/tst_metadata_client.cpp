@@ -191,6 +191,43 @@ private slots:
                  std::optional<int>(449562));
     }
 
+    void aResultOfTheFilesYearHoldingFewerWordsMatchesWhenNothingIsEqual()
+    {
+        // Year searches as TMDB answered them for these folders.
+        const QJsonArray trek{
+            QJsonObject{{"id", 253}, {"name", "Star Trek"}, {"first_air_date", "1966-09-08"}}};
+        QCOMPARE(tmdb::bestMatch(trek, QStringLiteral("Star Trek The Original Series"),
+                                 QStringLiteral("name"), QStringLiteral("first_air_date"), 1966),
+                 std::optional<int>(253));
+        const QJsonArray office{
+            QJsonObject{{"id", 2316}, {"name", "The Office"}, {"first_air_date", "2005-03-24"}}};
+        QCOMPARE(tmdb::bestMatch(office, QStringLiteral("The Office US"), QStringLiteral("name"),
+                                 QStringLiteral("first_air_date"), 2005),
+                 std::optional<int>(2316));
+        // Without a year no such result is accepted.
+        QCOMPARE(tmdb::bestMatch(results({{5, QStringLiteral("Star Trek")}}),
+                                 QStringLiteral("Star Trek The Motion Picture"), QStringLiteral("title")),
+                 std::optional<int>());
+        // Another year's shorter title is not the file's show.
+        QCOMPARE(tmdb::bestMatch(trek, QStringLiteral("Star Trek The Original Series"),
+                                 QStringLiteral("name"), QStringLiteral("first_air_date"), 1987),
+                 std::optional<int>());
+        QCOMPARE(tmdb::bestMatch(trek, QStringLiteral("Star Trek The Original Series"),
+                                 QStringLiteral("name")),
+                 std::optional<int>());
+        // Not a proper subset: the same words, or a word the query lacks.
+        QCOMPARE(tmdb::bestMatch(results({{6, QStringLiteral("Star Trek Voyager")}}),
+                                 QStringLiteral("Star Trek The Original Series"), QStringLiteral("name")),
+                 std::optional<int>());
+        // An equal title still wins over the subset one.
+        const QJsonArray both{
+            QJsonObject{{"id", 253}, {"name", "Star Trek"}, {"first_air_date", "1966-09-08"}},
+            QJsonObject{{"id", 254}, {"name", "Star Trek The Original Series"}, {"first_air_date", "1970-01-01"}}};
+        QCOMPARE(tmdb::bestMatch(both, QStringLiteral("Star Trek The Original Series"),
+                                 QStringLiteral("name"), QStringLiteral("first_air_date"), 1966),
+                 std::optional<int>(254));
+    }
+
     void onlyTheTopResultIsTriedBySimilarity()
     {
         // 2 of 3 words shared out of 4 distinct: 0.5 is not above the bar.

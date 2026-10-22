@@ -34,7 +34,10 @@ namespace tmdb
 /// query. The released app never consults the year here, only TMDB's search
 /// does. One pass runs before the three: with a `year` and the `dateKey` of
 /// the result type, a result with an equal title released in that year wins
-/// over an equal title that TMDB ranked higher. Titles count as equal, or as holding the words, when either their joined or
+/// over an equal title that TMDB ranked higher. One pass runs after the three:
+/// with a `year`, a result released in that year whose words are a smaller part
+/// of the query's ("Star Trek" for "Star Trek The Original Series") matches.
+/// Titles count as equal, or as holding the words, when either their joined or
 /// their unjoined initials do.
 [[nodiscard]] std::optional<int> bestMatch(const QJsonArray &results,
                                            const QString &query,

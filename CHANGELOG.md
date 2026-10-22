@@ -18,6 +18,10 @@ intermediate version bump.
   matched or missed by the earlier rules are matched again once, in the
   background, and a changed match replaces that title's stored metadata. The
   catalog is migrated to schema 7; titles and watch progress are kept.
+- Online metadata also finds shows whose folder name has more words than TMDB's
+  title when TMDB lists the show in the folder's year: "Star Trek The Original
+  Series (1966)" and "The Office US (2005)". Titles are checked once more, in
+  the background, after the update.
 - A `Title - (YYYY)` or `Title (YYYY) (YYYY)` movie name now shows and sorts as
   "Title" (not "Title -" or "Title (YYYY)"), and a `Title (2099)` name no longer
   takes 2099 as its release year.

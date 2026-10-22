@@ -263,6 +263,27 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
             return id;
         }
     }
+
+    // A folder often carries more words than TMDB's title: `Star Trek The
+    // Original Series` for `Star Trek`, `The Office US` for `The Office`. Last
+    // of all, with nothing else found, a result first aired in the file's
+    // year whose words are a smaller part of the query's is that show. The
+    // released app has no such pass.
+    if (year > 0 && !dateKey.isEmpty()) {
+        for (const QJsonValue &value : results) {
+            const QJsonObject result = value.toObject();
+            const auto id = resultId(result);
+            const auto title = resultTitle(result);
+            if (!id || !title || releaseYearOf(result, dateKey) != year) {
+                continue;
+            }
+            const QSet<QString> resultWords = wordsOf(normalizeTitle(*title));
+            if (!resultWords.isEmpty() && resultWords.size() < queryWords.size()
+                && isSubset(resultWords, queryWords)) {
+                return id;
+            }
+        }
+    }
     return std::nullopt;
 }
 
