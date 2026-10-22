@@ -140,6 +140,27 @@ private slots:
                  QStringLiteral("vitamin c daily"));
         QCOMPARE(tmdb::normalizeTitle(QStringLiteral("A Quiet Place")),
                  QStringLiteral("quiet place"));
+
+        // TMDB's "P.S. I Love You" joins to "psi love you", the folder's
+        // "PS I Love You" reads "ps i love you": the unjoined forms are
+        // equal, so a title the released rules matched still matches.
+        const QJsonArray psRows{
+            QJsonObject{{"id", 1}, {"title", "Unrelated Film"}, {"release_date", "2008-01-01"}},
+            QJsonObject{{"id", 2}, {"title", "P.S. I Love You"}, {"release_date", "2007-12-21"}}};
+        QCOMPARE(tmdb::normalizeTitle(QStringLiteral("P.S. I Love You"), false),
+                 tmdb::normalizeTitle(QStringLiteral("PS I Love You"), false));
+        QCOMPARE(tmdb::bestMatch(psRows, QStringLiteral("PS I Love You"), QStringLiteral("title")),
+                 std::optional<int>(2));
+        QCOMPARE(tmdb::bestMatch(psRows, QStringLiteral("PS I Love You"), QStringLiteral("title"),
+                                 QStringLiteral("release_date"), 2007),
+                 std::optional<int>(2));
+        // The words pass and the similarity pass see the unjoined form too.
+        QCOMPARE(tmdb::bestMatch(results({{3, QStringLiteral("P.S. I Love You Too")}}),
+                                 QStringLiteral("PS I Love You"), QStringLiteral("title")),
+                 std::optional<int>(3));
+        QCOMPARE(tmdb::bestMatch(results({{4, QStringLiteral("P.S. I Love You Always Truly")}}),
+                                 QStringLiteral("PS I Love You Never"), QStringLiteral("title")),
+                 std::optional<int>(4));
     }
 
     void aLookAlikeSymbolReadsAsTheLetter()

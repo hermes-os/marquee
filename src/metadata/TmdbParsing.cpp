@@ -108,7 +108,7 @@ namespace
 }
 }
 
-QString tmdb::normalizeTitle(const QString &title)
+QString tmdb::normalizeTitle(const QString &title, bool joinInitials)
 {
     static const QRegularExpression leadingArticle(
         QStringLiteral(R"(^(the|a|an)\s+)"), QRegularExpression::UseUnicodePropertiesOption);
@@ -130,7 +130,8 @@ QString tmdb::normalizeTitle(const QString &title)
     // losing its first letter as an article.
     qsizetype offset = 0;
     QString joined;
-    QRegularExpressionMatchIterator runs = initials.globalMatch(normalized);
+    QRegularExpressionMatchIterator runs =
+        initials.globalMatch(joinInitials ? normalized : QString());
     while (runs.hasNext()) {
         const QRegularExpressionMatch run = runs.next();
         joined += QStringView(normalized).mid(offset, run.capturedStart() - offset);
@@ -203,6 +204,16 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
         return title.isString() ? std::optional<QString>(title.toString()) : std::nullopt;
     };
 
+    // Initials are joined (`P.S.` is `ps`) and also kept apart (`ps` stays
+    // one word, `p s`): a folder `PS I Love You` reads `ps i love you`, which
+    // only the unjoined form of TMDB's `P.S. I Love You` equals. The released
+    // app only has the unjoined form, so a title it matched still matches.
+    const QString queryUnjoined = normalizeTitle(query, false);
+    const QSet<QString> queryUnjoinedWords = wordsOf(queryUnjoined);
+    const auto equalsQuery = [&](const QString &title) {
+        return normalizeTitle(title) == queryNormalized || normalizeTitle(title, false) == queryUnjoined;
+    };
+
     // TMDB's `year` filter also lists titles of other years and ranks by
     // popularity, so `Hustle` (2022) comes after the 2019 `The Hustle`. An
     // equal title released in the file's own year is the file's film
@@ -212,8 +223,7 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
             const QJsonObject result = value.toObject();
             const auto id = resultId(result);
             const auto title = resultTitle(result);
-            if (id && title && releaseYearOf(result, dateKey) == year
-                && normalizeTitle(*title) == queryNormalized) {
+            if (id && title && releaseYearOf(result, dateKey) == year && equalsQuery(*title)) {
                 return id;
             }
         }
@@ -223,7 +233,7 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
         const QJsonObject result = value.toObject();
         const auto id = resultId(result);
         const auto title = resultTitle(result);
-        if (id && title && normalizeTitle(*title) == queryNormalized) {
+        if (id && title && equalsQuery(*title)) {
             return id;
         }
     }
@@ -236,7 +246,9 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
             continue;
         }
         const QSet<QString> resultWords = wordsOf(normalizeTitle(*title));
-        if (!queryWords.isEmpty() && isSubset(queryWords, resultWords)) {
+        const QSet<QString> resultUnjoinedWords = wordsOf(normalizeTitle(*title, false));
+        if ((!queryWords.isEmpty() && isSubset(queryWords, resultWords))
+            || (!queryUnjoinedWords.isEmpty() && isSubset(queryUnjoinedWords, resultUnjoinedWords))) {
             return id;
         }
     }
@@ -245,7 +257,9 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
         const QJsonObject first = results.first().toObject();
         const auto id = resultId(first);
         const auto title = resultTitle(first);
-        if (id && title && titleSimilarity(normalizeTitle(*title), queryNormalized) > 0.5) {
+        if (id && title
+            && (titleSimilarity(normalizeTitle(*title), queryNormalized) > 0.5
+                || titleSimilarity(normalizeTitle(*title, false), queryUnjoined) > 0.5)) {
             return id;
         }
     }
