@@ -982,6 +982,95 @@ function arrowUpLeftAndDownRight(context, s) {
     context.stroke()
 }
 
+// The glyphs the Home hero's category badges and empty tile name
+// (BrowseSnapshotStore.swift:772-836, HeroCarousel.swift:89-91).
+function playCircle(context, s) {
+    context.beginPath()
+    circle(context, 0.5 * s, 0.5 * s, 0.44 * s)
+    context.stroke()
+    context.beginPath()
+    context.moveTo(0.40 * s, 0.30 * s)
+    context.lineTo(0.72 * s, 0.50 * s)
+    context.lineTo(0.40 * s, 0.70 * s)
+    context.closePath()
+    context.fill()
+}
+
+function gift(context, s) {
+    context.beginPath()
+    roundedRect(context, 0.12 * s, 0.44 * s, 0.76 * s, 0.44 * s, 0.05 * s)
+    roundedRect(context, 0.07 * s, 0.30 * s, 0.86 * s, 0.14 * s, 0.04 * s)
+    context.moveTo(0.50 * s, 0.30 * s)
+    context.lineTo(0.50 * s, 0.88 * s)
+    context.moveTo(0.50 * s, 0.30 * s)
+    context.bezierCurveTo(0.30 * s, 0.30 * s, 0.22 * s, 0.10 * s, 0.36 * s, 0.10 * s)
+    context.bezierCurveTo(0.46 * s, 0.10 * s, 0.50 * s, 0.22 * s, 0.50 * s, 0.30 * s)
+    context.bezierCurveTo(0.70 * s, 0.30 * s, 0.78 * s, 0.10 * s, 0.64 * s, 0.10 * s)
+    context.bezierCurveTo(0.54 * s, 0.10 * s, 0.50 * s, 0.22 * s, 0.50 * s, 0.30 * s)
+    context.stroke()
+}
+
+function plusSquareOnSquare(context, s) {
+    context.beginPath()
+    roundedRect(context, 0.30 * s, 0.30 * s, 0.62 * s, 0.62 * s, 0.08 * s)
+    context.moveTo(0.70 * s, 0.30 * s)
+    context.lineTo(0.70 * s, 0.14 * s)
+    context.lineTo(0.14 * s, 0.14 * s)
+    context.lineTo(0.14 * s, 0.70 * s)
+    context.lineTo(0.30 * s, 0.70 * s)
+    context.moveTo(0.61 * s, 0.48 * s)
+    context.lineTo(0.61 * s, 0.74 * s)
+    context.moveTo(0.48 * s, 0.61 * s)
+    context.lineTo(0.74 * s, 0.61 * s)
+    context.stroke()
+}
+
+function clockArrowCirclepath(context, s) {
+    context.beginPath()
+    context.arc(0.50 * s, 0.50 * s, 0.38 * s, Math.PI * 1.12, Math.PI * 2.86)
+    context.moveTo(0.50 * s, 0.28 * s)
+    context.lineTo(0.50 * s, 0.50 * s)
+    context.lineTo(0.64 * s, 0.58 * s)
+    context.stroke()
+    context.beginPath()
+    context.moveTo(0.04 * s, 0.30 * s)
+    context.lineTo(0.18 * s, 0.38 * s)
+    context.lineTo(0.24 * s, 0.22 * s)
+    context.closePath()
+    context.fill()
+}
+
+function wandAndStars(context, s) {
+    context.beginPath()
+    context.moveTo(0.10 * s, 0.90 * s)
+    context.lineTo(0.58 * s, 0.42 * s)
+    context.stroke()
+    context.beginPath()
+    star(context, 0.70 * s, 0.30 * s, 0.22 * s, 0.07 * s, 4)
+    context.fill()
+    context.beginPath()
+    star(context, 0.28 * s, 0.22 * s, 0.11 * s, 0.035 * s, 4)
+    context.fill()
+    context.beginPath()
+    star(context, 0.84 * s, 0.70 * s, 0.09 * s, 0.03 * s, 4)
+    context.fill()
+}
+
+// Two stacked frames, the hero's empty tile (`film.stack`).
+function filmStack(context, s) {
+    context.beginPath()
+    roundedRect(context, 0.16 * s, 0.34 * s, 0.68 * s, 0.50 * s, 0.07 * s)
+    context.moveTo(0.26 * s, 0.22 * s)
+    context.lineTo(0.74 * s, 0.22 * s)
+    context.moveTo(0.34 * s, 0.10 * s)
+    context.lineTo(0.66 * s, 0.10 * s)
+    context.moveTo(0.16 * s, 0.50 * s)
+    context.lineTo(0.84 * s, 0.50 * s)
+    context.moveTo(0.16 * s, 0.68 * s)
+    context.lineTo(0.84 * s, 0.68 * s)
+    context.stroke()
+}
+
 var painters = {
     "folder.fill": folderFill,
     "folder": folder,
@@ -1004,6 +1093,12 @@ var painters = {
     "captions.bubble": captionsBubbleOutline,
     "captions.bubble.fill": captionsBubbleFill,
     "sparkles": sparkles,
+    "play.circle": playCircle,
+    "gift": gift,
+    "plus.square.on.square": plusSquareOnSquare,
+    "clock.arrow.circlepath": clockArrowCirclepath,
+    "wand.and.stars": wandAndStars,
+    "film.stack": filmStack,
     "arrow.clockwise": arrowClockwise,
     "arrow.triangle.2.circlepath": arrowTriangle2Circlepath,
     "checkmark.seal.fill": checkmarkSealFill,

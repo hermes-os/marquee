@@ -63,6 +63,7 @@ qt_add_qml_module(marquee_core
         qml/components/ErrorToast.qml
         qml/components/FocusFrame.qml
         qml/components/GradientWordmark.qml
+        qml/components/HeroCarousel.qml
         qml/components/MarqueeSymbol.qml
         qml/components/MediaItemRow.qml
         qml/components/PlayerCardButton.qml
@@ -136,6 +137,8 @@ qt_add_qml_module(marquee_core
 
         src/models/BrowseSemantics.hpp
         src/models/BrowseSemantics.cpp
+        src/models/HeroSpotlight.hpp
+        src/models/HeroSpotlight.cpp
         src/models/HomeRowsModel.hpp
         src/models/HomeRowsModel.cpp
         src/models/LibraryModel.hpp
@@ -192,6 +195,8 @@ qt_add_qml_module(marquee_core
 
         src/ui/FocusRing.hpp
         src/ui/FocusRing.cpp
+        src/ui/WindowLiveness.hpp
+        src/ui/WindowLiveness.cpp
 )
 
 qt_add_shaders(marquee_core "marquee_shaders"

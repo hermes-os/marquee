@@ -87,6 +87,11 @@ void watched(MediaItem &item, const QDateTime &playedAt)
     return result;
 }
 
+[[nodiscard]] QString rowIdAt(HomeRowsModel *rows, int row)
+{
+    return rows->data(rows->index(row), HomeRowsModel::RowIdRole).toString();
+}
+
 [[nodiscard]] const home_rows::Row *rowNamed(const QVector<home_rows::Row> &rows, const QString &id)
 {
     for (const home_rows::Row &row : rows) {
@@ -673,10 +678,16 @@ private slots:
         model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
                             movie(QStringLiteral("Dune"), 2021)});
         QVERIFY(!model.playSomethingFocused());
+        // Home opens on the hero (HomeDetailView.swift:21); Down enters the
+        // first row, and Up from that row is the hero again, then the capsule.
+        QVERIFY(model.heroFocused());
+        QVERIFY(model.moveDown());
         QVERIFY(model.moveRight());
         QCOMPARE(model.focus()->column(), 1);
 
         QSignalSpy changed(&model, &HomeRowsModel::playSomethingFocusedChanged);
+        QVERIFY(model.moveUp());
+        QVERIFY(model.heroFocused());
         QVERIFY(model.moveUp());
         QVERIFY(model.playSomethingFocused());
         QCOMPARE(changed.count(), 1);
@@ -689,13 +700,19 @@ private slots:
         QCOMPARE(model.focus()->column(), 1);
         QCOMPARE(changed.count(), 1);
 
+        // Down leaves the capsule for the hero it came from, and on to the
+        // row at the column the cards last held.
         QVERIFY(model.moveDown());
         QVERIFY(!model.playSomethingFocused());
+        QVERIFY(model.heroFocused());
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
         QCOMPARE(model.focus()->row(), 0);
         QCOMPARE(model.focus()->column(), 1);
         QCOMPARE(changed.count(), 2);
 
         // A pointer that touches a card takes the remote off the capsule.
+        QVERIFY(model.moveUp());
         QVERIFY(model.moveUp());
         model.focusCard(1, 2);
         QVERIFY(!model.playSomethingFocused());
@@ -705,6 +722,79 @@ private slots:
         // Left at a first card is not spent, so the shell can reach the sidebar.
         model.focusCard(0, 0);
         QVERIFY(!model.moveLeft());
+    }
+
+    // HomeDetailView.swift:44-46 and :57-60: Down from the hero is a guide to
+    // the first row, whose container remembers its own column, so the remote
+    // lands where it last rested on that row and not on the column of the row
+    // it was on when it went up to the hero.
+    void downFromTheHeroLandsOnTheFirstRowsRememberedColumn()
+    {
+        HomeRowsModel model;
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021), movie(QStringLiteral("Heat"), 2016),
+                            movie(QStringLiteral("Moon"), 2009)});
+        QVERIFY(model.rowCount() >= 2);
+        QVERIFY(model.heroFocused());
+
+        QVERIFY(model.moveDown());
+        QVERIFY(model.moveRight());
+        QVERIFY(model.moveRight());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 2);
+
+        // The remote goes to the second row at column 0, then a pointer sends
+        // it to the hero from there.
+        model.focusCard(1, 0);
+        QCOMPARE(model.focus()->column(), 0);
+        model.focusHero();
+        QVERIFY(model.heroFocused());
+
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 2);
+    }
+
+    // The hero's sort ran on the GUI thread for every ten-second progress
+    // record during playback, for a hero nobody can see. It is built once when
+    // the player closes, from everything that changed meanwhile.
+    void theHeroIsNotRebuiltWhileThePlayerIsUpAndOnceWhenItCloses()
+    {
+        HomeRowsModel model;
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021)});
+        QCOMPARE(model.hero()->count(), 3);
+        const int builds = model.heroBuildCountForTest();
+
+        // Opening the player changes nothing.
+        model.setPlayerActive(true);
+        QCOMPARE(model.heroBuildCountForTest(), builds);
+
+        for (int tick = 1; tick <= 6; ++tick) {
+            model.applyWatchProgress(QStringLiteral("root/Coco"), tick * 10'000, 3'600'000, false);
+        }
+        QCOMPARE(model.heroBuildCountForTest(), builds);
+        // The rows still follow the viewing.
+        QCOMPARE(rowIdAt(&model, 0), QStringLiteral("continue-watching"));
+
+        // A library that changes under the player is held for the close too.
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017)});
+        QCOMPARE(model.heroBuildCountForTest(), builds);
+        QCOMPARE(model.hero()->count(), 3);
+
+        model.setPlayerActive(false);
+        QCOMPARE(model.heroBuildCountForTest(), builds + 1);
+        QCOMPARE(model.hero()->count(), 2);
+
+        // A player that opened and closed with nothing recorded rebuilds nothing.
+        model.setPlayerActive(true);
+        model.setPlayerActive(false);
+        QCOMPARE(model.heroBuildCountForTest(), builds + 1);
+
+        // Out of the player, a record is a change like any other.
+        model.applyWatchProgress(QStringLiteral("root/Coco"), 90'000, 3'600'000, false);
+        QCOMPARE(model.heroBuildCountForTest(), builds + 2);
     }
 
     // The title bar, and the capsule in it, is hidden while the library holds

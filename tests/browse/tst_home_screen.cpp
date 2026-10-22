@@ -3,8 +3,10 @@
 #include <QDir>
 #include <QFile>
 #include <QGuiApplication>
+#include <QImage>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScopeGuard>
@@ -21,6 +23,7 @@
 #include "navigation/NavigationController.hpp"
 #include "profiles/ProfileStore.hpp"
 #include "settings/SettingsStore.hpp"
+#include "support/RenderProbe.hpp"
 
 namespace
 {
@@ -29,6 +32,21 @@ namespace
     QDir().mkpath(QFileInfo(path).absolutePath());
     QFile file(path);
     return file.open(QIODevice::WriteOnly) && file.write("media") == 5;
+}
+
+// A real image file, so a sidecar the scanner adopts is one the scene can
+// decode.
+[[nodiscard]] bool writeImage(const QString &path, const QColor &colour)
+{
+    QDir().mkpath(QFileInfo(path).absolutePath());
+    QImage image(640, 360, QImage::Format_RGB32);
+    image.fill(colour);
+    return image.save(path, "PNG");
+}
+
+[[nodiscard]] QColor Theme_background()
+{
+    return QColor(QStringLiteral("#0d0b1a"));
 }
 
 [[nodiscard]] QString mainProfileId()
@@ -89,6 +107,31 @@ struct Seed
 [[nodiscard]] QQuickItem *itemNamed(QQuickWindow *window, const char *name)
 {
     return window->findChild<QQuickItem *>(QLatin1String(name));
+}
+
+// The visual descendants of `root` named `name`: a Repeater's delegates hang
+// off the item tree, not off the object tree `findChildren` walks.
+void collectNamed(QQuickItem *root, const QString &name, QList<QQuickItem *> &found)
+{
+    for (QQuickItem *child : root->childItems()) {
+        if (child->objectName() == name) {
+            found.push_back(child);
+        }
+        collectNamed(child, name, found);
+    }
+}
+
+[[nodiscard]] QList<QQuickItem *> allNamed(QQuickItem *root, const QString &name)
+{
+    QList<QQuickItem *> found;
+    collectNamed(root, name, found);
+    return found;
+}
+
+[[nodiscard]] QQuickItem *firstNamed(QQuickItem *root, const QString &name)
+{
+    const QList<QQuickItem *> found = allNamed(root, name);
+    return found.isEmpty() ? nullptr : found.constFirst();
 }
 
 // A Repeater's delegates hang off the repeater, not the window.
@@ -205,6 +248,17 @@ class HomeScreenTest final : public QObject
         QCoreApplication::processEvents();
     }
 
+    // Home opens on the hero (HomeDetailView.swift:21), so a case about the
+    // rows takes the remote down to the first one.
+    [[nodiscard]] static bool enterRows(Shell &shell)
+    {
+        if (!shell.controller->homeRows()->heroFocused()) {
+            return true;
+        }
+        press(shell, Qt::Key_Down);
+        return !shell.controller->homeRows()->heroFocused();
+    }
+
     // The sidebar owns the remote when the shell opens; walk it to the Play
     // Something control with the keys the remote has.
     [[nodiscard]] bool focusSidebarPlaySomething(Shell &shell)
@@ -231,7 +285,637 @@ class HomeScreenTest final : public QObject
         QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Dune (2021).mkv")));
     }
 
+    // Writes three movies that each have a poster and a backdrop of their own
+    // colour, so the hero has artwork to draw and the render can be judged.
+    static void writeThreeMoviesWithArtwork(Shell &shell)
+    {
+        for (const auto &film : {std::pair{QStringLiteral("Arrival (2016)"), QColor(200, 30, 30)},
+                                 std::pair{QStringLiteral("Coco (2017)"), QColor(30, 200, 30)},
+                                 std::pair{QStringLiteral("Dune (2021)"), QColor(30, 30, 200)}}) {
+            QVERIFY(writeFile(shell.movies.path() + QLatin1Char('/') + film.first + QLatin1Char('/')
+                              + film.first + QStringLiteral(".mkv")));
+            QVERIFY(writeImage(shell.movies.path() + QLatin1Char('/') + film.first
+                                   + QStringLiteral("/poster.png"),
+                               QColor(220, 220, 40)));
+            QVERIFY(writeImage(shell.movies.path() + QLatin1Char('/') + film.first
+                                   + QStringLiteral("/fanart.png"),
+                               film.second));
+        }
+    }
+
+    // The carousel's cards, front to back by logical slide.
+    [[nodiscard]] static QQuickItem *centerCard(Shell &shell)
+    {
+        QQuickItem *hero = itemNamed(shell.window, "homeHero");
+        if (hero == nullptr) {
+            return nullptr;
+        }
+        for (QQuickItem *card : allNamed(hero, QStringLiteral("heroCard"))) {
+            if (card->property("isCenter").toBool() && card->isVisible()) {
+                return card;
+            }
+        }
+        return nullptr;
+    }
+
+
 private slots:
+    // HomeDetailView.swift:202-203, :21: the hero is the top of the page and
+    // Home's first focus, above the rows.
+    void theHeroIsTheTopOfHomeAndWhereTheRemoteStarts()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_VERIFY(rows->hero()->count() == 3);
+        QVERIFY(handToContent(shell));
+
+        QQuickItem *hero = itemNamed(shell.window, "homeHero");
+        QVERIFY(hero != nullptr);
+        QVERIFY(hero->isVisible());
+        QVERIFY(rows->heroFocused());
+        QVERIFY(hero->property("remoteFocused").toBool());
+        QCOMPARE(rows->hero()->currentIndex(), 0);
+
+        // The hero lies above the first row and below the title bar, and the
+        // first row holds no focus.
+        QQuickItem *firstRow = nullptr;
+        QTRY_VERIFY((firstRow = rowNamed(shell.window, rowIdAt(rows, 0))) != nullptr);
+        QCOMPARE(firstRow->property("focusedIndex").toInt(), -1);
+        const qreal heroBottom = hero->mapToScene(QPointF(0, hero->height())).y();
+        QVERIFY(firstRow->mapToScene(QPointF(0, 0)).y() >= heroBottom);
+        QQuickItem *bar = itemNamed(shell.window, "homeTitleBarSurface");
+        QVERIFY(bar != nullptr);
+        QVERIFY(hero->mapToScene(QPointF(0, 0)).y() >= bar->mapToScene(QPointF(0, bar->height())).y()
+                - 1.0);
+
+        // Five cards are mounted around the front one (:48-61), of which only
+        // the nearest are seen.
+        QCOMPARE(allNamed(hero, QStringLiteral("heroCard")).size(), 5);
+        QQuickItem *front = centerCard(shell);
+        QVERIFY(front != nullptr);
+        // The front card offers Watch Now: the button, and over it the item
+        // that hears the click, since on a GPU scene graph the card's content
+        // is drawn through an effect and is itself not visible.
+        QVERIFY(firstNamed(front, QStringLiteral("heroWatchNow")) != nullptr);
+        QQuickItem *hit = firstNamed(front, QStringLiteral("heroWatchNowHit"));
+        QVERIFY(hit != nullptr);
+        QTRY_VERIFY(hit->isVisible());
+        // :194-239: arrows and dots for a carousel of more than one.
+        QVERIFY(firstNamed(hero, QStringLiteral("heroArrowLeft")) != nullptr);
+        QVERIFY(firstNamed(hero, QStringLiteral("heroDots"))->isVisible());
+    }
+
+    // HomeDetailView.swift:46-77, :985-1011: the remote walks the hero with
+    // Left and Right, enters the first row with Down, returns with Up, and
+    // Return plays the spotlight in front with no page between.
+    void theRemoteWalksTheHeroAndReturnPlaysIt()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        QVERIFY(rows->heroFocused());
+
+        press(shell, Qt::Key_Right);
+        QCOMPARE(rows->hero()->currentIndex(), 1);
+        press(shell, Qt::Key_Left);
+        press(shell, Qt::Key_Left);
+        // Left from the first slide wraps to the last, and is not the
+        // sidebar's.
+        QCOMPARE(rows->hero()->currentIndex(), 2);
+        QVERIFY(rows->heroFocused());
+        QVERIFY(itemNamed(shell.window, "contentFocus")->hasActiveFocus());
+        press(shell, Qt::Key_Right);
+        QCOMPARE(rows->hero()->currentIndex(), 0);
+        press(shell, Qt::Key_Right);
+        QCOMPARE(rows->hero()->currentIndex(), 1);
+
+        // The card in front follows the position (:69-75).
+        QQuickItem *card = nullptr;
+        QTRY_VERIFY((card = centerCard(shell)) != nullptr
+                    && card->property("logical").toInt() == 1);
+
+        press(shell, Qt::Key_Down);
+        QVERIFY(!rows->heroFocused());
+        QCOMPARE(rows->focus()->row(), 0);
+        QQuickItem *firstRow = rowNamed(shell.window, rowIdAt(rows, 0));
+        QVERIFY(firstRow != nullptr);
+        QCOMPARE(firstRow->property("focusedIndex").toInt(), 0);
+        QVERIFY(!itemNamed(shell.window, "homeHero")->property("remoteFocused").toBool());
+
+        press(shell, Qt::Key_Up);
+        QVERIFY(rows->heroFocused());
+        QCOMPARE(firstRow->property("focusedIndex").toInt(), -1);
+        // The slide the remote left is still in front.
+        QCOMPARE(rows->hero()->currentIndex(), 1);
+
+        const QString expected = rows->hero()->current().value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!expected.isEmpty());
+        press(shell, Qt::Key_Return);
+        QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Player);
+        QCOMPARE(shell.controller->player()->mediaId(), expected);
+        QVERIFY(!shell.controller->hasError());
+    }
+
+    // HomeDetailView.swift:1021 answers Back by handing the remote to the
+    // sidebar.
+    void backOnTheHeroHandsTheRemoteToTheSidebar()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        QTRY_COMPARE(shell.controller->homeRows()->hero()->count(), 3);
+        QVERIFY(handToContent(shell));
+        auto *sidebar = itemNamed(shell.window, "sidebar");
+        QVERIFY(sidebar != nullptr);
+        press(shell, Qt::Key_Escape);
+        QTRY_VERIFY(sidebar->hasActiveFocus());
+        QCOMPARE(shell.controller->navigation()->route(), NavigationController::Route::Home);
+        // With the remote gone from it, the hero is no longer the focused one.
+        QVERIFY(!itemNamed(shell.window, "homeHero")->property("remoteFocused").toBool());
+    }
+
+    // A click plays (Watch Now), a side card or a dot brings its slide to the
+    // front (HeroCarousel.swift:147-163, :208-239), and the arrows step.
+    void aPointerPlaysFromWatchNowAndMovesTheCarouselFromItsControls()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        // Take the remote off the hero so a pointer touch has to bring it
+        // back, and scroll the page to its origin as a flick would so the hero
+        // is not under the title bar.
+        press(shell, Qt::Key_Down);
+        QVERIFY(!rows->heroFocused());
+        QQuickItem *page = itemNamed(shell.window, "homeScroll");
+        QVERIFY(page != nullptr);
+        auto *pageSpring = page->findChild<QObject *>(QStringLiteral("homeScrollSpring"));
+        QTRY_VERIFY(pageSpring != nullptr && !pageSpring->property("running").toBool());
+        page->setProperty("contentY", -page->property("topMargin").toReal());
+
+        const auto centreOf = [&](QQuickItem *item) {
+            return item->mapToScene(QPointF(item->width() / 2, item->height() / 2)).toPoint();
+        };
+        QQuickItem *homeHero = itemNamed(shell.window, "homeHero");
+        QVERIFY(homeHero != nullptr);
+        QQuickItem *rightArrow = firstNamed(homeHero, QStringLiteral("heroArrowRight"));
+        QVERIFY(rightArrow != nullptr);
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, centreOf(rightArrow));
+        QTRY_COMPARE(rows->hero()->currentIndex(), 1);
+        QVERIFY(rows->heroFocused());
+
+        QQuickItem *dot = firstNamed(homeHero, QStringLiteral("heroDot_0"));
+        QVERIFY(dot != nullptr);
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, centreOf(dot));
+        QTRY_COMPARE(rows->hero()->currentIndex(), 0);
+
+        // The slide 0 -> 2 by the dot is one step back, the shorter way.
+        QQuickItem *lastDot = firstNamed(homeHero, QStringLiteral("heroDot_2"));
+        QVERIFY(lastDot != nullptr);
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, centreOf(lastDot));
+        QTRY_COMPARE(rows->hero()->currentIndex(), 2);
+        QCOMPARE(rows->hero()->position(), -1);
+
+        // Watch Now plays the spotlight in front.
+        const QString expected = rows->hero()->current().value(QStringLiteral("mediaId")).toString();
+        QQuickItem *watch = nullptr;
+        QQuickItem *front = nullptr;
+        // The strip has finished sliding: a card is "in front" from half a
+        // slide away, and a click aimed at one still moving misses it.
+        QTRY_VERIFY((front = centerCard(shell)) != nullptr
+                    && homeHero->property("scrollPosition").toReal() == rows->hero()->position()
+                    && front->property("logical").toInt() == rows->hero()->position()
+                    && firstNamed(front, QStringLiteral("heroWatchNow")) != nullptr);
+        watch = firstNamed(front, QStringLiteral("heroWatchNow"));
+        QVERIFY(watch != nullptr);
+        // The button joins the card's text column when the card reaches the
+        // front, and the column lays it out on the next frame: until then the
+        // button is reported a line above where it is drawn and a click aimed
+        // at it lands beside it. A frame later its place has not moved.
+        QPoint at;
+        QTRY_VERIFY([&] {
+            const QPoint before = centreOf(watch);
+            QSignalSpy swapped(shell.window, &QQuickWindow::frameSwapped);
+            swapped.wait(100);
+            at = centreOf(watch);
+            return at == before;
+        }());
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, at);
+        QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Player);
+        QCOMPARE(shell.controller->player()->mediaId(), expected);
+    }
+
+    // The title bar is opaque and sits over the page (HomeDetailView.swift
+    // :367), so a hero control scrolled under it is neither seen nor reachable:
+    // a click, a hover or a drag on the bar belongs to the bar.
+    void aPointerOnTheTitleBarDoesNotReachTheHeroUnderIt()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        press(shell, Qt::Key_Down);
+        QVERIFY(!rows->heroFocused());
+
+        QQuickItem *page = itemNamed(shell.window, "homeScroll");
+        QQuickItem *bar = itemNamed(shell.window, "homeTitleBarSurface");
+        QQuickItem *homeHero = itemNamed(shell.window, "homeHero");
+        QVERIFY(page != nullptr && bar != nullptr && homeHero != nullptr);
+        auto *pageSpring = page->findChild<QObject *>(QStringLiteral("homeScrollSpring"));
+        QTRY_VERIFY(pageSpring != nullptr && !pageSpring->property("running").toBool());
+        page->setProperty("contentY", -page->property("topMargin").toReal());
+
+        // Scroll the page until the hero's right arrow is under the middle of
+        // the bar.
+        QQuickItem *rightArrow = firstNamed(homeHero, QStringLiteral("heroArrowRight"));
+        QVERIFY(rightArrow != nullptr);
+        const auto centreOf = [](QQuickItem *item) {
+            return item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
+        };
+        const qreal barMiddle = bar->height() / 2;
+        QTRY_VERIFY(centreOf(rightArrow).y() > barMiddle);
+        page->setProperty("contentY",
+                          page->property("contentY").toReal() + centreOf(rightArrow).y() - barMiddle);
+        QTRY_VERIFY(qAbs(centreOf(rightArrow).y() - barMiddle) < 1.0);
+        const QPoint onTheBar = centreOf(rightArrow).toPoint();
+        QVERIFY(onTheBar.y() < bar->height());
+        const qreal scrolled = page->property("contentY").toReal();
+
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, onTheBar);
+        QTest::qWait(100);
+        QCOMPARE(rows->hero()->currentIndex(), 0);
+        QVERIFY(!rows->heroFocused());
+        QCOMPARE(page->property("contentY").toReal(), scrolled);
+
+        // A drag along the bar does not move the strip either.
+        QTest::mousePress(shell.window, Qt::LeftButton, Qt::NoModifier, onTheBar);
+        for (int step = 1; step <= 12; ++step) {
+            QTest::mouseMove(shell.window, onTheBar - QPoint(step * 25, 0));
+        }
+        QTest::mouseRelease(shell.window, Qt::LeftButton, Qt::NoModifier,
+                            onTheBar - QPoint(300, 0));
+        QTest::qWait(100);
+        QCOMPARE(rows->hero()->currentIndex(), 0);
+        QCOMPARE(homeHero->property("dragOffset").toReal(), 0.0);
+        QVERIFY(!rows->heroFocused());
+        QCOMPARE(page->property("contentY").toReal(), scrolled);
+    }
+
+    // HeroCarousel.swift:380-387, :238-244: the carousel advances on its own
+    // while it is on screen, and stops while the remote rests on it or motion
+    // is reduced. A pointer over it does not stop it.
+    void theCarouselAdvancesByItselfUntilTheRemoteOrReducedMotionHoldsIt()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(false);
+        QCOMPARE(rows->hero()->advanceIntervalMs(), 15'000);
+        rows->hero()->setAdvanceIntervalForTest(120);
+
+        // The shell opens with the remote on the sidebar, so nothing holds the
+        // carousel.
+        QTRY_VERIFY(rows->hero()->timerRunning());
+        QTRY_VERIFY_WITH_TIMEOUT(rows->hero()->position() >= 1, 3000);
+        // The card in front slides with it, a little behind the position
+        // while the slide is still travelling.
+        QTRY_VERIFY_WITH_TIMEOUT(
+            [&] {
+                QQuickItem *card = centerCard(shell);
+                return card != nullptr && card->property("logical").toInt() >= 1;
+            }(),
+            3000);
+
+        // The remote taking the hero stops it, and it stays where it was.
+        QVERIFY(handToContent(shell));
+        QVERIFY(!rows->hero()->timerRunning());
+        const int held = rows->hero()->position();
+        QTest::qWait(400);
+        QCOMPARE(rows->hero()->position(), held);
+
+        // A pointer over the front card leaves it held by the remote, and a
+        // hover on its own does not stop a free-running one.
+        QQuickItem *rowsItem = itemNamed(shell.window, "contentFocus");
+        QVERIFY(rowsItem != nullptr);
+        QTest::keyClick(shell.window, Qt::Key_Escape);
+        QTRY_VERIFY(itemNamed(shell.window, "sidebar")->hasActiveFocus());
+        QTRY_VERIFY(rows->hero()->timerRunning());
+        QQuickItem *front = centerCard(shell);
+        QVERIFY(front != nullptr);
+        QTest::mouseMove(shell.window,
+                         front->mapToScene(QPointF(front->width() / 2, front->height() / 3)).toPoint());
+        QTest::qWait(100);
+        QVERIFY(rows->hero()->timerRunning());
+
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(!rows->hero()->timerRunning());
+        const int reduced = rows->hero()->position();
+        QTest::qWait(400);
+        QCOMPARE(rows->hero()->position(), reduced);
+        shell.controller->settings()->setReduceMotion(false);
+        QTRY_VERIFY(rows->hero()->timerRunning());
+
+        // Leaving Home takes the carousel off screen and stops its timer.
+        shell.controller->navigation()->openRoute(NavigationController::Route::Movies);
+        QTRY_VERIFY(!rows->hero()->timerRunning());
+    }
+
+    // A window that is minimized or hidden leaves its items `visible`, so the
+    // carousel stops for the window as well as for the item.
+    void theCarouselStopsWhileTheWindowIsMinimizedOrHidden()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(false);
+        QTRY_VERIFY(rows->hero()->timerRunning());
+
+        shell.window->showMinimized();
+        QTRY_VERIFY(!rows->hero()->timerRunning());
+        QVERIFY(!rows->hero()->active());
+        shell.window->showNormal();
+        QTRY_VERIFY(rows->hero()->timerRunning());
+
+        shell.window->hide();
+        QTRY_VERIFY(!rows->hero()->timerRunning());
+        shell.window->show();
+        QTRY_VERIFY(rows->hero()->timerRunning());
+    }
+
+    // The slide ends at the same place with motion reduced as with it, only
+    // without the travel (:63-65, :19).
+    void theSlideSettlesOnTheSamePositionWithAndWithoutMotion()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        QVERIFY(handToContent(shell));
+        QQuickItem *hero = itemNamed(shell.window, "homeHero");
+
+        shell.controller->settings()->setReduceMotion(false);
+        QCOMPARE(hero->property("slideDuration").toInt(), 500);
+        press(shell, Qt::Key_Right);
+        QTRY_COMPARE(hero->property("scrollPosition").toReal(), 1.0);
+        shell.controller->settings()->setReduceMotion(true);
+        QCOMPARE(hero->property("slideDuration").toInt(), 10);
+        press(shell, Qt::Key_Right);
+        QTRY_COMPARE(hero->property("scrollPosition").toReal(), 2.0);
+        QCOMPARE(rows->hero()->currentIndex(), 2);
+    }
+
+    // The library with nothing in it has no hero; and the rows' focus there
+    // falls back as before (HomeDetailView.swift:94, :1128-1134).
+    void anEmptyLibraryHasNoHero()
+    {
+        Shell shell;
+        QVERIFY(open(shell, [](const Seed &) {}, false, false));
+        QTRY_VERIFY(!shell.controller->scanning());
+        QCOMPARE(shell.controller->homeRows()->hero()->count(), 0);
+        QVERIFY(!shell.controller->homeRows()->heroFocused());
+        QQuickItem *hero = itemNamed(shell.window, "homeHero");
+        QVERIFY(hero != nullptr);
+        QVERIFY(!hero->isVisible());
+    }
+
+    // Kids profile: only the titles its policy allows reach the hero.
+    void aKidsProfilesHeroHoldsOnlyWhatItsPolicyAllows()
+    {
+        Shell shell;
+        QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Kids/Wonder (2017).mkv")));
+        QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Drama/Heat (1995).mkv")));
+        QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Drama/Casino (1995).mkv")));
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+
+        const auto kidsId = [&] {
+            for (const Profile &profile : shell.controller->profiles()->profiles()) {
+                if (profile.name == QStringLiteral("Kids")) {
+                    return profile.id;
+                }
+            }
+            return QString();
+        }();
+        QVERIFY(!kidsId.isEmpty());
+        QVERIFY(shell.controller->chooseProfile(kidsId));
+        QTRY_VERIFY(!shell.controller->profileExitInFlight());
+        QTRY_COMPARE(rows->hero()->count(), 1);
+        QCOMPARE(rows->hero()->spotlightAt(0).value(QStringLiteral("title")).toString(),
+                 QStringLiteral("Wonder"));
+        // One spotlight has nothing to move to: no arrows, no dots, no timer.
+        QQuickItem *kidsHero = itemNamed(shell.window, "homeHero");
+        QVERIFY(kidsHero != nullptr);
+        QTRY_VERIFY(!firstNamed(kidsHero, QStringLiteral("heroDots"))->isVisible());
+        QTRY_VERIFY(firstNamed(kidsHero, QStringLiteral("heroArrowLeft")) == nullptr);
+        QVERIFY(!rows->hero()->timerRunning());
+    }
+
+    // A render on whatever scene graph the run has: the hero shows its
+    // artwork, not the fallback. A grab of the front card's backdrop is the
+    // colour of the title's fanart sidecar under the released washes.
+    void theHeroPaintsTheFrontCardsBackdrop()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+
+        QQuickItem *card = nullptr;
+        QTRY_VERIFY((card = centerCard(shell)) != nullptr);
+        QQuickItem *backdrop = firstNamed(card, QStringLiteral("heroBackdrop"));
+        QVERIFY(backdrop != nullptr);
+        QTRY_COMPARE(backdrop->property("status").toInt(), 1); // Image.Ready
+        QVERIFY(card->property("revealed").toBool());
+
+        const QString title = rows->hero()->current().value(QStringLiteral("title")).toString();
+        const QColor fanart = title == QStringLiteral("Arrival") ? QColor(200, 30, 30)
+            : title == QStringLiteral("Coco")                    ? QColor(30, 200, 30)
+                                                                 : QColor(30, 30, 200);
+
+        // The capsule badge and the title text sit on it; a point in the open
+        // top right of the card is only the backdrop and the washes.
+        QQuickItem *titleText = firstNamed(card, QStringLiteral("heroTitle"));
+        QVERIFY(titleText != nullptr);
+        const render_probe::Capture capture = render_probe::captureWindowUntil(
+            shell.window, {card, titleText}, [&](const render_probe::Capture &grabbed) {
+                const QRect area = render_probe::imageRectForItem(grabbed, card);
+                if (area.isEmpty()) {
+                    return false;
+                }
+                const QPoint at(area.left() + area.width() * 7 / 10, area.top() + area.height() / 8);
+                const QColor pixel = grabbed.image.pixelColor(at);
+                // 0.18 black wash and a transparent-to-0.3 gradient at the top.
+                return render_probe::withinTolerance(
+                    pixel, render_probe::washed(fanart, 0.18 + 0.04), 28);
+            });
+        const QRect area = render_probe::imageRectForItem(capture, card);
+        QVERIFY(!area.isEmpty());
+        // The card is wide: it is the hero's 0.72 of the page, 390 tall.
+        QVERIFY(area.width() > area.height() * 2);
+        const QPoint at(area.left() + area.width() * 7 / 10, area.top() + area.height() / 8);
+        const QColor pixel = capture.image.pixelColor(at);
+        QVERIFY2(render_probe::withinTolerance(pixel, render_probe::washed(fanart, 0.22), 28),
+                 qPrintable(QStringLiteral("%1 painted %2, fanart %3")
+                                .arg(title, pixel.name(), fanart.name())));
+        // The fallback wordmark is not showing over a ready backdrop.
+        QVERIFY(card->property("revealed").toBool());
+        // The title text is painted over the lower part of the card.
+        const QRect lower = render_probe::imageRectForItem(capture, titleText);
+        QVERIFY(!lower.isEmpty());
+        const int bright = render_probe::countPixels(capture.image, lower, [](const QColor &colour) {
+            return colour.red() > 200 && colour.green() > 200 && colour.blue() > 200;
+        });
+        QVERIFY2(bright > 40, qPrintable(QString::number(bright)));
+    }
+
+    // On a GPU scene graph every full-size layer and shader effect is a pass
+    // over the card's pixels each frame, and the owner's iMac has an old GPU.
+    // Three visible cards share one rounded mask, and a poster blur that a
+    // loaded backdrop covers is not drawn.
+    void theHeroDrawsNoLayerOrEffectThatIsCoveredOrDuplicated()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        QQuickItem *homeHero = itemNamed(shell.window, "homeHero");
+        QVERIFY(homeHero != nullptr);
+
+        QList<QQuickItem *> visibleCards;
+        QTRY_VERIFY([&] {
+            visibleCards.clear();
+            for (QQuickItem *card : allNamed(homeHero, QStringLiteral("heroCard"))) {
+                if (card->isVisible()) {
+                    visibleCards.push_back(card);
+                }
+            }
+            for (QQuickItem *card : std::as_const(visibleCards)) {
+                QQuickItem *backdrop = firstNamed(card, QStringLiteral("heroBackdrop"));
+                QQuickItem *poster = firstNamed(card, QStringLiteral("heroPoster"));
+                if (backdrop == nullptr || backdrop->property("status").toInt() != 1
+                    || poster == nullptr || poster->property("status").toInt() != 1) {
+                    return false;
+                }
+            }
+            return visibleCards.size() == 3;
+        }());
+        if (!visibleCards.constFirst()->property("gpu").toBool()) {
+            QSKIP("The software scene graph draws no layers or shader effects.");
+        }
+
+        const auto layerEnabled = [](QQuickItem *item) {
+            return QQmlProperty(item, QStringLiteral("layer.enabled")).read().toBool();
+        };
+        int layers = 0;
+        int effects = 0;
+        for (QQuickItem *card : std::as_const(visibleCards)) {
+            for (QQuickItem *content : allNamed(card, QStringLiteral("heroCardContent"))) {
+                layers += layerEnabled(content) ? 1 : 0;
+            }
+            // The card's content sits in a hidden layer on a GPU scene graph,
+            // so the poster blur is counted by the card's own verdict on it.
+            effects += allNamed(card, QStringLiteral("heroCardMasked")).size();
+            effects += card->property("posterBlurLive").toBool() ? 1 : 0;
+        }
+        // Every mask layer in the hero, whichever card or the root holds it.
+        int masks = 0;
+        for (QQuickItem *mask : allNamed(homeHero, QStringLiteral("heroCardMask"))) {
+            masks += layerEnabled(mask) ? 1 : 0;
+        }
+        qInfo("hero GPU cost with three visible cards: %d content layers, %d mask layers, %d visible effects",
+              layers, masks, effects);
+
+        QCOMPARE(masks, 1);
+        QCOMPARE(layers, 3);
+        // Only each card's masked composite; the poster blur sits under a
+        // loaded backdrop and is skipped.
+        QCOMPARE(effects, 3);
+
+        // A card whose backdrop has not loaded still shows the blurred poster.
+        QQuickItem *bare = visibleCards.constFirst();
+        QVERIFY(firstNamed(bare, QStringLiteral("heroPosterBlur")) != nullptr);
+        QVERIFY(!bare->property("posterBlurLive").toBool());
+        QVERIFY(QQmlProperty(firstNamed(bare, QStringLiteral("heroBackdrop")), QStringLiteral("source"))
+                    .write(QUrl()));
+        QTRY_VERIFY(bare->property("posterBlurLive").toBool());
+    }
+
+    // Set MARQUEE_HERO_GRAB to a file name to keep the frame this case sees,
+    // for a look at the whole page on a real scene graph.
+    void theWholePageGrabShowsTheHeroAboveTheRows()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        QQuickItem *card = nullptr;
+        QTRY_VERIFY((card = centerCard(shell)) != nullptr);
+        QQuickItem *backdrop = firstNamed(card, QStringLiteral("heroBackdrop"));
+        QVERIFY(backdrop != nullptr);
+        QTRY_COMPARE(backdrop->property("status").toInt(), 1);
+        QTRY_VERIFY(!shell.window->grabWindow().isNull());
+        QTest::qWait(300);
+        const QImage frame = shell.window->grabWindow();
+        QVERIFY(!frame.isNull());
+        const QString out = qEnvironmentVariable("MARQUEE_HERO_GRAB");
+        if (!out.isEmpty()) {
+            QVERIFY(frame.save(out));
+        }
+        // The hero is not blank: the backdrop's colour is on the page.
+        QQuickItem *hero = itemNamed(shell.window, "homeHero");
+        const QRect area = render_probe::imageRect(
+            render_probe::captureWindow(shell.window, {hero}),
+            hero->mapRectToScene(hero->boundingRect()));
+        QVERIFY(!area.isEmpty());
+        QVERIFY(render_probe::countPixels(frame, area, [](const QColor &colour) {
+                    return colour != Theme_background();
+                }) > area.width() * area.height() / 4);
+    }
+
+    // A title with no backdrop sidecar shows its content over the fallback at
+    // once: the wordmark tile beneath it, never a spinner (:36-40, :253-258).
+    void aTitleWithNoBackdropStillShowsItsCard()
+    {
+        Shell shell;
+        QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Arrival (2016).mkv")));
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 1);
+        QQuickItem *card = nullptr;
+        QTRY_VERIFY((card = centerCard(shell)) != nullptr);
+        QVERIFY(card->property("revealed").toBool());
+        QQuickItem *title = firstNamed(card, QStringLiteral("heroTitle"));
+        QVERIFY(title != nullptr);
+        QCOMPARE(title->property("text").toString(), QStringLiteral("Arrival"));
+        QVERIFY(firstNamed(card, QStringLiteral("heroFallbackWordmark")) != nullptr);
+    }
     // AppRouter.swift:40-46: Select on the sidebar's Play Something control
     // plays a pick at once, with no details page between.
     void theSidebarsPlaySomethingPlaysAnUnwatchedMovieAtOnce()
@@ -277,8 +961,9 @@ private slots:
         QVERIFY(!slot->property("remoteFocused").toBool());
         QVERIFY(!frame->property("active").toBool());
 
-        // Up from the first row reaches the capsule, draws its focus chrome,
-        // and takes the ring off every card.
+        // Up from the hero (where Home opens) reaches the capsule, draws its
+        // focus chrome, and leaves no ring on any card.
+        QVERIFY(rows->heroFocused());
         press(shell, Qt::Key_Up);
         QVERIFY(rows->playSomethingFocused());
         QVERIFY(slot->property("remoteFocused").toBool());
@@ -292,13 +977,18 @@ private slots:
         QVERIFY(rows->playSomethingFocused());
         QCOMPARE(shell.controller->navigation()->route(), NavigationController::Route::Home);
 
-        // Down leaves it, back on the card it left.
+        // Down leaves it, back on the hero it left, and Down again enters the
+        // first row.
         press(shell, Qt::Key_Down);
         QVERIFY(!rows->playSomethingFocused());
+        QVERIFY(rows->heroFocused());
         QVERIFY(!frame->property("active").toBool());
+        press(shell, Qt::Key_Down);
         QCOMPARE(firstRow->property("focusedIndex").toInt(), 0);
 
         press(shell, Qt::Key_Up);
+        press(shell, Qt::Key_Up);
+        QVERIFY(rows->playSomethingFocused());
         press(shell, Qt::Key_Return);
         // Coco is the only title left unwatched; the press plays it and opens
         // no details page.
@@ -617,7 +1307,7 @@ private slots:
         QQuickItem *content = itemNamed(shell.window, "contentFocus");
         QVERIFY(content != nullptr);
         const int lastRow = shell.controller->homeRows()->rowCount() - 1;
-        shell.controller->homeRows()->focus()->setPosition(lastRow, 0);
+        shell.controller->homeRows()->focusCard(lastRow, 0);
         for (int step = 0; step < 12; ++step) {
             press(shell, Qt::Key_Right);
         }
@@ -640,16 +1330,24 @@ private slots:
         QTRY_COMPARE(rowIds(rows).value(0), QStringLiteral("continue-watching"));
         QVERIFY(handToContent(shell));
         FocusNavigator *focus = rows->focus();
+        QVERIFY(rows->heroFocused());
+        QVERIFY(enterRows(shell));
         QCOMPARE(focus->row(), 0);
         QCOMPARE(focus->column(), 0);
 
-        // Up at the top reaches the Play Something capsule above the rows and
-        // moves no card; Down returns to the card it left.
+        // Up at the top reaches the hero, and Up again the Play Something
+        // capsule above it, moving no card; Down returns through the hero to
+        // the card it left.
+        press(shell, Qt::Key_Up);
+        QVERIFY(rows->heroFocused());
         press(shell, Qt::Key_Up);
         QVERIFY(rows->playSomethingFocused());
         QCOMPARE(focus->row(), 0);
         press(shell, Qt::Key_Down);
+        QVERIFY(rows->heroFocused());
+        press(shell, Qt::Key_Down);
         QVERIFY(!rows->playSomethingFocused());
+        QVERIFY(!rows->heroFocused());
         QCOMPARE(focus->row(), 0);
 
         press(shell, Qt::Key_Down);
@@ -685,6 +1383,12 @@ private slots:
         QVERIFY(handToContent(shell));
         auto *sidebar = itemNamed(shell.window, "sidebar");
         QVERIFY(sidebar != nullptr);
+        // Left on the hero wraps it, as the released hero does; with one
+        // spotlight there is nothing to wrap to, and it is not the sidebar's.
+        press(shell, Qt::Key_Left);
+        QVERIFY(shell.controller->homeRows()->heroFocused());
+        QVERIFY(!sidebar->hasActiveFocus());
+        QVERIFY(enterRows(shell));
         press(shell, Qt::Key_Left);
         QTRY_VERIFY(sidebar->hasActiveFocus());
     }
@@ -711,6 +1415,7 @@ private slots:
         QCOMPARE(card.value(QStringLiteral("showName")).toString(), QStringLiteral("Bluey"));
 
         QVERIFY(handToContent(shell));
+        QVERIFY(enterRows(shell));
         press(shell, Qt::Key_Return);
         QTRY_COMPARE(shell.controller->navigation()->route(),
                      NavigationController::Route::ShowDetail);
@@ -738,6 +1443,7 @@ private slots:
         HomeRowsModel *rows = shell.controller->homeRows();
         QTRY_COMPARE(rowIds(rows), QStringList{QStringLiteral("recently-added")});
         QVERIFY(handToContent(shell));
+        QVERIFY(enterRows(shell));
         press(shell, Qt::Key_Return);
         QTRY_COMPARE(shell.controller->navigation()->route(),
                      NavigationController::Route::ShowDetail);
@@ -753,7 +1459,15 @@ private slots:
         QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Coco (2017).mkv")));
         QVERIFY(writeFile(shell.movies.path() + QStringLiteral("/Dune (2021).mkv")));
         QVERIFY(open(shell, [](const Seed &) {}, true, false));
-        // The first row sits above the fold whatever the window size.
+        // The hero fills the top of the page, so the first row is brought into
+        // view the way the remote would: by resting on it.
+        shell.controller->homeRows()->focusCard(0, 0);
+        QQuickItem *scroller = itemNamed(shell.window, "homeScroll");
+        QVERIFY(scroller != nullptr);
+        auto *glide = scroller->findChild<QObject *>(QStringLiteral("homeScrollSpring"));
+        QVERIFY(glide != nullptr);
+        QTRY_VERIFY(scroller->property("contentY").toReal() > 0);
+        QTRY_VERIFY(!glide->property("running").toBool());
         QQuickItem *added = nullptr;
         QTRY_VERIFY((added = rowNamed(shell.window, QStringLiteral("play-something"))) != nullptr);
         auto *list = added->findChild<QQuickItem *>(QStringLiteral("movieRow"));
@@ -833,8 +1547,11 @@ private slots:
         QVERIFY(springObject != nullptr);
         QCOMPARE(springObject->property("duration").toInt(), 250);
 
+        // The page rests at its origin on the hero; one Down more than there
+        // are rows between enters the first row and walks to the last.
+        QVERIFY(rows->heroFocused());
         const qreal start = scroll->property("contentY").toReal();
-        for (int step = 0; step < rows->rowCount() - 1; ++step) {
+        for (int step = 0; step < rows->rowCount(); ++step) {
             press(shell, Qt::Key_Down);
         }
         QCOMPARE(rows->focus()->row(), rows->rowCount() - 1);
@@ -846,12 +1563,15 @@ private slots:
         // The same focus under Reduce Motion lands at the same place with no
         // spring running.
         shell.controller->settings()->setReduceMotion(true);
-        for (int step = 0; step < rows->rowCount() - 1; ++step) {
+        for (int step = 0; step < rows->rowCount(); ++step) {
             press(shell, Qt::Key_Up);
         }
+        // Back on the hero the page returns to its origin (HomeDetailView
+        // .swift:761-768), whatever offset a row left it at.
+        QVERIFY(rows->heroFocused());
         QTRY_COMPARE(qRound(scroll->property("contentY").toReal()), qRound(start));
         QVERIFY(!springObject->property("running").toBool());
-        for (int step = 0; step < rows->rowCount() - 1; ++step) {
+        for (int step = 0; step < rows->rowCount(); ++step) {
             press(shell, Qt::Key_Down);
         }
         QVERIFY(!springObject->property("running").toBool());
@@ -921,6 +1641,34 @@ private slots:
         QVERIFY(!rowIds(rows).contains(QStringLiteral("continue-watching")));
         // Wonder was watched by Main only, so it is new to Kids.
         QVERIFY(!rowIds(rows).contains(QStringLiteral("recently-watched")));
+    }
+
+    // The player route is what holds the hero: a viewing recorded while it is
+    // up changes the rows at once and the hero once, when the player closes.
+    void theHeroWaitsForThePlayerToCloseBeforeItRebuilds()
+    {
+        Shell shell;
+        writeThreeMovies(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        const QString id = shell.seeded.idOf(QStringLiteral("Coco"));
+        QVERIFY(!id.isEmpty());
+
+        shell.controller->playMediaId(id, false);
+        QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Player);
+        const int builds = rows->heroBuildCountForTest();
+        // Each pause records the position, as the ten-second cadence does.
+        for (int tick = 1; tick <= 4; ++tick) {
+            shell.controller->player()->reportPlayback(tick * 600.0, 3600.0, true);
+            shell.controller->player()->reportPlayback(tick * 600.0 + 1.0, 3600.0, false);
+        }
+        QTRY_COMPARE(rowIdAt(rows, 0), QStringLiteral("continue-watching"));
+        QCOMPARE(rows->heroBuildCountForTest(), builds);
+
+        shell.controller->navigation()->goHome();
+        QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Home);
+        QCOMPARE(rows->heroBuildCountForTest(), builds + 1);
     }
 
     void aViewingRecordedInThePlayerMovesTheShowIntoContinueWatching()

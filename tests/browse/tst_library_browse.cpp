@@ -332,9 +332,12 @@ private:
         return focus->row() == allMoviesRowIndex() ? focus->column() : -1;
     }
 
+    // Home opens on the hero, whose remote selection hides every card's focus,
+    // so a case that judges a card's focus treatment puts the remote on the
+    // card the way a pointer does, which takes it off the hero.
     static void setCurrentIndex(QQuickItem *, int column)
     {
-        s_controller->homeRows()->focus()->setPosition(allMoviesRowIndex(), column);
+        s_controller->homeRows()->focusCard(allMoviesRowIndex(), column);
     }
 
     [[nodiscard]] static bool contentHasFocus(QQuickWindow *window)

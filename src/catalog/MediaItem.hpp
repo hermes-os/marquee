@@ -35,6 +35,13 @@ struct MediaItem
     // media paths because only relative paths are stored.
     QString posterRelativePath;
     QString posterAbsolutePath;
+    // A movie's own backdrop sidecar (`<name>-backdrop.jpg`, `fanart.jpg`),
+    // which the Home hero draws full-bleed. Empty when there is none; episodes
+    // use the show-level backdrop below.
+    // Initialized in place so a projection built field by field elsewhere
+    // (tests, fixtures) need not name them.
+    QString backdropRelativePath{};
+    QString backdropAbsolutePath{};
     qint64 fileSize{0};
     QDateTime modifiedAt;
     // Where playing this title should start. Zero means from the beginning,

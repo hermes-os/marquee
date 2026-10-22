@@ -53,6 +53,36 @@ intermediate version bump.
   TMDB key" when there is none; the key is never logged or shown. Nothing on screen uses the new data
   yet: rows and Details sections come in later changes. The catalog is migrated
   to schema 6 on first start; titles and watch progress are kept.
+- Home has its hero carousel, above the rows, as the released app has it. It
+  spotlights up to five titles in the released order: Continue Watching (the
+  title or show you were last in), Featured (the best-scored title: artwork and
+  a long runtime count, and a title as new as your newest file), Holiday Pick,
+  Recently Added, From the Vault (a film from before 2000), then Smart Picks.
+  A franchise is not shown twice while other titles remain, and a Kids profile
+  is only spotlit what its policy allows. Home opens on the hero. Left and Right
+  move between spotlights and wrap, Down enters the first row, Up from it comes
+  back (and Up again reaches Play Something), Return or a click on Watch Now
+  plays the spotlight in front, and Back hands the remote to the sidebar. The
+  carousel moves on every 15 seconds on its own, and stops while the remote is
+  on it or Reduce Motion is on. The arrows, the dots, a tap on a side card, and
+  a drag also move it. A movie's hero picture is found by the released app's
+  names and order: `fanart`, `backdrop`, `<name> fanart`, `<name> backdrop`, in
+  jpg, jpeg, png and webp (v3's `<name>-backdrop` and `<name>-fanart` come
+  after them); a title without one shows the poster and the fallback tile. A spotlight for a show plays the episode you are
+  up to rather than always the first, which differs from the released app.
+  Ratings, taste, genres, and online artwork are not in the catalog, so those
+  terms of the released selection are left out (see `issues.md`). The next
+  scan of an existing library picks up a movie's backdrop; no migration.
+  A click on Watch Now reaches the button when the window is drawn by the GPU.
+  The carousel also stops advancing while the window is minimized or hidden.
+  On a GPU-drawn window the hero shares one rounded mask between its cards and
+  skips the blurred-poster pass once a backdrop covers it, which takes about
+  half the full-size layers and effects off each frame. While a film plays,
+  Home no longer re-sorts its hero on every progress save; it is built once
+  when the player closes.
+  The title bar takes its own clicks, hover and drags: a hero arrow, dot or
+  card scrolled under it no longer moves the carousel, takes the remote or
+  scrolls the page.
 - A few unreadable files no longer empty the whole library. A file the drive
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the

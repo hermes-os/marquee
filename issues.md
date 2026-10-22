@@ -51,15 +51,28 @@ built-in icons only. Episode frame thumbnails generated from the video
 sidecar and no TMDB still draws its show backdrop.
 Found: the TMDB enrichment task, comparing `Marquee/Services/` with `src/`.
 
-## Home has no hero spotlight, taste rows, or seasonal rows
-Where: `qml/screens/HomeScreen.qml`, `src/models/HomeRowsModel.cpp` (`compose`
-leaves the place after Play Something and before Recently Added open).
-What happens: Home has no hero spotlight or carousel. Its rows are Continue
-Watching, Recently Watched, Play Something, Recently Added, a row per decade,
-and All Movies; the released Because You Watched, Hidden Gems, Short Tonight,
-seasonal, and Holiday Movies rows are not built, and the hero has no place in
-the Home focus tree.
-Found: parity inventory in the retired plan, re-checked against source at 81c8fa8.
+## Home has no taste rows or seasonal rows, and the hero lacks the terms the catalog has no data for
+Where: `src/models/HomeRowsModel.cpp` (`compose` leaves the place after Play
+Something and before Recently Added open), `src/models/HeroSpotlight.cpp`.
+What happens: Home's rows are Continue Watching, Recently Watched, Play
+Something, Recently Added, a row per decade, and All Movies; the released
+Because You Watched, Hidden Gems, Short Tonight, seasonal, and Holiday Movies
+rows are not built. The hero (Continue Watching, Featured, Holiday Pick,
+Recently Added, From the Vault, Smart Picks) is built, but its selection leaves
+out what the catalog does not hold: the rating term of `heroScore` (vote average
+times 100, BrowseSnapshotStore.swift:2104), the taste boost
+(`tasteModel.heroBoost`, :788), and every similarity input but the franchise
+(genres, director, cast, overview, rating; `HeroContentProfile` :841-880 and
+`BrowseSimilarityIndex` :2377-2470), so near-duplicates are judged by franchise
+alone. The Holiday Pick reads the title alone, not genres or overview. Artwork
+is the local sidecars only: no online backdrop, no season backdrop, and a
+runtime is known only after the player has recorded one, so the long-film and
+short-film terms of the score apply only to titles that have been played. The
+released first-paint placeholder (HomeDetailView.swift:513-600) and the
+spring's overshoot (response 0.5, damping 0.82) are not reproduced; the slide
+is a 500 ms ease.
+Found: parity inventory in the retired plan, re-checked against source at
+81c8fa8 and again when the hero was built.
 
 ## Home remembers the selected card only while its row survives
 Where: `src/models/HomeRowsModel.cpp` (`recompose` keeps the focus on the

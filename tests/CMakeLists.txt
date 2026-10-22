@@ -92,6 +92,12 @@ marquee_add_test(tst_home_rows
     browse/tst_home_rows.cpp
 )
 
+# The hero's selection rules, its carousel position and timer, and the remote's
+# walk over hero, capsule and rows are plain model behaviour: no window.
+marquee_add_test(tst_hero_spotlight
+    browse/tst_hero_spotlight.cpp
+)
+
 # Home's titled rows need key and pointer delivery into the shipped QML scene.
 marquee_add_test(tst_home_screen
     browse/tst_home_screen.cpp

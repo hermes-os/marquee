@@ -70,6 +70,38 @@ const QStringList &imageExtensions()
     return {};
 }
 
+/// The movie's backdrop, in the released scanner's names and order
+/// (CatalogContentPolicy.swift:96-136): across the image extensions,
+/// `fanart`, `backdrop`, `<base> fanart`, `<base> backdrop`. v3's own
+/// `<base>-backdrop` and `<base>-fanart` follow them, so a library the
+/// released app already reads picks the same image here.
+[[nodiscard]] QString backdropNameFor(const QString &stem, const QSet<QString> &fileNames)
+{
+    for (const QString &extension : imageExtensions()) {
+        const QString suffix = QLatin1Char('.') + extension;
+        for (const QString &candidate : {QStringLiteral("fanart") + suffix,
+                                         QStringLiteral("backdrop") + suffix,
+                                         stem + QStringLiteral(" fanart") + suffix,
+                                         stem + QStringLiteral(" backdrop") + suffix}) {
+            if (fileNames.contains(candidate)) {
+                return candidate;
+            }
+        }
+    }
+
+    for (const QString &extension : imageExtensions()) {
+        const QString suffix = QLatin1Char('.') + extension;
+        for (const QString &candidate : {stem + QStringLiteral("-backdrop") + suffix,
+                                         stem + QStringLiteral("-fanart") + suffix}) {
+            if (fileNames.contains(candidate)) {
+                return candidate;
+            }
+        }
+    }
+
+    return {};
+}
+
 // Set only by tests, to make a listed media entry fail its stat. A plain
 // static: set it only while no catalog worker is scanning.
 LibraryScanner::MediaStat &mediaStatOverride()
@@ -345,6 +377,9 @@ const QVector<QRegularExpression> &episodeExpressions()
         const QString posterName = posterNameFor(entry.completeBaseName(), fileNames);
         const QString posterPath =
             posterName.isEmpty() ? QString() : entry.absoluteDir().filePath(posterName);
+        const QString backdropName = backdropNameFor(entry.completeBaseName(), fileNames);
+        const QString backdropPath =
+            backdropName.isEmpty() ? QString() : entry.absoluteDir().filePath(backdropName);
 
         if (root.role == LibraryRoot::Role::TvShows) {
             if (seasonNumber == 0) {
@@ -437,6 +472,10 @@ const QVector<QRegularExpression> &episodeExpressions()
                 posterPath.isEmpty() ? QString()
                                      : rootDirectory.relativeFilePath(posterPath),
             .posterAbsolutePath = posterPath,
+            .backdropRelativePath =
+                backdropPath.isEmpty() ? QString()
+                                       : rootDirectory.relativeFilePath(backdropPath),
+            .backdropAbsolutePath = backdropPath,
             .fileSize = movieFile->size(),
             .modifiedAt = movieModifiedAt,
             // Movies store NULL in every episode column, so the projection's

@@ -95,4 +95,43 @@ QString franchiseKey(const QString &title)
     return {};
 }
 
+// BrowseSnapshotStore.swift:2073-2101 scores a title's holiday signal: a direct
+// keyword anywhere in the text, then a named holiday film. The released score
+// also reads the genres and the overview, which the v3 catalog does not model,
+// so what remains here is that same rule over the title alone -- which is what
+// recognizes Home Alone and Elf there, not a genre. Both passes match on
+// containment rather than on whole tokens, exactly as :2083 and :2096 do.
+int holidayScore(const QString &title)
+{
+    const QString normalized = browse::normalizedText(title);
+
+    static const QLatin1String directSignals[]{
+        QLatin1String("christmas"), QLatin1String("xmas"),
+        QLatin1String("holiday"),   QLatin1String("santa"),
+        QLatin1String("claus"),     QLatin1String("noel"),
+        QLatin1String("hanukkah"),  QLatin1String("chanukah"),
+        QLatin1String("kwanzaa"),   QLatin1String("thanksgiving"),
+        QLatin1String("halloween")};
+    for (const QLatin1String &signal : directSignals) {
+        if (normalized.contains(signal)) {
+            return 100;
+        }
+    }
+
+    static const QLatin1String knownHolidayTitles[]{
+        QLatin1String("home alone"),
+        QLatin1String("elf"),
+        QLatin1String("scrooged"),
+        QLatin1String("polar express"),
+        QLatin1String("miracle on 34th street"),
+        QLatin1String("its a wonderful life"),
+        QLatin1String("nightmare before christmas")};
+    for (const QLatin1String &knownTitle : knownHolidayTitles) {
+        if (normalized.contains(knownTitle)) {
+            return 86;
+        }
+    }
+
+    return 0;
+}
 }

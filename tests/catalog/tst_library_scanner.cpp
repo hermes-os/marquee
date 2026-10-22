@@ -605,6 +605,110 @@ private slots:
                      .filePath(QStringLiteral("Arrival (2016)/Arrival (2016)-poster.jpg")));
     }
 
+    // The Home hero draws a movie's backdrop: the folder's `fanart` before the
+    // file's own `-backdrop`, as the released app orders them, stored
+    // relatively and projected absolutely.
+    void aMoviesBackdropSidecarIsStoredAndProjected()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+
+        QVERIFY(writeMediaFile(library.path(),
+                               QStringLiteral("Arrival (2016)/Arrival (2016).mkv")));
+        QVERIFY(writeFile(library.path(), QStringLiteral("Arrival (2016)/fanart.jpg"),
+                          QByteArrayLiteral("art")));
+        QVERIFY(writeFile(library.path(),
+                          QStringLiteral("Arrival (2016)/Arrival (2016)-backdrop.jpg"),
+                          QByteArrayLiteral("art")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Heat (1995)/Heat (1995).mkv")));
+        QVERIFY(writeFile(library.path(), QStringLiteral("Heat (1995)/backdrop.png"),
+                          QByteArrayLiteral("art")));
+
+        CatalogStore store(catalogPath);
+        const QVector<MediaItem> items = refresh(store, {library.path()});
+        QCOMPARE(items.size(), 3);
+        QHash<QString, MediaItem> byTitle;
+        for (const MediaItem &item : items) {
+            byTitle.insert(item.title, item);
+        }
+        // v3's `-backdrop` name is an extra after the released names.
+        QCOMPARE(byTitle.value(QStringLiteral("Arrival")).backdropRelativePath,
+                 QStringLiteral("Arrival (2016)/fanart.jpg"));
+        QCOMPARE(byTitle.value(QStringLiteral("Arrival")).backdropAbsolutePath,
+                 QDir(library.path()).filePath(QStringLiteral("Arrival (2016)/fanart.jpg")));
+        QCOMPARE(byTitle.value(QStringLiteral("Heat")).backdropRelativePath,
+                 QStringLiteral("Heat (1995)/backdrop.png"));
+        QVERIFY(byTitle.value(QStringLiteral("Moon")).backdropAbsolutePath.isEmpty());
+
+        // A backdrop added later reaches the next projection.
+        QVERIFY(writeFile(library.path(), QStringLiteral("Moon.2009-fanart.jpg"),
+                          QByteArrayLiteral("art")));
+        for (const MediaItem &item : refresh(store, {library.path()})) {
+            if (item.title == QStringLiteral("Moon")) {
+                QCOMPARE(item.backdropRelativePath, QStringLiteral("Moon.2009-fanart.jpg"));
+            }
+        }
+    }
+
+    // CatalogContentPolicy.swift:96-136: across jpg, jpeg, png and webp, a
+    // folder's `fanart` and `backdrop` come before the file's `<base> fanart`
+    // and `<base> backdrop`; v3's `<base>-backdrop` and `<base>-fanart` follow.
+    void aBackdropSidecarIsFoundByEveryReleasedNameAndExtension()
+    {
+        const QStringList extensions{QStringLiteral("jpg"), QStringLiteral("jpeg"),
+                                     QStringLiteral("png"), QStringLiteral("webp")};
+        const QStringList names{QStringLiteral("fanart"), QStringLiteral("backdrop"),
+                                QStringLiteral("Heat (1995) fanart"),
+                                QStringLiteral("Heat (1995) backdrop"),
+                                QStringLiteral("Heat (1995)-backdrop"),
+                                QStringLiteral("Heat (1995)-fanart")};
+        const auto backdropOf = [](const QStringList &sidecars) {
+            QTemporaryDir library;
+            if (!writeMediaFile(library.path(), QStringLiteral("Heat (1995)/Heat (1995).mkv"))) {
+                return QStringLiteral("<media not written>");
+            }
+            for (const QString &sidecar : sidecars) {
+                if (!writeFile(library.path(), QStringLiteral("Heat (1995)/") + sidecar,
+                               QByteArrayLiteral("art"))) {
+                    return QStringLiteral("<sidecar not written>");
+                }
+            }
+            const LibraryScanner::ScanResult result = LibraryScanner::scan(rootAt(library.path()));
+            return result.items.size() == 1
+                ? result.items.constFirst().backdropRelativePath
+                : QStringLiteral("<%1 items>").arg(result.items.size());
+        };
+
+        for (const QString &name : names) {
+            for (const QString &extension : extensions) {
+                const QString file = name + QLatin1Char('.') + extension;
+                QCOMPARE(backdropOf({file}), QStringLiteral("Heat (1995)/") + file);
+            }
+        }
+
+        // Extension order leads: a jpg of a later name beats a webp of an
+        // earlier one, and within an extension the released names keep their order.
+        QCOMPARE(backdropOf({QStringLiteral("fanart.webp"),
+                             QStringLiteral("Heat (1995) backdrop.jpg")}),
+                 QStringLiteral("Heat (1995)/Heat (1995) backdrop.jpg"));
+        QCOMPARE(backdropOf({QStringLiteral("backdrop.png"), QStringLiteral("fanart.png"),
+                             QStringLiteral("Heat (1995) fanart.png")}),
+                 QStringLiteral("Heat (1995)/fanart.png"));
+        QCOMPARE(backdropOf({QStringLiteral("Heat (1995) backdrop.png"),
+                             QStringLiteral("Heat (1995) fanart.png")}),
+                 QStringLiteral("Heat (1995)/Heat (1995) fanart.png"));
+        QCOMPARE(backdropOf({QStringLiteral("Heat (1995)-backdrop.jpg"),
+                             QStringLiteral("backdrop.webp")}),
+                 QStringLiteral("Heat (1995)/backdrop.webp"));
+        QCOMPARE(backdropOf({QStringLiteral("Heat (1995)-fanart.jpg"),
+                             QStringLiteral("Heat (1995)-backdrop.jpg")}),
+                 QStringLiteral("Heat (1995)/Heat (1995)-backdrop.jpg"));
+    }
+
     void folderArtworkCoversItsOwnDirectoryOnly()
     {
         QTemporaryDir library;
