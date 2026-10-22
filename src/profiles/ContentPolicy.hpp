@@ -39,6 +39,12 @@ QString folderGenreOf(const MediaItem &item);
 /// then the title-inferred ones.
 QStringList genresOf(const MediaItem &item);
 
+/// MediaItem.swift:154-171 `displayGenres`: TMDB's genres when it named any,
+/// followed by the local ones only when TMDB's are all generic family labels;
+/// otherwise the local genres. Rows still key on `genresOf` until the Rows
+/// task moves them.
+QStringList displayGenresOf(const MediaItem &item);
+
 /// MaturityLevel.classify without a certification, as a ProfileStore::Maturity
 /// value: 0 Kids, 1 Family, 2 Teen, 3 Adult.
 int maturityOf(const MediaItem &item);

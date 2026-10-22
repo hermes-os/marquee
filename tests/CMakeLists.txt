@@ -298,3 +298,8 @@ target_compile_definitions(tst_metadata_enrichment PRIVATE
 marquee_add_test(tst_metadata_switch
     metadata/tst_metadata_switch.cpp
 )
+
+# The stored TMDB fields on the models' roles.
+marquee_add_test(tst_metadata_models
+    metadata/tst_metadata_models.cpp
+)

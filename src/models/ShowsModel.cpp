@@ -1,6 +1,7 @@
 #include "models/ShowsModel.hpp"
 
 #include "models/BrowseSemantics.hpp"
+#include "models/TitleMetadataView.hpp"
 #include "profiles/ContentPolicy.hpp"
 
 #include <QChar>
@@ -125,7 +126,16 @@ namespace
             ? QStringLiteral("%1h %2m").arg(totalMinutes / 60).arg(totalMinutes % 60)
             : QStringLiteral("%1m").arg(totalMinutes);
     }
-    return {{QStringLiteral("mediaId"), episode.id},
+    // The episode's own TMDB facts ride along under their own keys; the keys
+    // below, which the screen binds today, keep their meaning.
+    QVariantMap map = {{QStringLiteral("tmdbTitle"), episode.tmdbEpisodeTitle},
+                       {QStringLiteral("overview"), episode.episodeOverview},
+                       {QStringLiteral("airDate"), episode.episodeAirDate},
+                       {QStringLiteral("voteAverage"), episode.episodeVoteAverage
+                                                           ? QVariant(*episode.episodeVoteAverage)
+                                                           : QVariant()},
+                       {QStringLiteral("tmdbStillUrl"), localUrl(episode.tmdbEpisodeStillAbsolutePath)}};
+    const QVariantMap shown = {{QStringLiteral("mediaId"), episode.id},
             {QStringLiteral("episodeNumber"), episode.episodeNumber},
             {QStringLiteral("seasonNumber"), episode.seasonNumber},
             {QStringLiteral("episodeLabel"), episode.episodeLabel()},
@@ -136,6 +146,10 @@ namespace
             {QStringLiteral("hasProgress"), episode.hasProgress()},
             {QStringLiteral("progress"), progress},
             {QStringLiteral("isUpNext"), isUpNext}};
+    for (auto entry = shown.cbegin(); entry != shown.cend(); ++entry) {
+        map.insert(entry.key(), entry.value());
+    }
+    return map;
 }
 }
 
@@ -166,6 +180,28 @@ QVariant ShowRowModel::data(const QModelIndex &index, int role) const
             .arg(show.seasonCount == 1 ? QString() : QStringLiteral("s"));
     case UpNextLabelRole:
         return show.upNextLabel();
+    case HasMetadataRole:
+        return title_metadata_view::has(show.representative());
+    case TmdbIdRole:
+        return title_metadata_view::tmdbId(show.representative());
+    case OverviewRole:
+        return title_metadata_view::overview(show.representative());
+    case DirectorRole:
+        return title_metadata_view::director(show.representative());
+    case CertificationRole:
+        return title_metadata_view::certification(show.representative());
+    case ReleaseDateRole:
+        return title_metadata_view::releaseDate(show.representative());
+    case VoteAverageRole:
+        return title_metadata_view::voteAverage(show.representative());
+    case RuntimeMinutesRole:
+        return title_metadata_view::runtimeMinutes(show.representative());
+    case GenresRole:
+        return title_metadata_view::genres(show.representative());
+    case CastRole:
+        return title_metadata_view::cast(show.representative());
+    case BackdropUrlRole:
+        return localUrl(show.representative().tmdbBackdropAbsolutePath);
     default:
         return {};
     }
@@ -176,7 +212,18 @@ QHash<int, QByteArray> ShowRowModel::roleNames() const
     return {{ShowNameRole, "showName"},
             {PosterUrlRole, "posterUrl"},
             {SeasonLabelRole, "seasonLabel"},
-            {UpNextLabelRole, "upNextLabel"}};
+            {UpNextLabelRole, "upNextLabel"},
+            {HasMetadataRole, "hasMetadata"},
+            {TmdbIdRole, "tmdbId"},
+            {OverviewRole, "overview"},
+            {DirectorRole, "director"},
+            {CertificationRole, "certification"},
+            {ReleaseDateRole, "releaseDate"},
+            {VoteAverageRole, "voteAverage"},
+            {RuntimeMinutesRole, "runtimeMinutes"},
+            {GenresRole, "genres"},
+            {CastRole, "cast"},
+            {BackdropUrlRole, "backdropUrl"}};
 }
 
 void ShowRowModel::replaceShows(QVector<ShowSummary> shows)
@@ -299,7 +346,17 @@ QVariantMap ShowsModel::showDetails(const QString &showName) const
               .arg(upNext->hasProgress() ? QStringLiteral("Resume") : QStringLiteral("Continue"),
                    upNext->episodeLabel());
 
-    return {{QStringLiteral("showName"), show->showName},
+    // The show's TMDB metadata (an episode carries its show's) under the
+    // fields the later Details task reads; the keys below keep their meaning.
+    QVariantMap details = title_metadata_view::toMap(representative);
+    details.remove(QStringLiteral("genres"));
+    details.remove(QStringLiteral("backdropUrl"));
+    details.insert(QStringLiteral("displayGenres"), title_metadata_view::genres(representative));
+    // Only the cached TMDB backdrop; `backdropUrl` below stays the sidecar's.
+    details.insert(QStringLiteral("tmdbBackdropUrl"),
+                   localUrl(representative.tmdbBackdropAbsolutePath));
+
+    const QVariantMap facts = {{QStringLiteral("showName"), show->showName},
             {QStringLiteral("year"), representative.year},
             {QStringLiteral("seasons"), seasons},
             {QStringLiteral("seasonCount"), show->seasonCount},
@@ -314,6 +371,10 @@ QVariantMap ShowsModel::showDetails(const QString &showName) const
             {QStringLiteral("upNextSeason"), upNext == nullptr ? 0 : upNext->seasonNumber},
             {QStringLiteral("showsContinue"), showsContinue},
             {QStringLiteral("continueLabel"), continueLabel}};
+    for (auto fact = facts.cbegin(); fact != facts.cend(); ++fact) {
+        details.insert(fact.key(), fact.value());
+    }
+    return details;
 }
 
 namespace

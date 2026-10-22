@@ -281,6 +281,21 @@ QStringList genresOf(const MediaItem &item)
     return uniqueGenres(genres);
 }
 
+QStringList displayGenresOf(const MediaItem &item)
+{
+    const QStringList local = genresOf(item);
+    if (!item.metadata || item.metadata->genres.isEmpty()) {
+        return local;
+    }
+    const QStringList remote = uniqueGenres(item.metadata->genres);
+    static const QSet<QString> generic{QStringLiteral("family"), QStringLiteral("kids"),
+                                       QStringLiteral("kids & family"), QStringLiteral("children")};
+    const bool allGeneric = !remote.isEmpty()
+        && std::all_of(remote.cbegin(), remote.cend(),
+                       [](const QString &genre) { return generic.contains(genre.toLower()); });
+    return allGeneric && !local.isEmpty() ? uniqueGenres(remote + local) : remote;
+}
+
 int maturityOf(const MediaItem &item)
 {
     using Maturity = ProfileStore::Maturity;

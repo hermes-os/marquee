@@ -39,7 +39,27 @@ public:
         MetadataRole,
         // The container format the fallback artwork names when a title has no
         // usable artwork.
-        FormatBadgeRole
+        FormatBadgeRole,
+        // TMDB metadata (MediaItem.swift `metadata`, TMDBMetadata.swift:5-22).
+        // Absent values are empty, or null for numbers; `hasMetadata` says
+        // whether TMDB matched the title at all. The later Rows and Details
+        // tasks bind to these; nothing draws them yet.
+        HasMetadataRole,
+        TmdbIdRole,
+        OverviewRole,
+        DirectorRole,
+        CertificationRole,
+        ReleaseDateRole,
+        VoteAverageRole,
+        VoteCountRole,
+        PopularityRole,
+        CollectionIdRole,
+        CollectionNameRole,
+        RuntimeMinutesRole,
+        GenresRole,
+        CastRole,
+        KeywordsRole,
+        BackdropUrlRole
     };
     Q_ENUM(Role)
 

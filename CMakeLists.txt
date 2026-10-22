@@ -146,6 +146,8 @@ qt_add_qml_module(marquee_core
         src/models/PlaySomething.cpp
         src/models/ShowsModel.hpp
         src/models/ShowsModel.cpp
+        src/models/TitleMetadataView.hpp
+        src/models/TitleMetadataView.cpp
 
         src/navigation/FocusNavigator.hpp
         src/navigation/FocusNavigator.cpp

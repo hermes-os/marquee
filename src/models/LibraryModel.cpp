@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "models/BrowseSemantics.hpp"
+#include "models/TitleMetadataView.hpp"
 
 namespace
 {
@@ -19,9 +20,9 @@ namespace
 // owns the placeholder, which lives in the QML module's own resources.
 [[nodiscard]] QUrl posterUrlOf(const MediaItem &item)
 {
-    return item.posterAbsolutePath.isEmpty()
-        ? QUrl()
-        : QUrl::fromLocalFile(item.posterAbsolutePath);
+    // A local sidecar wins; the cached TMDB poster only fills its absence.
+    const QString poster = item.displayPosterPath();
+    return poster.isEmpty() ? QUrl() : QUrl::fromLocalFile(poster);
 }
 
 // MediaItem.swift:143-151 derives displayRuntime from duration in seconds,
@@ -133,6 +134,38 @@ QVariant LibraryModel::data(const QModelIndex &index, int role) const
         return metadataOf(item);
     case FormatBadgeRole:
         return formatBadgeOf(item);
+    case HasMetadataRole:
+        return title_metadata_view::has(item);
+    case TmdbIdRole:
+        return title_metadata_view::tmdbId(item);
+    case OverviewRole:
+        return title_metadata_view::overview(item);
+    case DirectorRole:
+        return title_metadata_view::director(item);
+    case CertificationRole:
+        return title_metadata_view::certification(item);
+    case ReleaseDateRole:
+        return title_metadata_view::releaseDate(item);
+    case VoteAverageRole:
+        return title_metadata_view::voteAverage(item);
+    case VoteCountRole:
+        return title_metadata_view::voteCount(item);
+    case PopularityRole:
+        return title_metadata_view::popularity(item);
+    case CollectionIdRole:
+        return title_metadata_view::collectionId(item);
+    case CollectionNameRole:
+        return title_metadata_view::collectionName(item);
+    case RuntimeMinutesRole:
+        return title_metadata_view::runtimeMinutes(item);
+    case GenresRole:
+        return title_metadata_view::genres(item);
+    case CastRole:
+        return title_metadata_view::cast(item);
+    case KeywordsRole:
+        return title_metadata_view::keywords(item);
+    case BackdropUrlRole:
+        return title_metadata_view::backdropUrl(item);
     default:
         return {};
     }
@@ -146,7 +179,23 @@ QHash<int, QByteArray> LibraryModel::roleNames() const
             {KindRole, "mediaKind"},
             {PosterUrlRole, "posterUrl"},
             {MetadataRole, "metadata"},
-            {FormatBadgeRole, "formatBadge"}};
+            {FormatBadgeRole, "formatBadge"},
+            {HasMetadataRole, "hasMetadata"},
+            {TmdbIdRole, "tmdbId"},
+            {OverviewRole, "overview"},
+            {DirectorRole, "director"},
+            {CertificationRole, "certification"},
+            {ReleaseDateRole, "releaseDate"},
+            {VoteAverageRole, "voteAverage"},
+            {VoteCountRole, "voteCount"},
+            {PopularityRole, "popularity"},
+            {CollectionIdRole, "collectionId"},
+            {CollectionNameRole, "collectionName"},
+            {RuntimeMinutesRole, "runtimeMinutes"},
+            {GenresRole, "genres"},
+            {CastRole, "cast"},
+            {KeywordsRole, "keywords"},
+            {BackdropUrlRole, "backdropUrl"}};
 }
 
 int LibraryModel::titleCount() const
@@ -173,7 +222,9 @@ QVariantMap LibraryModel::detailsForId(const QString &mediaId) const
         return {};
     }
 
-    return {{QStringLiteral("mediaId"), item->id},
+    QVariantMap details = title_metadata_view::toMap(*item);
+    // Keys below win over a metadata key of the same name.
+    const QVariantMap facts = {{QStringLiteral("mediaId"), item->id},
             {QStringLiteral("title"), item->title},
             {QStringLiteral("year"), item->year},
             {QStringLiteral("posterUrl"), posterUrlOf(*item)},
@@ -194,6 +245,10 @@ QVariantMap LibraryModel::detailsForId(const QString &mediaId) const
             // by leaving that slot out exactly as the oracle leaves an absent
             // runtime out.
             {QStringLiteral("runtime"), displayRuntimeOf(item->durationSeconds)}};
+    for (auto fact = facts.cbegin(); fact != facts.cend(); ++fact) {
+        details.insert(fact.key(), fact.value());
+    }
+    return details;
 }
 
 // BrowseSnapshotStore.swift:148-159, through BrowseRecommendationEngine's
