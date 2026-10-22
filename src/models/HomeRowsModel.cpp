@@ -606,12 +606,11 @@ bool HomeRowsModel::moveDown()
         return true;
     }
     if (heroFocused()) {
-        // :57-60 guides Down from every hero item to the first row. Without
-        // one it is spent where it is.
+        // :57-60 guides Down from every hero item to the first row, at the
+        // column that row's container remembers (:44-46). Without one it is
+        // spent where it is.
         if (!m_focus.empty()) {
-            if (m_focus.row() != 0) {
-                m_focus.setPosition(0, m_focus.column());
-            }
+            m_focus.moveToRow(0);
             setHeroSelected(false);
         }
         return true;

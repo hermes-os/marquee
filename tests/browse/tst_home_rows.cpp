@@ -719,6 +719,38 @@ private slots:
         QVERIFY(!model.moveLeft());
     }
 
+    // HomeDetailView.swift:44-46 and :57-60: Down from the hero is a guide to
+    // the first row, whose container remembers its own column, so the remote
+    // lands where it last rested on that row and not on the column of the row
+    // it was on when it went up to the hero.
+    void downFromTheHeroLandsOnTheFirstRowsRememberedColumn()
+    {
+        HomeRowsModel model;
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021), movie(QStringLiteral("Heat"), 2016),
+                            movie(QStringLiteral("Moon"), 2009)});
+        QVERIFY(model.rowCount() >= 2);
+        QVERIFY(model.heroFocused());
+
+        QVERIFY(model.moveDown());
+        QVERIFY(model.moveRight());
+        QVERIFY(model.moveRight());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 2);
+
+        // The remote goes to the second row at column 0, then a pointer sends
+        // it to the hero from there.
+        model.focusCard(1, 0);
+        QCOMPARE(model.focus()->column(), 0);
+        model.focusHero();
+        QVERIFY(model.heroFocused());
+
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 2);
+    }
+
     // The title bar, and the capsule in it, is hidden while the library holds
     // nothing: Up is spent but the remote must not rest on a control nobody
     // can see.

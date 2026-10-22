@@ -34,6 +34,10 @@ public:
     Q_INVOKABLE bool moveDown();
     Q_INVOKABLE void setPosition(int row, int column);
     Q_INVOKABLE void reset();
+    /// Moves to `row` the way a vertical move reaches it: at the column the
+    /// remote last rested on there, or the current column where it never has.
+    /// A missing or empty row, or the row the remote is on, changes nothing.
+    void moveToRow(int row);
 
 signals:
     void focusChanged();
@@ -42,6 +46,7 @@ signals:
 
 private:
     [[nodiscard]] bool moveVertical(int delta);
+    void enterRow(int destination);
     [[nodiscard]] int clampedColumn(int row, int requested) const;
     [[nodiscard]] bool hasNonEmptyRows() const;
     void reconcile();

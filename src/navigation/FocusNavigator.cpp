@@ -154,6 +154,21 @@ bool FocusNavigator::moveVertical(int delta)
         return false;
     }
 
+    enterRow(destination);
+    return true;
+}
+
+void FocusNavigator::moveToRow(int rowValue)
+{
+    if (empty() || rowValue < 0 || rowValue >= m_rowLengths.size() || m_rowLengths[rowValue] == 0
+        || rowValue == m_row) {
+        return;
+    }
+    enterRow(rowValue);
+}
+
+void FocusNavigator::enterRow(int destination)
+{
     m_rememberedColumns[m_row] = m_column;
     const int storedColumn = m_rememberedColumns.value(destination, -1);
     const int requestedColumn = storedColumn >= 0 ? storedColumn : m_column;
@@ -161,7 +176,6 @@ bool FocusNavigator::moveVertical(int delta)
     m_column = clampedColumn(destination, requestedColumn);
     m_rememberedColumns[m_row] = m_column;
     emit focusChanged();
-    return true;
 }
 
 int FocusNavigator::clampedColumn(int rowValue, int requested) const
