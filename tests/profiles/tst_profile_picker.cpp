@@ -20,7 +20,9 @@
 #include "catalog/CatalogStore.hpp"
 #include "catalog/LibraryScanner.hpp"
 #include "navigation/NavigationController.hpp"
+#include "models/HeroSpotlight.hpp"
 #include "models/HomeRowsModel.hpp"
+#include "playback/PlayerController.hpp"
 #include "profiles/ProfileStore.hpp"
 
 namespace
@@ -127,6 +129,30 @@ private:
             return nullptr;
         }
         return loader->property("item").value<QQuickItem *>();
+    }
+
+    // The hero is the top of Home's tree and Down from it is the first row
+    // (HomeDetailView.swift:57-60), so a case that browses the rows takes the
+    // remote down first.
+    void enterTheRows(QQuickWindow *window, HomeRowsModel *home)
+    {
+        if (home->heroFocused()) {
+            QTest::keyClick(window, Qt::Key_Down);
+        }
+        QVERIFY(!home->heroFocused());
+    }
+
+    // Return on the hero plays the slide in front (HomeDetailView.swift
+    // :1009-1011), whatever the viewer last did on Home.
+    void verifyReturnPlaysTheHero(QQuickWindow *window, ApplicationController &controller,
+                                  const QString &expected)
+    {
+        QVERIFY(controller.homeRows()->heroFocused());
+        QCOMPARE(controller.homeRows()->hero()->currentIndex(), 0);
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Player);
+        QCOMPARE(controller.player()->mediaId(), expected);
+        QVERIFY(pickerOf(window) == nullptr);
     }
 
 private slots:
@@ -359,8 +385,16 @@ private slots:
         auto *home = loader->property("item").value<QQuickItem *>();
         QVERIFY(home != nullptr);
         QVERIFY(home->hasActiveFocus());
-        // The ring is drawn by the row whose focusedIndex is not -1.
+        // Home opens on the hero when it has one (HomeDetailView.swift:21,
+        // :1128-1130), and the ring is the hero's; without one it is drawn by
+        // the row whose focusedIndex is not -1.
+        HomeRowsModel *model = controller.homeRows();
         QTRY_VERIFY(([&] {
+            if (model->hero()->count() > 0) {
+                auto *hero = itemNamed(home, QStringLiteral("homeHero"));
+                return model->heroFocused() && hero != nullptr
+                    && hero->property("remoteFocused").toBool();
+            }
             auto *rows = itemNamed(home, QStringLiteral("homeRows"));
             if (rows == nullptr) {
                 return false;
@@ -401,7 +435,14 @@ private slots:
         QCOMPARE(controller.navigation()->route(), NavigationController::Route::Home);
         verifyHomeHoldsTheRemote(window, controller);
 
+        // HomeDetailView.swift:985-991 wraps the hero on Left, and :993-995
+        // hands the remote to the sidebar only from a row card, so Left on
+        // the hero (one slide here) leaves the remote on Home.
         QQuickItem *sidebar = itemNamed(window, QStringLiteral("sidebar"));
+        QTest::keyClick(window, Qt::Key_Left);
+        QVERIFY(!sidebar->hasActiveFocus());
+        QVERIFY(controller.homeRows()->heroFocused());
+        enterTheRows(window, controller.homeRows());
         QTest::keyClick(window, Qt::Key_Left);
         QTRY_VERIFY(sidebar->hasActiveFocus());
         const int profileIndex = sidebar->property("profileIndex").toInt();
@@ -418,10 +459,11 @@ private slots:
         QTest::keyClick(window, Qt::Key_Return);
         verifyHomeHoldsTheRemote(window, controller);
 
-        // Return on Home opens the focused card; it does not reopen the picker.
-        QTest::keyClick(window, Qt::Key_Return);
-        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
-        QVERIFY(pickerOf(window) == nullptr);
+        // Return on Home acts on its first target, the hero (:1009-1011), and
+        // does not reopen the picker.
+        verifyReturnPlaysTheHero(window, controller,
+                                 controller.homeRows()->hero()->spotlightAt(0)
+                                     .value(QStringLiteral("mediaId")).toString());
     }
 
     // The owner's loop on a real session: choose, Return opens Details, back
@@ -455,6 +497,7 @@ private slots:
         // would open another card after the re-choice.
         // The same movie can sit in several rows, so walk to a card that is a
         // different title.
+        enterTheRows(window, home);
         QTest::keyClick(window, Qt::Key_Down);
         QCOMPARE(home->focus()->row(), 1);
         const auto focusedCard = [home] {
@@ -492,10 +535,12 @@ private slots:
         QTest::keyClick(window, Qt::Key_Return);
         verifyHomeHoldsTheRemote(window, controller);
 
+        // Home starts again at its first target: the hero, over the first
+        // card of the first row, not the card the last visit left.
         QTRY_VERIFY(home->focus()->row() == 0 && home->focus()->column() == 0);
-        QTest::keyClick(window, Qt::Key_Return);
-        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
-        QCOMPARE(controller.navigation()->selectedMediaId(), firstCard);
+        QCOMPARE(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString(), firstCard);
+        verifyReturnPlaysTheHero(window, controller,
+                                 home->hero()->spotlightAt(0).value(QStringLiteral("mediaId")).toString());
     }
 
     [[nodiscard]] bool prepareSwitch(ApplicationController &controller, QQuickWindow *window,
@@ -571,6 +616,7 @@ private slots:
         QVERIFY2(refreshEntered.tryAcquire(1, 5000), "the refresh did not reach its gate");
 
         chooseSecondProfile(window, controller, fixture.second);
+        enterTheRows(window, home);
         QTest::keyClick(window, Qt::Key_Down);
         QCOMPARE(home->focus()->row(), 1);
         const auto focusedCard = [home] {
@@ -774,6 +820,7 @@ private slots:
             CatalogStore store(AppPaths::catalogFile());
             store.recordWatchProgress(second, watched, 600'000, 3'600'000, false);
         }
+        enterTheRows(window, home);
         QTest::keyClick(window, Qt::Key_Right);
         QTest::keyClick(window, Qt::Key_Down);
         QCOMPARE(home->focus()->row(), 1);
@@ -794,9 +841,11 @@ private slots:
         QCOMPARE(home->focus()->column(), 0);
         QVERIFY(!home->playSomethingFocused());
 
-        QTest::keyClick(window, Qt::Key_Return);
-        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
-        QCOMPARE(controller.navigation()->selectedMediaId(), watched);
+        // The remote is on the hero, whose first slide is now the title with
+        // progress (Continue Watching leads the carousel), and the first card
+        // of the first row is that same title.
+        QCOMPARE(home->hero()->spotlightAt(0).value(QStringLiteral("mediaId")).toString(), watched);
+        verifyReturnPlaysTheHero(window, controller, watched);
     }
 
     // Home is rebuilt at its first target on every profile choice
@@ -843,6 +892,7 @@ private slots:
             QTest::keyClick(window, Qt::Key_Up);
             QVERIFY(home->playSomethingFocused());
         } else {
+            enterTheRows(window, home);
             QTest::keyClick(window, Qt::Key_Right);
             QTest::keyClick(window, Qt::Key_Down);
             QCOMPARE(home->focus()->row(), 1);
@@ -865,12 +915,12 @@ private slots:
         QVERIFY(!home->playSomethingFocused());
         QCOMPARE(home->focus()->row(), 0);
         QCOMPARE(home->focus()->column(), 0);
-        const QString firstCard = home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString();
-        QVERIFY(!firstCard.isEmpty());
+        QVERIFY(home->heroFocused());
+        QCOMPARE(home->hero()->currentIndex(), 0);
+        const QString first = home->hero()->spotlightAt(0).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!first.isEmpty());
 
-        QTest::keyClick(window, Qt::Key_Return);
-        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
-        QCOMPARE(controller.navigation()->selectedMediaId(), firstCard);
+        verifyReturnPlaysTheHero(window, controller, first);
     }
 
     // The same loop through the pointer: the sidebar's remembered stop is
@@ -896,7 +946,10 @@ private slots:
         QTest::keyClick(window, Qt::Key_Return);
         verifyHomeHoldsTheRemote(window, controller);
 
+        // Left leaves the hero for nothing (HomeDetailView.swift:985-995), so
+        // the remote goes down to a row card before Left reaches the sidebar.
         QQuickItem *sidebar = itemNamed(window, QStringLiteral("sidebar"));
+        enterTheRows(window, controller.homeRows());
         QTest::keyClick(window, Qt::Key_Left);
         QTRY_VERIFY(sidebar->hasActiveFocus());
         const int profileIndex = sidebar->property("profileIndex").toInt();
@@ -917,9 +970,9 @@ private slots:
         QTest::mouseClick(window, Qt::LeftButton, Qt::NoModifier, cardPoint);
         verifyHomeHoldsTheRemote(window, controller);
 
-        QTest::keyClick(window, Qt::Key_Return);
-        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
-        QVERIFY(pickerOf(window) == nullptr);
+        verifyReturnPlaysTheHero(window, controller,
+                                 controller.homeRows()->hero()->spotlightAt(0)
+                                     .value(QStringLiteral("mediaId")).toString());
     }
 
     // ProfilePickerView.swift:495-497, :664-690, :1022-1031: Manage Profiles

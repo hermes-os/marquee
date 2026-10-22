@@ -675,6 +675,9 @@ void HomeRowsModel::resetFocus()
     // A rebuilt Home keeps no column for any row; a repair after a vanished
     // row keeps them, as the released one does.
     m_focus.reset();
+    // The rebuilt HeroCarousel starts at its first card (HeroCarousel.swift
+    // :54 `scrollPosition = 0`), whichever one the last viewer left it on.
+    m_hero.moveTo(0);
 }
 
 void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
@@ -686,6 +689,12 @@ void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
         : static_cast<int>(std::distance(rowLengths.cbegin(), firstNonEmpty));
     // One placed call, so the move to the first target is one announcement.
     m_focus.setRows(std::move(rowLengths), firstRow, 0);
+    // With a hero the first target is its first item: Home's focus starts
+    // there (HomeDetailView.swift:21) and the repair sends a lost row's
+    // remote there (:1128-1130). `heroFocused` needs a hero to be shown, so
+    // without one the first card holds the remote, and a hero that arrives
+    // later takes it as it does on a fresh Home.
+    setHeroSelected(true);
 }
 
 QStringList HomeRowsModel::playSomethingCandidates() const

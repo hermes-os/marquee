@@ -63,6 +63,13 @@ intermediate version bump.
   on that stale place (Play Something, or nothing when nothing was playable)
   instead of opening the first card. A switch made with the pointer, or to the
   same profile, is covered too.
+- Choosing a profile now puts the remote on Home's hero, as in the released app,
+  when the library has a spotlight: Home opens on the hero's first slide and the
+  first Return plays it, whatever slide or place the last viewer left. Left on
+  the hero wraps the carousel and Down enters the rows; only a row card hands
+  the remote to the sidebar. Before, the choice (and the repair after the row
+  the remote rested on went away) left the remote on a row card with no ring
+  on the hero, and Return opened that card's details.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's

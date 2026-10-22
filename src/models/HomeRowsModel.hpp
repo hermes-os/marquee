@@ -200,8 +200,9 @@ public:
     Q_INVOKABLE void focusCard(int row, int column);
     /// Puts the remote on the hero a pointer touched.
     Q_INVOKABLE void focusHero();
-    /// Home's first focus target: the remote off the capsule, on the first
-    /// card of the first row, with no column remembered for any row. A profile
+    /// Home's first focus target: the remote off the capsule, on the hero
+    /// when there is one and otherwise the first card of the first row, with
+    /// the hero back on its first slide and no column remembered for any row. A profile
     /// choice rebuilds Home at the top (ContentView.swift:391-407), so what
     /// the last viewer left focused is not carried over. Both this and the
     /// repair after a recomposition lose their row go through
@@ -260,8 +261,8 @@ private:
 
     void recompose();
     void rebuildHero();
-    /// Home's first focus target, named once: the first card of the first row
-    /// that has one, announced as one change. Whether the capsule holds the
+    /// Home's first focus target, named once: the hero, or without one the
+    /// first card of the first row that has one, announced as one change. Whether the capsule holds the
     /// remote, and whether remembered columns are forgotten, is the caller's,
     /// so a repair keeps both. A Home whose first target is elsewhere changes
     /// only this.

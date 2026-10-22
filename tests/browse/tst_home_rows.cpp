@@ -610,6 +610,12 @@ private slots:
         QCOMPARE(model.focus()->row(), 0);
         QCOMPARE(model.focus()->column(), 0);
         QCOMPARE(focusChanged.count(), 1);
+        // With a hero the repair sends the remote there (:1128-1130); Down
+        // from it is the first row, then the rows the remote remembers.
+        QVERIFY(model.heroFocused());
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
+        QCOMPARE(model.focus()->row(), 0);
         QVERIFY(model.moveDown());
         QVERIFY(model.moveDown());
         QCOMPARE(model.focus()->row(), 2);
@@ -647,6 +653,44 @@ private slots:
         model.replaceItems({});
         model.resetFocus();
         QVERIFY(!model.playSomethingFocused());
+    }
+
+    // The rebuilt Home opens on the hero's first slide (HomeDetailView.swift
+    // :21, HeroCarousel.swift:54), so a choice puts the remote there with the
+    // carousel back on its first slide, and the repair after a vanished row
+    // does the same only while the remote is on the hero (:1101-1111, :1128).
+    void resetFocusReturnsTheRemoteToTheHeroItsFirstSlide()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kNow; });
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021), movie(QStringLiteral("Tenet"), 2020)});
+        QVERIFY(model.hero()->count() >= 2);
+        QVERIFY(model.heroFocused());
+
+        // On a later slide, on the capsule: both are forgotten.
+        QVERIFY(model.moveRight());
+        QCOMPARE(model.hero()->currentIndex(), 1);
+        QVERIFY(model.moveUp());
+        QVERIFY(model.playSomethingFocused());
+        model.resetFocus();
+        QVERIFY(!model.playSomethingFocused());
+        QVERIFY(model.heroFocused());
+        QCOMPARE(model.hero()->currentIndex(), 0);
+
+        // In the rows: the remote returns to the hero, Down then reaches the
+        // first row at the first column.
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
+        model.focus()->setPosition(1, 3);
+        model.resetFocus();
+        QVERIFY(model.heroFocused());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 0);
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
+        QCOMPARE(model.focus()->row(), 0);
+        QCOMPARE(model.focus()->column(), 0);
     }
 
     // BrowseSnapshotStore.swift:369-385 and HomeDetailView.swift:668: the row
