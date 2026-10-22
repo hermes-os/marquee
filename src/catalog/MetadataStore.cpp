@@ -124,6 +124,7 @@ struct StoredTitle
     QString posterCachePath;
     QString backdropCachePath;
     int matcherVersion{0};
+    QDateTime rematchAttemptedAt;
 };
 
 [[nodiscard]] QHash<QString, StoredTitle> storedTitles(QSqlDatabase &database)
@@ -132,7 +133,8 @@ struct StoredTitle
         database,
         QStringLiteral("SELECT owner_key, kind, fetch_state, fetched_at, tmdb_id, "
                        "poster_remote_path, backdrop_remote_path, poster_cache_path, "
-                       "backdrop_cache_path, matcher_version FROM title_metadata"));
+                       "backdrop_cache_path, matcher_version, rematch_attempted_at "
+                       "FROM title_metadata"));
     executeOrThrow(query);
 
     QHash<QString, StoredTitle> titles;
@@ -148,7 +150,10 @@ struct StoredTitle
                        .backdropRemotePath = query.value(6).toString(),
                        .posterCachePath = query.value(7).toString(),
                        .backdropCachePath = query.value(8).toString(),
-                       .matcherVersion = query.value(9).toInt()});
+                       .matcherVersion = query.value(9).toInt(),
+                       .rematchAttemptedAt = query.value(10).isNull()
+                           ? QDateTime()
+                           : parseTimestamp(query.value(10).toString())});
     }
     return titles;
 }
@@ -286,9 +291,12 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
     };
     // A match that a newer matcher could not replace because TMDB failed
     // answering is tried again after the failed-retry wait, not on every scan.
+    // The wait counts from that failed attempt, not from when the stored data
+    // was fetched: a row fetched yesterday has not yet been rematched at all.
     const auto isWaiting = [&](const StoredTitle *stored) {
         return isStale(stored) && stored->state == QLatin1String("matched")
-            && !retryDue(stored->fetchedAt, MetadataStore::failedRetryDays, now);
+            && stored->rematchAttemptedAt.isValid()
+            && !retryDue(stored->rematchAttemptedAt, MetadataStore::failedRetryDays, now);
     };
     const auto fillFromRow = [&](MetadataTarget &target, const StoredTitle *row) {
         if (row == nullptr) {
@@ -492,7 +500,8 @@ void MetadataStore::saveTitle(const MetadataTarget &target, const TitleMetadata 
                 "excluded.backdrop_remote_path THEN backdrop_cache_path ELSE NULL END, "
                 "poster_remote_path = excluded.poster_remote_path, "
                 "backdrop_remote_path = excluded.backdrop_remote_path, "
-                "matcher_version = excluded.matcher_version"));
+                "matcher_version = excluded.matcher_version, "
+                "rematch_attempted_at = NULL"));
         upsert.addBindValue(target.ownerKey);
         upsert.addBindValue(target.kind == MetadataTarget::Kind::Movie ? QStringLiteral("movie")
                                                                        : QStringLiteral("show"));
@@ -597,11 +606,12 @@ void MetadataStore::saveAttempt(const MetadataTarget &target, const QString &sta
     query.addBindValue(matcherVersion);
     executeOrThrow(query);
 
-    // A match an older matcher made stays, with its data, when the new try
-    // fails; only the time moves so the retry wait applies.
+    // A match an older matcher made stays, with its data and the time it was
+    // fetched, when the new try fails; the attempt's own time is recorded so the
+    // retry wait applies.
     QSqlQuery stale = prepared(
         m_database.connection(),
-        QStringLiteral("UPDATE title_metadata SET fetched_at = ? WHERE owner_key = ? "
+        QStringLiteral("UPDATE title_metadata SET rematch_attempted_at = ? WHERE owner_key = ? "
                        "AND fetch_state = 'matched' AND matcher_version < ?"));
     stale.addBindValue(formatTimestamp(now));
     stale.addBindValue(target.ownerKey);
@@ -613,7 +623,8 @@ void MetadataStore::keepMatch(const QString &ownerKey)
 {
     QSqlQuery query = prepared(
         m_database.connection(),
-        QStringLiteral("UPDATE title_metadata SET matcher_version = ? WHERE owner_key = ?"));
+        QStringLiteral("UPDATE title_metadata SET matcher_version = ?, "
+                       "rematch_attempted_at = NULL WHERE owner_key = ?"));
     query.addBindValue(matcherVersion);
     query.addBindValue(ownerKey);
     executeOrThrow(query);

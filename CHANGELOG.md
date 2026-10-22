@@ -6,6 +6,11 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- After an update, every title whose online metadata an older matcher wrote is
+  checked again once in the background, including the ones fetched in the last
+  day (before, those skipped the check). A title waits a day only after a check
+  that failed. The catalog is migrated to schema 8; titles, metadata and watch
+  progress are kept.
 - A dot-separated movie name keeps the dots of its initials:
   "E.T.the.Extra-Terrestrial.(1982)" shows as "E.T. the Extra-Terrestrial" and
   "L.A.Confidential.(1997)" as "L.A. Confidential", not "E T the

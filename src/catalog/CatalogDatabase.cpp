@@ -347,7 +347,13 @@ struct Migration
          // matcher can look again at what an older one matched or missed.
          // Rows written before this column existed are version 0.
          {QStringLiteral("ALTER TABLE title_metadata "
-                         "ADD COLUMN matcher_version INTEGER NOT NULL DEFAULT 0")}}
+                         "ADD COLUMN matcher_version INTEGER NOT NULL DEFAULT 0")}},
+        {8,
+         // When a rematch of a row an older matcher wrote last failed, apart
+         // from fetched_at (when the stored data was fetched), so only a failed
+         // rematch makes the title wait before the next try. Null until then.
+         {QStringLiteral("ALTER TABLE title_metadata "
+                         "ADD COLUMN rematch_attempted_at TEXT")}}
     };
 }
 }

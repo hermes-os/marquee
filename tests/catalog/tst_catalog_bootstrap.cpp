@@ -260,7 +260,7 @@ private slots:
         catalog.migrate();
 
         QVERIFY(QFileInfo::exists(path));
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(tableNames(catalog),
                  QStringList({"episode_metadata", "library_roots", "media_items",
                                       "title_cast", "title_keyword", "title_metadata",
@@ -281,7 +281,7 @@ private slots:
         CatalogDatabase reopened(path);
         reopened.migrate();
 
-        QCOMPARE(schemaVersionOf(reopened), 7);
+        QCOMPARE(schemaVersionOf(reopened), 8);
         QCOMPARE(rowCount(reopened, "library_roots"), 1);
     }
 
@@ -419,7 +419,7 @@ private slots:
         }
 
         CatalogDatabase catalog(path);
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(tableNames(catalog),
                  QStringList({"episode_metadata", "library_roots", "media_items",
                                       "title_cast", "title_keyword", "title_metadata",
@@ -458,7 +458,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(tableNames(catalog),
                  QStringList({"episode_metadata", "library_roots", "media_items",
                                       "title_cast", "title_keyword", "title_metadata",
@@ -491,6 +491,7 @@ private slots:
             CatalogDatabase seeded(path);
             seeded.migrate();
             QVERIFY(execute(seeded, "ALTER TABLE title_metadata DROP COLUMN matcher_version"));
+            QVERIFY(execute(seeded, "ALTER TABLE title_metadata DROP COLUMN rematch_attempted_at"));
             QVERIFY(execute(seeded, "PRAGMA user_version = 6"));
             QVERIFY(execute(seeded,
                             "INSERT INTO title_metadata (owner_key, kind, fetch_state, fetched_at, tmdb_id) "
@@ -502,7 +503,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "title_metadata"), 3);
         QSqlQuery query(catalog.connection());
         QVERIFY(query.exec("SELECT COUNT(*) FROM title_metadata WHERE matcher_version = 0"));
@@ -511,6 +512,36 @@ private slots:
         QVERIFY(query.exec("SELECT tmdb_id FROM title_metadata WHERE owner_key = 'movie-a'"));
         QVERIFY(query.next());
         QCOMPARE(query.value(0).toInt(), 11);
+    }
+
+    void migrationEightAddsAnEmptyRematchAttemptTimeAndKeepsTheRows()
+    {
+        QTemporaryDir dataDirectory;
+        const QString path = QDir(dataDirectory.path()).filePath("catalog.sqlite");
+        {
+            // A schema 7 catalog: the current tables without the column that
+            // migration 8 adds.
+            CatalogDatabase seeded(path);
+            seeded.migrate();
+            QVERIFY(execute(seeded, "ALTER TABLE title_metadata DROP COLUMN rematch_attempted_at"));
+            QVERIFY(execute(seeded, "PRAGMA user_version = 7"));
+            QVERIFY(execute(seeded,
+                            "INSERT INTO title_metadata (owner_key, kind, fetch_state, fetched_at, tmdb_id, "
+                            "matcher_version) VALUES "
+                            "('movie-a', 'movie', 'matched', '2026-01-01T00:00:00.000Z', 11, 2)"));
+        }
+
+        CatalogDatabase catalog(path);
+        catalog.migrate();
+
+        QCOMPARE(schemaVersionOf(catalog), 8);
+        QSqlQuery query(catalog.connection());
+        QVERIFY(query.exec("SELECT tmdb_id, matcher_version, rematch_attempted_at "
+                           "FROM title_metadata WHERE owner_key = 'movie-a'"));
+        QVERIFY(query.next());
+        QCOMPARE(query.value(0).toInt(), 11);
+        QCOMPARE(query.value(1).toInt(), 2);
+        QVERIFY(query.value(2).isNull());
     }
 
     void upgradedVersionOneCatalogRejectsRowsWithoutAnIdentity()
@@ -570,7 +601,7 @@ private slots:
         }
 
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
     }
 
     void startupLoadsTheReadableFilesOfRootsWithUnreadableEntries()
@@ -662,7 +693,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main"), kids});
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "watch_progress"), 4);
         for (const QString &profile : {QStringLiteral("main"), kids}) {
             QCOMPARE(progressOf(catalog, profile, "item-1"),
@@ -714,7 +745,7 @@ private slots:
         CatalogDatabase reopened(path);
         reopened.migrate({QStringLiteral("main"), QStringLiteral("added")});
 
-        QCOMPARE(schemaVersionOf(reopened), 7);
+        QCOMPARE(schemaVersionOf(reopened), 8);
         QCOMPARE(rowCount(reopened, "watch_progress"), 2);
         QCOMPARE(progressOf(reopened, "main", "item-1").at(0).toLongLong(), 1);
         QVERIFY(progressOf(reopened, "added", "item-1").isEmpty());
@@ -732,7 +763,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "watch_progress"), 0);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
@@ -765,7 +796,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QString()});
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
     }
 
@@ -781,7 +812,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({odd, QStringLiteral("a")});
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "watch_progress"), 4);
         QCOMPARE(progressOf(catalog, odd, "item-1"),
                  (QVariantList{600000, 7200000, 0}));
@@ -802,7 +833,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "watch_progress"), 0);
     }
 
@@ -828,7 +859,7 @@ private slots:
 
         QVERIFY(execute(catalog, "DROP TABLE watch_progress_v5"));
         catalog.migrate({QStringLiteral("main")});
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "watch_progress"), 2);
     }
 
@@ -866,7 +897,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main")});
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "library_roots"), 1);
         QCOMPARE(rowCount(catalog, "media_items"), 1);
         QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
@@ -887,7 +918,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main")});
 
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
         QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
         QVERIFY(tableNames(catalog).contains("title_metadata"));
@@ -919,7 +950,7 @@ private slots:
 
         QVERIFY(execute(catalog, "DROP TABLE title_keyword"));
         catalog.migrate({QStringLiteral("main")});
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "media_items"), 1);
     }
 
@@ -967,7 +998,7 @@ private slots:
         }
 
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
     }
@@ -991,7 +1022,7 @@ private slots:
 
         QCOMPARE(profileIds.size(), 2);
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 7);
+        QCOMPARE(schemaVersionOf(catalog), 8);
         for (const QString &profile : profileIds) {
             QCOMPARE(progressOf(catalog, profile, "item-1"),
                      (QVariantList{600000, 7200000, 0}));
