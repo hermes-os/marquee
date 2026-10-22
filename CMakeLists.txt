@@ -136,6 +136,9 @@ qt_add_qml_module(marquee_core
 
         src/models/BrowseSemantics.hpp
         src/models/BrowseSemantics.cpp
+        src/models/HomeRowIds.hpp
+        src/models/HomeTasteRows.hpp
+        src/models/HomeTasteRows.cpp
         src/models/HomeRowsModel.hpp
         src/models/HomeRowsModel.cpp
         src/models/LibraryModel.hpp

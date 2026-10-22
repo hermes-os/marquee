@@ -14,6 +14,7 @@
 #include <functional>
 
 #include "catalog/MediaItem.hpp"
+#include "models/HomeTasteRows.hpp"
 #include "navigation/FocusNavigator.hpp"
 
 /// The rules behind Home's titled rows, as plain functions over projected
@@ -105,11 +106,16 @@ struct Row
 /// only; Play Something never offers an episode.
 [[nodiscard]] QVector<Card> playSomethingCards(const QVector<MediaItem> &items);
 
-/// Home's rows in the released order (BrowseSnapshotStore.swift:2832-2892)
-/// for the rows this milestone builds: Continue Watching, Recently Watched,
-/// Play Something, Recently Added, a row per decade, All Movies. An empty row
-/// is not returned.
-[[nodiscard]] QVector<Row> compose(const QVector<MediaItem> &items, const QDateTime &now);
+/// Home's rows in the released order (BrowseSnapshotStore.swift:2832-2892):
+/// Continue Watching, Recently Watched, Play Something, the taste rows
+/// (Because You Watched, Hidden Gems, Short Tonight), the seasonal rows
+/// (October Horror, Summer Blockbusters), Recently Added, Holiday Movies, a
+/// row per decade, All Movies. An empty row is not returned. The taste,
+/// seasonal and Play Something rows come from `HomeTasteRows.hpp`; `cache`,
+/// when given, keeps them between calls until its owner invalidates it.
+[[nodiscard]] QVector<Row> compose(const QVector<MediaItem> &items,
+                                   const QDateTime &now,
+                                   DerivedRowsCache *cache = nullptr);
 }
 
 /// One row's cards, with the roles the shared poster card reads.
@@ -204,6 +210,9 @@ public:
 
     /// Replaces the clock the idle window reads, for tests.
     void setClockForTest(std::function<QDateTime()> clock);
+    /// How many times the taste, seasonal and Play Something rows were built
+    /// from the library, for tests of what a progress record costs.
+    [[nodiscard]] int derivedRowBuildsForTest() const;
     /// Replaces the source of the shuffle salt a press draws, for tests.
     void setPlaySomethingSaltForTest(std::function<QString()> salt);
 
@@ -242,5 +251,8 @@ private:
     QHash<QString, HomeCardModel *> m_cardModels;
     std::function<QDateTime()> m_clock;
     std::function<QString()> m_saltSource;
+    // The rows that rank the library against the profile's history, which a
+    // progress record cannot change (see `DerivedRowsCache`).
+    home_rows::DerivedRowsCache m_derived;
     bool m_playSomethingFocused{false};
 };

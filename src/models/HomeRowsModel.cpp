@@ -340,8 +340,29 @@ QVector<home_rows::Row> home_rows::decadeRows(const QVector<MediaItem> &items)
     return rows;
 }
 
-QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items, const QDateTime &now)
+QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items,
+                                           const QDateTime &now,
+                                           DerivedRowsCache *cache)
 {
+    DerivedRowsCache uncached;
+    const DerivedRows &derived = (cache != nullptr ? *cache : uncached).rows(items, now);
+    QHash<QString, const MediaItem *> movieById;
+    for (const MediaItem &item : items) {
+        if (item.isMovie()) {
+            movieById.insert(item.id, &item);
+        }
+    }
+    // A row of ids becomes cards from the items as they are now.
+    const auto idRow = [&movieById](const IdRow &row) {
+        QVector<Card> cards;
+        for (const QString &id : row.mediaIds) {
+            if (const MediaItem *movie = movieById.value(id, nullptr)) {
+                cards.push_back(movieCard(*movie));
+            }
+        }
+        return makeRow(row.id, row.title, std::move(cards));
+    };
+
     QVector<Row> rows;
     const auto append = [&rows](Row row) {
         if (row.totalCount > 0) {
@@ -354,12 +375,15 @@ QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items, cons
     append(makeRow(QStringLiteral("recently-watched"), QStringLiteral("Recently Watched"),
                    recentlyWatched(items)));
 
-    // BrowseSnapshotStore.swift:2856-2860 puts Play Something here; :2862-2870
-    // puts the taste rows (Because You Watched, Hidden Gems, Short Tonight) and
-    // the seasonal rows after it, before Recently Added. Those arrive with
-    // their own inputs; append them at this point to keep the released order.
-    append(makeRow(QString::fromLatin1(play_something::kRowId), QStringLiteral("Play Something"),
-                   playSomethingCards(items)));
+    // BrowseSnapshotStore.swift:2855-2869: Play Something, the taste rows, the
+    // seasonal rows, then Recently Added.
+    append(idRow(derived.playSomething));
+    for (const IdRow &row : derived.taste) {
+        append(idRow(row));
+    }
+    for (const IdRow &row : derived.seasonal) {
+        append(idRow(row));
+    }
 
     append(makeRow(QStringLiteral("recently-added"), QStringLiteral("Recently Added"),
                    recentlyAdded(items)));
@@ -631,6 +655,11 @@ void HomeRowsModel::setPlaySomethingSaltForTest(std::function<QString()> salt)
     m_saltSource = std::move(salt);
 }
 
+int HomeRowsModel::derivedRowBuildsForTest() const
+{
+    return m_derived.buildCount();
+}
+
 void HomeRowsModel::setClockForTest(std::function<QDateTime()> clock)
 {
     m_clock = std::move(clock);
@@ -645,6 +674,7 @@ QDateTime HomeRowsModel::now() const
 void HomeRowsModel::replaceItems(QVector<MediaItem> items)
 {
     m_items = std::move(items);
+    m_derived.invalidate();
     if (m_items.isEmpty()) {
         // The capsule goes with the title bar when the library empties.
         setPlaySomethingFocused(false);
@@ -663,10 +693,16 @@ void HomeRowsModel::applyWatchProgress(const QString &mediaId,
     if (match == m_items.end()) {
         return;
     }
-    match->resumePositionMs = completed ? 0 : positionMs;
-    if (durationMs > 0) {
-        match->durationSeconds = durationMs / 1000;
+    // A position recorded every ten seconds of a film changes where the title
+    // resumes and when it was played, and nothing the taste, seasonal and
+    // Play Something rows rank on. Only a title newly watched (or unwatched)
+    // or one whose length became known sends them to be built again.
+    const qint64 durationSeconds = durationMs > 0 ? durationMs / 1000 : match->durationSeconds;
+    if (match->watched != completed || match->durationSeconds != durationSeconds) {
+        m_derived.invalidate();
     }
+    match->resumePositionMs = completed ? 0 : positionMs;
+    match->durationSeconds = durationSeconds;
     match->watched = completed;
     match->lastPlayedAt = now();
     recompose();
@@ -683,7 +719,7 @@ HomeCardModel *HomeRowsModel::cardModelFor(const QString &rowId)
 
 void HomeRowsModel::recompose()
 {
-    QVector<home_rows::Row> composed = home_rows::compose(m_items, now());
+    QVector<home_rows::Row> composed = home_rows::compose(m_items, now(), &m_derived);
 
     // The remote follows the card it rests on, not its row and column number:
     // a row inserted above it would otherwise hand it a different title.

@@ -114,6 +114,11 @@ marquee_add_test(tst_taste_model
     browse/tst_taste_model.cpp
 )
 
+# Home's taste and seasonal rows, composed and as the model serves them.
+marquee_add_test(tst_home_taste_rows
+    browse/tst_home_taste_rows.cpp
+)
+
 # October Horror and Summer Blockbusters, with the date they read pinned.
 marquee_add_test(tst_seasonal_rows
     browse/tst_seasonal_rows.cpp

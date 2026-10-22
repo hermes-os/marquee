@@ -26,15 +26,15 @@ Found: source read at 81c8fa8; no audio module is linked in `CMakeLists.txt`.
 
 ## TMDB metadata is stored but Details and search do not show it yet
 Where: `qml/screens/DetailsScreen.qml`, `qml/screens/ShowDetailScreen.qml`,
-`src/models/HomeRowsModel.cpp`, `src/search/SearchSession.cpp`.
+`src/search/SearchSession.cpp`.
 What happens: after a scan Marquee fetches TMDB details and artwork when a key
 exists (`src/metadata/`, catalog migration 6) and the models expose the fields
 as roles. The Movies and TV routes order and group by it, and a Kids profile
 reads the stored certification, but Details has no overview, director, cast,
 rating or certification section; scoped and genre search find nothing from
-TMDB; Home's Because You Watched, Hidden Gems and Short Tonight rows are not
-built. TMDB's similar and recommended movie ids are stored as TMDB ids and are
-not yet resolved to library titles. A movie backdrop is only ever TMDB's,
+TMDB. TMDB's similar and recommended movie ids are stored as TMDB ids and are
+not resolved to library titles; no released browse code reads them
+(`movieEdges` is stored and never consulted). A movie backdrop is only ever TMDB's,
 because the scanner reads no movie `fanart` or `backdrop` sidecar, so with no
 key a movie has no backdrop.
 Found: the TMDB enrichment commits; `git grep -n "metadata->" src` outside
@@ -49,14 +49,11 @@ built-in icons only. Episode frame thumbnails generated from the video
 sidecar and no TMDB still draws its show backdrop.
 Found: the TMDB enrichment task, comparing `Marquee/Services/` with `src/`.
 
-## Home has no hero spotlight, taste rows, or seasonal rows
-Where: `qml/screens/HomeScreen.qml`, `src/models/HomeRowsModel.cpp` (`compose`
-leaves the place after Play Something and before Recently Added open).
-What happens: Home has no hero spotlight or carousel. Its rows are Continue
-Watching, Recently Watched, Play Something, Recently Added, Holiday Movies, a
-row per decade, and All Movies; the released Because You Watched, Hidden Gems,
-Short Tonight, and seasonal rows are not built, and the hero has no place in
-the Home focus tree.
+## Home has no hero spotlight
+Where: `qml/screens/HomeScreen.qml`, `src/models/HomeRowsModel.cpp`.
+What happens: Home has no hero spotlight or carousel, and the hero has no place
+in the Home focus tree. Its rows are the released ones (`buildHomeRows`,
+`BrowseSnapshotStore.swift:2832-2890`).
 Found: parity inventory in the retired plan, re-checked against source at 81c8fa8.
 
 ## Home remembers the selected card only while its row survives

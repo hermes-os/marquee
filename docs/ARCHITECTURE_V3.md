@@ -82,7 +82,9 @@ the reason. Read these before copying an example.
   pointer or key delivery still unwinding through the tapped card returns into
   freed memory.
 - Home is a stack of titled rows composed in C++ (`HomeRowsModel`), not a grid:
-  Continue Watching, Recently Watched, Recently Added, a row per decade, All
+  Continue Watching, Recently Watched, Play Something, the taste rows (Because
+  You Watched, Hidden Gems, Short Tonight), the seasonal rows (October Horror,
+  Summer Blockbusters), Recently Added, Holiday Movies, a row per decade, All
   Movies, at most eight cards each. The rules are plain functions in
   `home_rows` over projected items, which carry the active profile's progress
   and when it was recorded; the Kids policy is applied before they see the
@@ -93,9 +95,13 @@ the reason. Read these before copying an example.
   the page scrolls to the focused row over `Theme.motionNormal` (immediately
   under Reduce Motion). An
   episode card opens its show with `ShowsModel::requestEpisodeFocus`, which the
-  show page spends once. The Play Something row sits between Recently Watched
-  and Recently Added; the taste rows and the seasonal rows have a marked place
-  after it in `home_rows::compose` and no code yet. The Play Something capsule
+  show page spends once. The taste, seasonal and Play Something rows are plain
+  functions in `HomeTasteRows.*`, `TasteModel.*`, `SimilarityIndex.*` and
+  `SeasonalRows.*`; `compose` only places them. They rank the library against
+  the profile's history, so `HomeRowsModel` builds them once per set of items
+  and calendar day and again only when a title becomes watched, a movie's length
+  becomes known, or the projection is replaced, never for the progress record
+  playback writes every ten seconds. The Play Something capsule
   in the title bar is the first stop of the remote's vertical order
   (`HomeRowsModel::moveUp`/`moveDown`), and `play_something::pick` is the one
   rule behind the capsule, the sidebar control, and the row: unwatched movies in

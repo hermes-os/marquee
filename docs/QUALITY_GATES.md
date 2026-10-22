@@ -54,7 +54,7 @@ Run one target with `ctest --test-dir build/v3-debug -R '<regex>'
 | Settings, Reduce Motion | `^tst_settings_store$`, `^tst_settings_screen$` |
 | Catalog schema, repository, scanner | `^tst_catalog_bootstrap$`, `^tst_library_scanner$`, `^tst_tv_scanner$` |
 | Home poster cards and header | `^tst_library_browse` (also runs `_hidpi`) |
-| Home rows (rules, then the screen) | `^tst_home_rows$`, `^tst_home_screen$` |
+| Home rows (rules, then the screen) | `^tst_home_rows$`, `^tst_home_taste_rows$`, `^tst_home_screen$` |
 | Play Something (the pick, then the controls) | `^tst_play_something$`, `^tst_home_rows$`, `^tst_home_screen$`, `^tst_sidebar_navigation` |
 | Movies and TV routes (order, genre rows, holiday) | `^tst_browse_order$`, `^tst_movies_route` (also runs `_hidpi`), `^tst_tv_route$` |
 | Details | `^tst_media_details$` |

@@ -6,6 +6,18 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home shows the released app's taste and seasonal rows, each only with metadata
+  to judge by, so with no key and no metadata Home shows the rows it showed
+  before. After Play Something: "Because You Watched ..." (up to three rows, one
+  for each of the newest movies you finished, the twelve unwatched movies most
+  like it by franchise, director, cast, genres, overview and year, shown with
+  four or more), Hidden Gems (rated 7.5 or more by 50 or more people) and Short
+  Tonight (100 minutes or less), each ranked by your taste and shown with two or
+  more movies; then October Horror in October and Summer Blockbusters from June
+  to August, in an order that holds for the day. Each profile's rows come from
+  its own history, and a Kids profile's rows hold only what Kids may see.
+  Home no longer ranks the library again for every progress record while a film
+  plays. No migration.
 - Play Something favours what the profile is likely to enjoy, as the released
   app does: titles like the ones the profile finished (genres, director, cast,
   keywords), better rated and more popular titles, and titles with a backdrop
