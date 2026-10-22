@@ -6,6 +6,7 @@
 #include <QGuiApplication>
 #include <QIODevice>
 #include <QKeyEvent>
+#include <QPointer>
 #include <QPointF>
 #include <QProcess>
 #include <QQmlApplicationEngine>
@@ -844,6 +845,98 @@ private slots:
         QCOMPARE(skipped.count(), 0);
         QVERIFY(seeks.at(0).at(0).toDouble() >= landing);
         QVERIFY(!player.scrubber->scrubbing());
+    }
+
+    /// Opens the film, leaves it paused or playing as asked and holds Right
+    /// until the item scrubs with libmpv's seek mode relaxed.
+    [[nodiscard]] bool holdRightUntilTheItemScrubs(Player &player, bool pausedBefore)
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("ffmpeg")).isEmpty()) {
+            return false;
+        }
+        if (!openHud(player, true) || !fileIsOpen(player.window)) {
+            return false;
+        }
+        if (pausedBefore) {
+            player.video->pause();
+            if (!QTest::qWaitFor([&] { return player.video->paused(); }, 5000)) {
+                return false;
+            }
+        }
+        QTest::keyPress(player.window, Qt::Key_Right);
+        return QTest::qWaitFor([&] {
+                   return player.scrubber->scrubbing() && player.video->scrubbing()
+                       && player.video->propertyForTest(QStringLiteral("hr-seek"))
+                           == QStringLiteral("no");
+               }, 5000);
+    }
+
+    // A menu taking the remote mid-hold ends the scrub the way a release
+    // that goes nowhere does: no scrub left, the seek mode back to normal and
+    // the film paused or playing as it was before the hold.
+    void aMenuOpeningMidHoldEndsTheScrubAndRestoresTheFilmState()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("ffmpeg")).isEmpty()) {
+            QSKIP("ffmpeg is not installed, so the test clip cannot be made");
+        }
+        for (const bool pausedBefore : {false, true}) {
+            Player player;
+            const auto restorePaths = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+            QVERIFY2(holdRightUntilTheItemScrubs(player, pausedBefore),
+                     pausedBefore ? "paused hold never scrubbed" : "playing hold never scrubbed");
+
+            // The pointer is how a menu opens while a key is down.
+            QQuickItem *button = itemNamed(player.window, "speedButton");
+            QQuickItem *menu = itemNamed(player.window, "speedMenu");
+            QVERIFY(button != nullptr && menu != nullptr);
+            QTRY_VERIFY2(button->width() > 0 && player.scrim->isVisible(), "speed button");
+            QTest::mouseClick(player.window, Qt::LeftButton, Qt::NoModifier, centreOf(button));
+            QTRY_VERIFY(menu->isVisible());
+
+            QTRY_VERIFY(!player.scrubber->scrubbing());
+            QVERIFY(!player.video->scrubbing());
+            QTRY_COMPARE_WITH_TIMEOUT(player.video->propertyForTest(QStringLiteral("hr-seek")),
+                                      QStringLiteral("absolute"), 5000);
+            QTRY_COMPARE(player.video->paused(), pausedBefore);
+
+            // The key coming up afterwards seeks nowhere.
+            QSignalSpy seeks(player.scrubber, &SeekScrubber::seekRequested);
+            QTest::keyRelease(player.window, Qt::Key_Right);
+            QTest::qWait(300);
+            QCOMPARE(seeks.count(), 0);
+            QVERIFY(!player.video->scrubbing());
+            QCOMPARE(player.video->paused(), pausedBefore);
+        }
+    }
+
+    // Media Stop mid-hold closes the player with the scrub undone.
+    void mediaStopMidHoldLeavesNoScrubBehind()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("ffmpeg")).isEmpty()) {
+            QSKIP("ffmpeg is not installed, so the test clip cannot be made");
+        }
+        for (const bool pausedBefore : {false, true}) {
+            Player player;
+            const auto restorePaths = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+            QVERIFY2(holdRightUntilTheItemScrubs(player, pausedBefore),
+                     pausedBefore ? "paused hold never scrubbed" : "playing hold never scrubbed");
+            QPointer<MpvVideoItem> video = player.video;
+            QPointer<SeekScrubber> scrubber = player.scrubber;
+
+            QTest::keyClick(player.window, Qt::Key_MediaStop);
+            QTRY_VERIFY(player.controller.navigation()->route()
+                        != NavigationController::Route::Player);
+            // The screen may already be gone; if it is not, nothing scrubs.
+            if (!scrubber.isNull()) {
+                QVERIFY(!scrubber->scrubbing());
+            }
+            if (!video.isNull()) {
+                QVERIFY(!video->scrubbing());
+                QTRY_COMPARE_WITH_TIMEOUT(video->propertyForTest(QStringLiteral("hr-seek")),
+                                          QStringLiteral("absolute"), 5000);
+            }
+            QTest::keyRelease(player.window, Qt::Key_Right);
+        }
     }
 
     void theSubtitleMuteSpeedAndFullscreenKeysDoTheirWork()
