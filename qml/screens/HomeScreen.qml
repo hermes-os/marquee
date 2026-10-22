@@ -260,6 +260,18 @@ FocusScope {
             height: titleBar.topPadding + titleBar.barHeight
             color: Theme.background
 
+            // The bar is opaque, so what is scrolled under it must not hear a
+            // press, a hover or a drag through it. Items declared after this
+            // one, the capsule, sit above it and keep their own taps.
+            MouseArea {
+                objectName: "homeTitleBarShield"
+
+                anchors.fill: parent
+                acceptedButtons: Qt.AllButtons
+                hoverEnabled: true
+                preventStealing: true
+            }
+
             // :303 spaces the wordmark, the capsule, and the control; :363
             // insets the whole row by the page's outer padding, and :302-362
             // centres it in the bar below its top padding.

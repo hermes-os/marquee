@@ -513,6 +513,65 @@ private slots:
         QCOMPARE(shell.controller->player()->mediaId(), expected);
     }
 
+    // The title bar is opaque and sits over the page (HomeDetailView.swift
+    // :367), so a hero control scrolled under it is neither seen nor reachable:
+    // a click, a hover or a drag on the bar belongs to the bar.
+    void aPointerOnTheTitleBarDoesNotReachTheHeroUnderIt()
+    {
+        Shell shell;
+        writeThreeMoviesWithArtwork(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        press(shell, Qt::Key_Down);
+        QVERIFY(!rows->heroFocused());
+
+        QQuickItem *page = itemNamed(shell.window, "homeScroll");
+        QQuickItem *bar = itemNamed(shell.window, "homeTitleBarSurface");
+        QQuickItem *homeHero = itemNamed(shell.window, "homeHero");
+        QVERIFY(page != nullptr && bar != nullptr && homeHero != nullptr);
+        auto *pageSpring = page->findChild<QObject *>(QStringLiteral("homeScrollSpring"));
+        QTRY_VERIFY(pageSpring != nullptr && !pageSpring->property("running").toBool());
+        page->setProperty("contentY", -page->property("topMargin").toReal());
+
+        // Scroll the page until the hero's right arrow is under the middle of
+        // the bar.
+        QQuickItem *rightArrow = firstNamed(homeHero, QStringLiteral("heroArrowRight"));
+        QVERIFY(rightArrow != nullptr);
+        const auto centreOf = [](QQuickItem *item) {
+            return item->mapToScene(QPointF(item->width() / 2, item->height() / 2));
+        };
+        const qreal barMiddle = bar->height() / 2;
+        QTRY_VERIFY(centreOf(rightArrow).y() > barMiddle);
+        page->setProperty("contentY",
+                          page->property("contentY").toReal() + centreOf(rightArrow).y() - barMiddle);
+        QTRY_VERIFY(qAbs(centreOf(rightArrow).y() - barMiddle) < 1.0);
+        const QPoint onTheBar = centreOf(rightArrow).toPoint();
+        QVERIFY(onTheBar.y() < bar->height());
+        const qreal scrolled = page->property("contentY").toReal();
+
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, onTheBar);
+        QTest::qWait(100);
+        QCOMPARE(rows->hero()->currentIndex(), 0);
+        QVERIFY(!rows->heroFocused());
+        QCOMPARE(page->property("contentY").toReal(), scrolled);
+
+        // A drag along the bar does not move the strip either.
+        QTest::mousePress(shell.window, Qt::LeftButton, Qt::NoModifier, onTheBar);
+        for (int step = 1; step <= 12; ++step) {
+            QTest::mouseMove(shell.window, onTheBar - QPoint(step * 25, 0));
+        }
+        QTest::mouseRelease(shell.window, Qt::LeftButton, Qt::NoModifier,
+                            onTheBar - QPoint(300, 0));
+        QTest::qWait(100);
+        QCOMPARE(rows->hero()->currentIndex(), 0);
+        QCOMPARE(homeHero->property("dragOffset").toReal(), 0.0);
+        QVERIFY(!rows->heroFocused());
+        QCOMPARE(page->property("contentY").toReal(), scrolled);
+    }
+
     // HeroCarousel.swift:380-387, :238-244: the carousel advances on its own
     // while it is on screen, and stops while the remote rests on it or motion
     // is reduced. A pointer over it does not stop it.

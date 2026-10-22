@@ -27,6 +27,9 @@ intermediate version bump.
   terms of the released selection are left out (see `issues.md`). The next
   scan of an existing library picks up a movie's backdrop; no migration.
   A click on Watch Now reaches the button when the window is drawn by the GPU.
+  The title bar takes its own clicks, hover and drags: a hero arrow, dot or
+  card scrolled under it no longer moves the carousel, takes the remote or
+  scrolls the page.
 - A few unreadable files no longer empty the whole library. A file the drive
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the
