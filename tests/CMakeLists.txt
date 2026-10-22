@@ -114,6 +114,12 @@ marquee_add_test(tst_taste_model
     browse/tst_taste_model.cpp
 )
 
+# The similarity ranking behind Because You Watched: plain functions over
+# projected items.
+marquee_add_test(tst_similarity_index
+    browse/tst_similarity_index.cpp
+)
+
 marquee_add_test(tst_movies_route
     browse/tst_movies_route.cpp
 )
