@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Effects
 import QtQuick.Layouts
 import Marquee 3.0
 
@@ -429,20 +430,16 @@ FocusScope {
             }
         }
 
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0.72) }
-                GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
-            }
-        }
-
+        // PlayerView.swift:170-196 puts nothing behind the top bar: the title
+        // block carries its own shadow (:216) to stay readable over bright
+        // pictures.
         ColumnLayout {
             id: topColumn
             anchors.left: parent.left
             anchors.right: parent.right
             anchors.top: parent.top
-            // :189-190: 20 (36 in lean-back) at the sides, 16 (28) above.
+            // PlayerView.swift:194-195: 20 (36 in lean-back) at the sides, 16 (28)
+            // above.
             anchors.leftMargin: Theme.scaled(20, 36, root.leanBack)
             anchors.rightMargin: Theme.scaled(20, 36, root.leanBack)
             anchors.topMargin: Theme.scaled(16, 28, root.leanBack)
@@ -463,26 +460,63 @@ FocusScope {
                 onActivated: root.close()
             }
 
-            Text {
-                objectName: "playerTitle"
-                text: root.title
-                color: Theme.textPrimary
-                font.pixelSize: Theme.scaled(18, 27, root.leanBack)
-                font.weight: Font.DemiBold
-                elide: Text.ElideRight
+            // :199-217: the title and the episode line sit 2 (4 in
+            // lean-back) apart, as one block with a black-at-0.7 shadow of
+            // radius 6, 1 down. The shadow is a layer effect on a GPU scene
+            // graph, which has room around the text for the blur; the
+            // software one (the offscreen test platform) has no shader
+            // effects and draws the block plain.
+            Item {
+                id: titleBlock
+                objectName: "playerTitleBlock"
+                readonly property real pad: 10
+                readonly property bool shadowed:
+                    titleBlock.GraphicsInfo.api !== GraphicsInfo.Software
+                    && titleBlock.GraphicsInfo.api !== GraphicsInfo.Unknown
                 Layout.fillWidth: true
-            }
+                // The room for the blur is taken back from the layout.
+                Layout.margins: -titleBlock.pad
+                implicitHeight: titleColumn.implicitHeight + 2 * titleBlock.pad
+                layer.enabled: titleBlock.shadowed
+                layer.effect: MultiEffect {
+                    objectName: "playerTitleShadow"
+                    autoPaddingEnabled: false
+                    shadowEnabled: true
+                    shadowColor: "black"
+                    shadowOpacity: 0.7
+                    shadowVerticalOffset: 1
+                    // SoftShadow.qml's mapping of a SwiftUI radius to a blur.
+                    shadowBlur: Math.min(1, 6 * 1.9 / 64)
+                }
 
-            // :207-213: the episode line beneath the show.
-            Text {
-                objectName: "playerSubtitle"
-                visible: root.subtitle.length > 0
-                text: root.subtitle
-                color: Qt.rgba(1, 1, 1, 0.78)
-                font.pixelSize: Theme.scaled(13, 19, root.leanBack)
-                font.weight: Font.Medium
-                elide: Text.ElideRight
-                Layout.fillWidth: true
+                ColumnLayout {
+                    id: titleColumn
+                    anchors.fill: parent
+                    anchors.margins: titleBlock.pad
+                    spacing: Theme.scaled(2, 4, root.leanBack)
+
+                    Text {
+                        objectName: "playerTitle"
+                        text: root.title
+                        color: Theme.textPrimary
+                        font.pixelSize: Theme.scaled(18, 27, root.leanBack)
+                        font.weight: Font.DemiBold
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+
+                    // :207-213: the episode line beneath the show.
+                    Text {
+                        objectName: "playerSubtitle"
+                        visible: root.subtitle.length > 0
+                        text: root.subtitle
+                        color: Qt.rgba(1, 1, 1, 0.78)
+                        font.pixelSize: Theme.scaled(13, 19, root.leanBack)
+                        font.weight: Font.Medium
+                        elide: Text.ElideRight
+                        Layout.fillWidth: true
+                    }
+                }
             }
         }
     }
@@ -495,10 +529,11 @@ FocusScope {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
-        implicitHeight: controls.implicitHeight + Theme.spacingXXL
+        implicitHeight: controls.implicitHeight
             + Theme.scaled(Theme.spacingMD, 28, root.leanBack)
-        // PlayerControlsOverlay.swift:567-575: clear at the top of the
-        // controls, black at 0.8 at the bottom.
+        // PlayerControlsOverlay.swift:574-581: clear at the top of the
+        // controls, black at 0.8 at the bottom. The gradient covers only the
+        // padded controls (:261-267), with no extra fade above the bar.
         gradient: Gradient {
             GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
             GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0.8) }
@@ -514,8 +549,7 @@ FocusScope {
             }
         }
 
-        // :250-254: 24 (40 in lean-back) at the sides and 16 (28) below; the
-        // fade above the seek bar is the gradient's own room.
+        // :266-267: 24 (40 in lean-back) at the sides and 16 (28) below.
         ColumnLayout {
             id: controls
             anchors.left: parent.left
@@ -536,7 +570,7 @@ FocusScope {
                 Layout.fillWidth: true
                 implicitHeight: Theme.scaled(24, 38, root.leanBack)
 
-                // :243-262: a capsule 4 (7 in lean-back) high, the tertiary
+                // :279-305: a capsule 4 (7 in lean-back) high, the tertiary
                 // text colour at 0.3 under the secondary accent's fill.
                 Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
@@ -1450,9 +1484,18 @@ FocusScope {
     }
 
     // PlayerControlsOverlay.swift:517-522: whole speeds read "2x", the rest
-    // as their digits, "0.75x".
+    // as C's %.2g does, which rounds a tie to even: 1.25 reads "1.2x".
     function speedLabel(speed) {
-        return Number(speed.toFixed(2)) + "x"
+        if (speed === Math.floor(speed)) {
+            return Math.floor(speed) + "x"
+        }
+        const scale = Math.pow(10, 1 - Math.floor(Math.log10(Math.abs(speed))))
+        const scaled = speed * scale
+        let digits = Math.round(scaled)
+        if (Math.abs(scaled - Math.floor(scaled) - 0.5) < 1e-9) {
+            digits = 2 * Math.round(scaled / 2)
+        }
+        return (digits / scale) + "x"
     }
 
     // :546-556.

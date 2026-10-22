@@ -5,9 +5,12 @@
 #include <QFile>
 #include <QFileInfo>
 #include <QGuiApplication>
+#include <QImage>
+#include <QMetaObject>
 #include <QPointF>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
+#include <QQmlProperty>
 #include <QQuickItem>
 #include <QQuickWindow>
 #include <QScopeGuard>
@@ -381,6 +384,102 @@ private slots:
         QTest::mouseMove(env.window, QPoint(320, 310));
         QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
         QTRY_COMPARE(env.window->cursor().shape(), Qt::BlankCursor);
+    }
+
+    // PlayerView.swift:199-217: the title and the episode line sit 2 apart
+    // as one block with a shadow, and the top bar has no gradient of its own.
+    void theTitleBlockMatchesTheReleasedSpacingAndShadow()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *title = itemNamed(env.window, "playerTitle");
+        QQuickItem *subtitle = itemNamed(env.window, "playerSubtitle");
+        QQuickItem *block = itemNamed(env.window, "playerTitleBlock");
+        QQuickItem *topBar = itemNamed(env.window, "playerTopBar");
+        QVERIFY(title != nullptr && subtitle != nullptr && block != nullptr && topBar != nullptr);
+
+        // The top bar draws nothing of its own: only its controls and the
+        // title block are in it.
+        for (QQuickItem *child : topBar->childItems()) {
+            QVERIFY2(child->objectName() != QLatin1String("playerTopBarGradient")
+                         && !child->property("gradient").isValid(),
+                     "The top bar has a gradient behind it");
+        }
+
+        // A text is not given a subtitle unless the episode has one, so
+        // show one to measure the gap.
+        subtitle->setProperty("text", QStringLiteral("S01E02 · Pilot"));
+        subtitle->setVisible(true);
+        QTRY_VERIFY(subtitle->isVisible());
+        const auto gap = [&] {
+            return subtitle->mapToScene(QPointF(0, 0)).y()
+                - (title->mapToScene(QPointF(0, 0)).y() + title->height());
+        };
+        // 2, and 4 in lean-back mode.
+        QQuickItem *screen = itemNamed(env.window, "playerScreen");
+        QVERIFY(screen != nullptr);
+        QTRY_COMPARE(gap(), screen->property("leanBack").toBool() ? 4.0 : 2.0);
+
+        // The shadow is a layer effect where there are shaders to draw it:
+        // black at 0.7, one down. The picture behind is black, so pixels
+        // cannot tell a shadow from none; the effect's own values are
+        // checked instead.
+        if (!block->property("shadowed").toBool()) {
+            QSKIP("The shadow needs a GPU scene graph; the software one draws the block plain");
+        }
+        QVERIFY(QQmlProperty(block, QStringLiteral("layer.enabled")).read().toBool());
+        // The layer's effect item is a sibling the layer creates.
+        QObject *effect = nullptr;
+        for (QQuickItem *sibling : block->parentItem()->childItems()) {
+            if (sibling->objectName() == QLatin1String("playerTitleShadow")) {
+                effect = sibling;
+            }
+        }
+        QVERIFY(effect != nullptr);
+        // The layer must not swallow the text it shadows: the title still
+        // draws white pixels on the black picture.
+        QTest::qWait(500);
+        const QImage frame = env.window->grabWindow();
+        QVERIFY(!frame.isNull());
+        const qreal dpr = frame.devicePixelRatio();
+        const QPointF at = title->mapToScene(QPointF(0, 0));
+        int brightest = 0;
+        for (int y = int(at.y() * dpr); y < int((at.y() + title->height()) * dpr); ++y) {
+            for (int x = int(at.x() * dpr); x < int((at.x() + 120) * dpr); ++x) {
+                brightest = qMax(brightest, qGray(frame.pixel(x, y)));
+            }
+        }
+        QVERIFY2(brightest > 128, "The title block did not draw through its shadow layer");
+        QCOMPARE(effect->property("shadowEnabled").toBool(), true);
+        QCOMPARE(effect->property("shadowOpacity").toDouble(), 0.7);
+        QCOMPARE(effect->property("shadowVerticalOffset").toDouble(), 1.0);
+        QCOMPARE(effect->property("shadowColor").value<QColor>(), QColor(Qt::black));
+    }
+
+    // PlayerControlsOverlay.swift:517-522 formats a speed with %.2g.
+    void theSpeedLabelReadsAsTheReleasedFormat()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *screen = itemNamed(env.window, "playerScreen");
+        QVERIFY(screen != nullptr);
+        const auto label = [&](double speed) {
+            QVariant out;
+            [&] {
+                QVERIFY(QMetaObject::invokeMethod(screen, "speedLabel", Q_RETURN_ARG(QVariant, out),
+                                                  Q_ARG(QVariant, speed)));
+            }();
+            return out.toString();
+        };
+        QCOMPARE(label(0.5), QStringLiteral("0.5x"));
+        QCOMPARE(label(0.75), QStringLiteral("0.75x"));
+        QCOMPARE(label(1.0), QStringLiteral("1x"));
+        QCOMPARE(label(1.25), QStringLiteral("1.2x"));
+        QCOMPARE(label(1.5), QStringLiteral("1.5x"));
+        QCOMPARE(label(2.0), QStringLiteral("2x"));
+        QCOMPARE(label(3.0), QStringLiteral("3x"));
     }
 
     // PlayerView.swift:226-233: a failed player keeps its controls and its
