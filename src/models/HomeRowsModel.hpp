@@ -267,6 +267,8 @@ private:
     /// so a repair keeps both. A Home whose first target is elsewhere changes
     /// only this.
     void placeFirstTarget(QVector<int> rowLengths);
+    /// The row ids in order, for the navigator's memory of columns by row.
+    [[nodiscard]] QStringList currentRowIds() const;
     void setPlaySomethingFocused(bool focused);
     void setHeroSelected(bool selected);
     void syncHeroFocused();

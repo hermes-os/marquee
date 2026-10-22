@@ -33,10 +33,14 @@ void FocusNavigator::setRowLengths(const QVariantList &rowLengths)
     setRows(std::move(rows));
 }
 
-void FocusNavigator::setRows(QVector<int> rowLengths, int focusRow, int focusColumn)
+void FocusNavigator::setRows(QVector<int> rowLengths, int focusRow, int focusColumn,
+                             QStringList rowIds)
 {
     sanitizeRows(rowLengths);
-    const bool structural = m_rowLengths != rowLengths;
+    if (rowIds.size() != rowLengths.size()) {
+        rowIds.clear();
+    }
+    const bool structural = m_rowLengths != rowLengths || m_rowIds != rowIds;
     const bool placed = focusRow >= 0;
     if (!structural && !placed) {
         return;
@@ -46,11 +50,25 @@ void FocusNavigator::setRows(QVector<int> rowLengths, int focusRow, int focusCol
     const int previousColumn = m_column;
     if (structural) {
         const qsizetype previousSize = m_rememberedColumns.size();
-        m_rowLengths = std::move(rowLengths);
-        m_rememberedColumns.resize(m_rowLengths.size());
-        for (qsizetype index = previousSize; index < m_rememberedColumns.size(); ++index) {
-            m_rememberedColumns[index] = -1;
+        QVector<int> remembered(rowLengths.size(), -1);
+        if (!rowIds.isEmpty() && m_rowIds.size() == previousSize) {
+            // A surviving row keeps its column wherever it now sits; a new row
+            // has none.
+            for (qsizetype index = 0; index < rowIds.size(); ++index) {
+                const qsizetype old = m_rowIds.indexOf(rowIds.at(index));
+                if (old >= 0) {
+                    remembered[index] = m_rememberedColumns.at(old);
+                }
+            }
+        } else {
+            for (qsizetype index = 0; index < std::min<qsizetype>(previousSize, remembered.size());
+                 ++index) {
+                remembered[index] = m_rememberedColumns.at(index);
+            }
         }
+        m_rowLengths = std::move(rowLengths);
+        m_rowIds = std::move(rowIds);
+        m_rememberedColumns = std::move(remembered);
     }
     // The caller's target replaces the old position before it is reconciled
     // with the new rows, so one change is announced and a view never sees the

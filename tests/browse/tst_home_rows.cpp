@@ -616,9 +616,56 @@ private slots:
         QVERIFY(model.moveDown());
         QVERIFY(!model.heroFocused());
         QCOMPARE(model.focus()->row(), 0);
+        // Play Something was left on column 1 and Recently Watched, above it,
+        // is gone: the column stays with the row (HomeDetailView.swift:1115
+        // -1124 keys it by row id), not with the slot it sat in.
         QVERIFY(model.moveDown());
+        QCOMPARE(model.data(model.index(model.focus()->row()), HomeRowsModel::RowIdRole).toString(),
+                 QStringLiteral("play-something"));
+        QCOMPARE(model.focus()->column(), 1);
+    }
+
+    // A row that appears above keeps the others' columns too: Continue
+    // Watching arriving after a viewing must not hand Play Something the
+    // column of the row that now sits in its old slot.
+    void anInsertedRowKeepsTheRememberedColumnsOfTheOthers()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kNow; });
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021)});
+        const auto rowIndex = [&model](const QString &id) {
+            for (int index = 0; index < model.rowCount(); ++index) {
+                if (model.data(model.index(index), HomeRowsModel::RowIdRole).toString() == id) {
+                    return index;
+                }
+            }
+            return -1;
+        };
+        const auto focusedRowId = [&model] {
+            return model.data(model.index(model.focus()->row()), HomeRowsModel::RowIdRole).toString();
+        };
+        const int playSomething = rowIndex(QStringLiteral("play-something"));
+        QVERIFY(playSomething >= 0);
+        QCOMPARE(rowIndex(QStringLiteral("continue-watching")), -1);
+        const int otherRow = playSomething + 1;
+        QVERIFY(otherRow < model.rowCount());
+        const QString otherId = model.data(model.index(otherRow), HomeRowsModel::RowIdRole).toString();
+        // Off the hero, so Up and Down walk the rows.
         QVERIFY(model.moveDown());
-        QCOMPARE(model.focus()->row(), 2);
+        QVERIFY(!model.heroFocused());
+        model.focus()->setPosition(playSomething, 1);
+        model.focus()->setPosition(otherRow, 0);
+
+        // Starting Arrival inserts Continue Watching above Play Something.
+        model.applyWatchProgress(QStringLiteral("root/Arrival"), 600'000, 7'200'000, false);
+        const int shifted = rowIndex(QStringLiteral("play-something"));
+        QVERIFY(shifted > playSomething);
+        QCOMPARE(focusedRowId(), otherId);
+        QCOMPARE(model.focus()->column(), 0);
+
+        QVERIFY(model.moveUp());
+        QCOMPARE(model.focus()->row(), shifted);
         QCOMPARE(model.focus()->column(), 1);
     }
 

@@ -680,6 +680,16 @@ void HomeRowsModel::resetFocus()
     m_hero.moveTo(0);
 }
 
+QStringList HomeRowsModel::currentRowIds() const
+{
+    QStringList ids;
+    ids.reserve(m_rows.size());
+    for (const RowSlot &row : m_rows) {
+        ids.push_back(row.id);
+    }
+    return ids;
+}
+
 void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
 {
     const auto firstNonEmpty = std::find_if(rowLengths.cbegin(), rowLengths.cend(),
@@ -688,7 +698,7 @@ void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
         ? -1
         : static_cast<int>(std::distance(rowLengths.cbegin(), firstNonEmpty));
     // One placed call, so the move to the first target is one announcement.
-    m_focus.setRows(std::move(rowLengths), firstRow, 0);
+    m_focus.setRows(std::move(rowLengths), firstRow, 0, currentRowIds());
     // With a hero the first target is its first item: Home's focus starts
     // there (HomeDetailView.swift:21) and the repair sends a lost row's
     // remote there (:1128-1130). `heroFocused` needs a hero to be shown, so
@@ -893,7 +903,7 @@ void HomeRowsModel::recompose()
         rowLengths.push_back(row.cards->rowCount());
     }
     if (focusedRowId.isEmpty()) {
-        m_focus.setRows(std::move(rowLengths));
+        m_focus.setRows(std::move(rowLengths), -1, 0, currentRowIds());
         return;
     }
     const auto found = std::find_if(m_rows.cbegin(), m_rows.cend(), [&focusedRowId](const RowSlot &row) {
@@ -918,5 +928,6 @@ void HomeRowsModel::recompose()
         }
     }
     m_focus.setRows(std::move(rowLengths),
-                    static_cast<int>(std::distance(m_rows.cbegin(), found)), column);
+                    static_cast<int>(std::distance(m_rows.cbegin(), found)), column,
+                    currentRowIds());
 }

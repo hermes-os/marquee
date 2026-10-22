@@ -108,6 +108,35 @@ private slots:
         QCOMPARE(navigator.row(), 1);
         QCOMPARE(navigator.column(), 0);
     }
+
+    void rememberedColumnsFollowTheirRowIdsAndResetForgetsThem()
+    {
+        FocusNavigator navigator;
+        navigator.setRows({3, 4, 5}, -1, 0, {"a", "b", "c"});
+        navigator.setPosition(1, 3);
+        navigator.setPosition(2, 4);
+        navigator.setPosition(0, 0);
+
+        // "a" vanishes: "b" and "c" slide up and keep their own columns.
+        navigator.setRows({4, 5}, 0, 3, {"b", "c"});
+        QVERIFY(navigator.moveDown());
+        QCOMPARE(navigator.column(), 4);
+        QVERIFY(navigator.moveUp());
+        QCOMPARE(navigator.column(), 3);
+
+        // "n" appears above: "c" is still where it was left, "n" has nothing.
+        navigator.setRows({2, 4, 5}, 1, 3, {"n", "b", "c"});
+        QVERIFY(navigator.moveDown());
+        QCOMPARE(navigator.column(), 4);
+        QVERIFY(navigator.moveUp());
+        QVERIFY(navigator.moveUp());
+        QCOMPARE(navigator.column(), 1);
+
+        navigator.reset();
+        QVERIFY(navigator.moveDown());
+        QVERIFY(navigator.moveDown());
+        QCOMPARE(navigator.column(), 0);
+    }
 };
 
 QTEST_MAIN(FocusNavigatorTest)

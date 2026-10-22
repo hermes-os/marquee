@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QObject>
+#include <QStringList>
 #include <QVector>
 #include <QVariant>
 #include <QtQml/qqmlregistration.h>
@@ -26,7 +27,12 @@ public:
     /// Replaces the row lengths. A non-negative `focusRow` also moves the
     /// remote to that row and column (clamped to the new rows) in the same
     /// announcement, for a model that knows where the card it rests on went.
-    void setRows(QVector<int> rowLengths, int focusRow = -1, int focusColumn = 0);
+    /// With `rowIds` (one per row) the columns the remote remembers follow
+    /// their rows by id, so a row that vanishes or appears above a survivor
+    /// does not hand the survivor another row's column
+    /// (HomeDetailView.swift keys preferredGridColumnByContainer by row id).
+    void setRows(QVector<int> rowLengths, int focusRow = -1, int focusColumn = 0,
+                 QStringList rowIds = {});
 
     Q_INVOKABLE bool moveLeft();
     Q_INVOKABLE bool moveRight();
@@ -54,6 +60,7 @@ private:
 
     QVector<int> m_rowLengths;
     QVector<int> m_rememberedColumns;
+    QStringList m_rowIds;
     int m_row{0};
     int m_column{0};
 };
