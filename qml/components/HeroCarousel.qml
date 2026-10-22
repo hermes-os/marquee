@@ -467,18 +467,6 @@ Item {
                                     font.weight: Font.DemiBold
                                 }
                             }
-
-                            TapHandler {
-                                onTapped: {
-                                    root.pointerTouched()
-                                    root.playRequested(card.spotlight)
-                                }
-                            }
-
-                            Accessible.name: qsTr("Watch %1").arg(
-                                card.known ? card.spotlight.title : "")
-                            Accessible.description: qsTr("Start playback")
-                            Accessible.role: Accessible.Button
                         }
                     }
                 }
@@ -507,6 +495,33 @@ Item {
                 visible: card.gpu
                 maskEnabled: true
                 maskSource: mask
+            }
+
+            // :324-376's Watch Now button takes the tap here, not in `content`.
+            // On a GPU scene graph `content` is hidden and drawn through the
+            // masked effect above, and Qt delivers no pointer event to an item
+            // that is not visible, so a handler inside it never hears the
+            // click. This item covers the drawn button; `content` and the card
+            // share an origin.
+            Item {
+                objectName: "heroWatchNowHit"
+
+                visible: card.isCenter && card.revealed
+                x: textBlock.x + watchNow.x
+                y: textBlock.y + watchNow.y
+                width: watchNow.width
+                height: watchNow.height
+
+                TapHandler {
+                    onTapped: {
+                        root.pointerTouched()
+                        root.playRequested(card.spotlight)
+                    }
+                }
+
+                Accessible.name: qsTr("Watch %1").arg(card.known ? card.spotlight.title : "")
+                Accessible.description: qsTr("Start playback")
+                Accessible.role: Accessible.Button
             }
 
             // :350-355: the ring, drawn inside the card's edge.

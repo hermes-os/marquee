@@ -481,12 +481,27 @@ private slots:
         const QString expected = rows->hero()->current().value(QStringLiteral("mediaId")).toString();
         QQuickItem *watch = nullptr;
         QQuickItem *front = nullptr;
+        // The strip has finished sliding: a card is "in front" from half a
+        // slide away, and a click aimed at one still moving misses it.
         QTRY_VERIFY((front = centerCard(shell)) != nullptr
+                    && homeHero->property("scrollPosition").toReal() == rows->hero()->position()
                     && front->property("logical").toInt() == rows->hero()->position()
                     && firstNamed(front, QStringLiteral("heroWatchNow")) != nullptr);
         watch = firstNamed(front, QStringLiteral("heroWatchNow"));
         QVERIFY(watch != nullptr);
-        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, centreOf(watch));
+        // The button joins the card's text column when the card reaches the
+        // front, and the column lays it out on the next frame: until then the
+        // button is reported a line above where it is drawn and a click aimed
+        // at it lands beside it. A frame later its place has not moved.
+        QPoint at;
+        QTRY_VERIFY([&] {
+            const QPoint before = centreOf(watch);
+            QSignalSpy swapped(shell.window, &QQuickWindow::frameSwapped);
+            swapped.wait(100);
+            at = centreOf(watch);
+            return at == before;
+        }());
+        QTest::mouseClick(shell.window, Qt::LeftButton, Qt::NoModifier, at);
         QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Player);
         QCOMPARE(shell.controller->player()->mediaId(), expected);
     }
