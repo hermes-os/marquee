@@ -6,6 +6,9 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Choosing the same profile again while a profile switch is still loading no
+  longer cancels Home's restart at its top card. Before, the second choice
+  cleared it and the profile's own rows then arrived above the remote.
 - Switching profile while a library scan is running no longer snaps Home to
   its top card when the scan finishes. Home restarts at its first target only
   while the profile picker is still leaving or the remote has not moved on Home

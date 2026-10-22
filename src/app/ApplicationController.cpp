@@ -541,8 +541,10 @@ bool ApplicationController::chooseProfile(const QString &profileId)
         m_homeRows.resetFocus();
     }
     // A different profile's progress arrives with the reloaded projection and
-    // reshapes Home's rows; that projection restarts Home's focus again.
-    m_homeRestartPending = profileSwitched;
+    // reshapes Home's rows; that projection restarts Home's focus again. A
+    // second choice while that reload is in flight leaves it pending: the
+    // remote has not moved, and the reload has not landed.
+    m_homeRestartPending = m_homeRestartPending || profileSwitched;
     qCInfo(logApp) << "profile selected id=" << profile->id
                    << "maturity=" << profile->maturityLevel;
 

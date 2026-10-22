@@ -665,6 +665,76 @@ private slots:
         QCOMPARE(home->cardAt(1, 0).value(QStringLiteral("mediaId")).toString(), top);
     }
 
+    // Choosing the same profile again while the switch's reload is in flight
+    // leaves the restart pending: the viewer has not moved, and the reload has
+    // not landed.
+    void choosingTheSameProfileAgainKeepsTheRestartPending()
+    {
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(seedMovies(movies.path(), 4));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        SwitchFixture fixture;
+        QVERIFY(prepareSwitch(controller, window, fixture));
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+        QTRY_VERIFY(!controller.scanning());
+        fixture.watched = home->cardAt(0, 1).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!fixture.watched.isEmpty()
+                && fixture.watched != home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString());
+        {
+            CatalogStore store(AppPaths::catalogFile());
+            store.recordWatchProgress(fixture.second, fixture.watched, 600'000, 3'600'000, false);
+        }
+
+        QSemaphore refreshEntered;
+        QSemaphore releaseRefresh;
+        const QMetaObject::Connection gate = QObject::connect(
+            &controller, &ApplicationController::catalogRefreshStarted, &controller,
+            [&] {
+                refreshEntered.release();
+                releaseRefresh.acquire();
+            },
+            Qt::DirectConnection);
+        const auto releaseGate = qScopeGuard([&] {
+            QObject::disconnect(gate);
+            releaseRefresh.release(2);
+        });
+        controller.requestCatalogRefresh();
+        QVERIFY2(refreshEntered.tryAcquire(1, 5000), "the refresh did not reach its gate");
+
+        chooseSecondProfile(window, controller, fixture.second);
+        // The same profile again, with the reload still queued and the remote
+        // untouched. The picker opens on the active profile.
+        controller.switchProfile();
+        QQuickItem *reopened = pickerOf(window);
+        QVERIFY(reopened != nullptr);
+        QTRY_VERIFY(reopened->hasActiveFocus());
+        QCOMPARE(focusProfileId(reopened), fixture.second);
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        QCOMPARE(home->focus()->row(), 0);
+        QCOMPARE(home->focus()->column(), 0);
+
+        releaseRefresh.release();
+        QTRY_COMPARE(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString(), fixture.watched);
+        QTRY_VERIFY(!controller.scanning());
+        QCOMPARE(home->focus()->row(), 0);
+        QCOMPARE(home->focus()->column(), 0);
+        QVERIFY(!home->playSomethingFocused());
+    }
+
     // The profile choice resets Home's focus on the previous profile's
     // projection; the chosen profile's own projection then adds a Continue
     // Watching row above, and the first Return must still open the top card.
