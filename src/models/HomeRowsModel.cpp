@@ -593,6 +593,17 @@ void HomeRowsModel::focusCard(int row, int column)
 void HomeRowsModel::resetFocus()
 {
     setPlaySomethingFocused(false);
+    QVector<int> rowLengths;
+    rowLengths.reserve(m_rows.size());
+    for (const RowSlot &row : std::as_const(m_rows)) {
+        rowLengths.push_back(row.cards->rowCount());
+    }
+    placeFirstTarget(std::move(rowLengths));
+}
+
+void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
+{
+    m_focus.setRows(std::move(rowLengths));
     m_focus.reset();
 }
 
@@ -773,16 +784,8 @@ void HomeRowsModel::recompose()
     if (found == m_rows.cend()) {
         // The row the remote rested on is gone. The oracle's repair
         // (HomeFocusContentPolicy.repair, :1128-1134) sends focus to the first
-        // card of the first row that has one, and so does this; Home has no
-        // hero to prefer.
-        const auto first = std::find_if(m_rows.cbegin(), m_rows.cend(), [](const RowSlot &row) {
-            return row.cards->rowCount() > 0;
-        });
-        m_focus.setRows(std::move(rowLengths),
-                        first == m_rows.cend()
-                            ? 0
-                            : static_cast<int>(std::distance(m_rows.cbegin(), first)),
-                        0);
+        // card of the first row that has one, and so does this.
+        placeFirstTarget(std::move(rowLengths));
         return;
     }
     // The same card where the row still holds it; otherwise the column it was

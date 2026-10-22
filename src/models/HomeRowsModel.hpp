@@ -189,8 +189,9 @@ public:
     /// Home's first focus target: the remote off the capsule, on the first
     /// card of the first row, with no column remembered for any row. A profile
     /// choice rebuilds Home at the top (ContentView.swift:391-407), so what
-    /// the last viewer left focused is not carried over. The one place that
-    /// names the first target, so a Home that starts elsewhere changes it here.
+    /// the last viewer left focused is not carried over. Both this and the
+    /// repair after a recomposition lose their row go through
+    /// `placeFirstTarget`, the one function that names the first target.
     Q_INVOKABLE void resetFocus();
     /// The ids one press of Play Something may play, best first: a fresh
     /// shuffle of the unwatched movies the profile may see (AppState.swift:
@@ -236,6 +237,11 @@ private:
     };
 
     void recompose();
+    /// Home's first focus target, named once: the first card of the first row
+    /// that has one, no column remembered for any row. Whether the capsule
+    /// holds the remote is the caller's, so a repair keeps it. A Home whose
+    /// first target is elsewhere changes only this.
+    void placeFirstTarget(QVector<int> rowLengths);
     void setPlaySomethingFocused(bool focused);
     [[nodiscard]] HomeCardModel *cardModelFor(const QString &rowId);
     [[nodiscard]] QDateTime now() const;
