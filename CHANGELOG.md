@@ -13,8 +13,10 @@ intermediate version bump.
   exactly to the landing time and puts `hr-seek` back to `absolute`. Cancelling
   the hold (a menu opening, Media Stop, the player closing, a new file, a lost
   render surface) restores the seek mode and puts the picture back where the
-  hold began. The watch-progress position never takes a preview time, only the
-  landing.
+  hold began. After a release the clock and progress bar go to the landing and
+  stay there (on a film with a long keyframe interval they briefly jumped back
+  to a preview's keyframe time), and the watch-progress position and the
+  next-episode card never take a preview time, only the landing.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the
