@@ -38,13 +38,15 @@ namespace tmdb
 /// with a `year`, a result released in that year whose normalized title the
 /// query begins with, followed by a space ("Star Trek" for "Star Trek The
 /// Original Series"), matches; "Us" does not match "Between Us Girls".
+/// `prefixPass` false leaves that last pass out.
 /// Titles count as equal, or as holding the words, when either their joined or
 /// their unjoined initials do.
 [[nodiscard]] std::optional<int> bestMatch(const QJsonArray &results,
                                            const QString &query,
                                            const QString &titleKey,
                                            const QString &dateKey = {},
-                                           int year = 0);
+                                           int year = 0,
+                                           bool prefixPass = true);
 
 /// The results whose `dateKey` ("release_date", "first_air_date") names a year
 /// within `tolerance` of `year`. A result with no readable date is dropped.

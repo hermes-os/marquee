@@ -530,6 +530,46 @@ private slots:
         QCOMPARE(transport.count(), 2);
     }
 
+    void aTitleTheNameOnlyBeginsWithWaitsForTheSearchWithoutTheYear()
+    {
+        // The year search lists only "Star Trek"; the search without the year
+        // lists an equal title one year off, which is the better answer.
+        FakeTransport transport([](const QUrl &url) {
+            if (!FakeTransport::queryValue(url, QStringLiteral("first_air_date_year")).isEmpty()) {
+                return FakeTransport::json(QByteArrayLiteral(
+                    R"({"results":[{"id":253,"name":"Star Trek","first_air_date":"1966-09-08"}]})"));
+            }
+            return FakeTransport::json(QByteArrayLiteral(
+                R"({"results":[{"id":254,"name":"Star Trek The Original Series","first_air_date":"1967-01-01"}]})"));
+        });
+        MetadataClient client(transport, fastConfig());
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findShow(QStringLiteral("Star Trek The Original Series"), 1966,
+                        [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY(answer.has_value());
+        QCOMPARE(answer->value, 254);
+        QCOMPARE(transport.count(), 2);
+    }
+
+    void aTitleTheNameOnlyBeginsWithIsUsedWhenTheSearchWithoutTheYearFindsNothing()
+    {
+        FakeTransport transport([](const QUrl &url) {
+            if (!FakeTransport::queryValue(url, QStringLiteral("first_air_date_year")).isEmpty()) {
+                return FakeTransport::json(QByteArrayLiteral(
+                    R"({"results":[{"id":253,"name":"Star Trek","first_air_date":"1966-09-08"}]})"));
+            }
+            return FakeTransport::json(QByteArrayLiteral(R"({"results":[]})"));
+        });
+        MetadataClient client(transport, fastConfig());
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findShow(QStringLiteral("Star Trek The Original Series"), 1966,
+                        [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY(answer.has_value());
+        QCOMPARE(answer->status, MetadataClient::Status::Ok);
+        QCOMPARE(answer->value, 253);
+        QCOMPARE(transport.count(), 2);
+    }
+
     void aHugeRetryAfterIsCappedWithoutOverflowing()
     {
         int calls = 0;

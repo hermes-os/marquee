@@ -118,6 +118,7 @@ private:
                 const QString &title,
                 int year,
                 bool yearInQuery,
+                std::optional<int> prefixMatch,
                 std::function<void(Result<int>)> done);
     void send(const QUrl &url, int attempt, std::function<void(HttpReply)> done);
     void afterPacing(std::function<void()> action);

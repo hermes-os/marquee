@@ -143,14 +143,15 @@ void MetadataClient::getJson(const QString &path, const Query &query,
 }
 
 void MetadataClient::search(const SearchKind &kind, const QString &title, int year,
-                            bool yearInQuery, std::function<void(Result<int>)> done)
+                            bool yearInQuery, std::optional<int> prefixMatch,
+                            std::function<void(Result<int>)> done)
 {
     Query query{{QStringLiteral("query"), title}};
     if (yearInQuery && year > 0) {
         query.push_back({kind.yearParameter, QString::number(year)});
     }
     getJson(kind.path, query,
-            [this, kind, title, year, yearInQuery, done = std::move(done)](JsonOutcome outcome) mutable {
+            [this, kind, title, year, yearInQuery, prefixMatch, done = std::move(done)](JsonOutcome outcome) mutable {
                 if (outcome.status != Status::Ok) {
                     done({outcome.status, 0});
                     return;
@@ -161,12 +162,26 @@ void MetadataClient::search(const SearchKind &kind, const QString &title, int ye
                 const QJsonArray candidates = yearInQuery
                     ? results
                     : tmdb::resultsNearYear(results, kind.dateKey, year, 1);
-                if (const std::optional<int> match = tmdb::bestMatch(candidates, title, kind.titleKey, kind.dateKey, year)) {
+                // A title the file's name merely begins with (`Star Trek` for
+                // `Star Trek The Original Series`) is the last resort: the
+                // search without the year can still find an equal title one
+                // year off, which is a better answer.
+                const bool canSearchAgain = yearInQuery && year > 0;
+                if (const std::optional<int> match = tmdb::bestMatch(candidates, title, kind.titleKey, kind.dateKey,
+                                                                     year, !canSearchAgain)) {
                     done({Status::Ok, *match});
                     return;
                 }
-                if (yearInQuery && year > 0) {
-                    search(kind, title, year, false, std::move(done));
+                const std::optional<int> prefix = prefixMatch
+                    ? prefixMatch
+                    : (canSearchAgain ? tmdb::bestMatch(candidates, title, kind.titleKey, kind.dateKey, year)
+                                      : std::nullopt);
+                if (canSearchAgain) {
+                    search(kind, title, year, false, prefix, std::move(done));
+                    return;
+                }
+                if (prefix) {
+                    done({Status::Ok, *prefix});
                     return;
                 }
                 qCInfo(logMetadata) << "no matching TMDB result for a title";
@@ -179,7 +194,7 @@ void MetadataClient::findMovie(const QString &title, int year,
 {
     search({QStringLiteral("/search/movie"), QStringLiteral("year"), QStringLiteral("title"),
             QStringLiteral("release_date")},
-           title, year, true, std::move(done));
+           title, year, true, std::nullopt, std::move(done));
 }
 
 void MetadataClient::findShow(const QString &title, int year,
@@ -187,7 +202,7 @@ void MetadataClient::findShow(const QString &title, int year,
 {
     search({QStringLiteral("/search/tv"), QStringLiteral("first_air_date_year"),
             QStringLiteral("name"), QStringLiteral("first_air_date")},
-           title, year, true, std::move(done));
+           title, year, true, std::nullopt, std::move(done));
 }
 
 void MetadataClient::movieDetails(int tmdbId, std::function<void(Result<TitleMetadata>)> done)

@@ -193,7 +193,8 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
                                    const QString &query,
                                    const QString &titleKey,
                                    const QString &dateKey,
-                                   int year)
+                                   int year,
+                                   bool prefixPass)
 {
     const QString queryNormalized = normalizeTitle(query);
     const QSet<QString> queryWords = wordsOf(queryNormalized);
@@ -269,7 +270,7 @@ std::optional<int> tmdb::bestMatch(const QJsonArray &results,
     // of all, with nothing else found, a result released in the file's year
     // whose title the query begins with is that title. The released app has
     // no such pass.
-    if (year > 0 && !dateKey.isEmpty()) {
+    if (prefixPass && year > 0 && !dateKey.isEmpty()) {
         for (const QJsonValue &value : results) {
             const QJsonObject result = value.toObject();
             const auto id = resultId(result);
