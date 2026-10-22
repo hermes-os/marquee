@@ -25,6 +25,7 @@ intermediate version bump.
   Ratings, taste, genres, and online artwork are not in the catalog, so those
   terms of the released selection are left out (see `issues.md`). The next
   scan of an existing library picks up a movie's backdrop; no migration.
+  A click on Watch Now reaches the button when the window is drawn by the GPU.
 - A few unreadable files no longer empty the whole library. A file the drive
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the
