@@ -1643,6 +1643,34 @@ private slots:
         QVERIFY(!rowIds(rows).contains(QStringLiteral("recently-watched")));
     }
 
+    // The player route is what holds the hero: a viewing recorded while it is
+    // up changes the rows at once and the hero once, when the player closes.
+    void theHeroWaitsForThePlayerToCloseBeforeItRebuilds()
+    {
+        Shell shell;
+        writeThreeMovies(shell);
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_COMPARE(rows->hero()->count(), 3);
+        const QString id = shell.seeded.idOf(QStringLiteral("Coco"));
+        QVERIFY(!id.isEmpty());
+
+        shell.controller->playMediaId(id, false);
+        QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Player);
+        const int builds = rows->heroBuildCountForTest();
+        // Each pause records the position, as the ten-second cadence does.
+        for (int tick = 1; tick <= 4; ++tick) {
+            shell.controller->player()->reportPlayback(tick * 600.0, 3600.0, true);
+            shell.controller->player()->reportPlayback(tick * 600.0 + 1.0, 3600.0, false);
+        }
+        QTRY_COMPARE(rowIdAt(rows, 0), QStringLiteral("continue-watching"));
+        QCOMPARE(rows->heroBuildCountForTest(), builds);
+
+        shell.controller->navigation()->goHome();
+        QTRY_COMPARE(shell.controller->navigation()->route(), NavigationController::Route::Home);
+        QCOMPARE(rows->heroBuildCountForTest(), builds + 1);
+    }
+
     void aViewingRecordedInThePlayerMovesTheShowIntoContinueWatching()
     {
         Shell shell;

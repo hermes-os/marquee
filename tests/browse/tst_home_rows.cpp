@@ -87,6 +87,11 @@ void watched(MediaItem &item, const QDateTime &playedAt)
     return result;
 }
 
+[[nodiscard]] QString rowIdAt(HomeRowsModel *rows, int row)
+{
+    return rows->data(rows->index(row), HomeRowsModel::RowIdRole).toString();
+}
+
 [[nodiscard]] const home_rows::Row *rowNamed(const QVector<home_rows::Row> &rows, const QString &id)
 {
     for (const home_rows::Row &row : rows) {
@@ -749,6 +754,47 @@ private slots:
         QVERIFY(!model.heroFocused());
         QCOMPARE(model.focus()->row(), 0);
         QCOMPARE(model.focus()->column(), 2);
+    }
+
+    // The hero's sort ran on the GUI thread for every ten-second progress
+    // record during playback, for a hero nobody can see. It is built once when
+    // the player closes, from everything that changed meanwhile.
+    void theHeroIsNotRebuiltWhileThePlayerIsUpAndOnceWhenItCloses()
+    {
+        HomeRowsModel model;
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021)});
+        QCOMPARE(model.hero()->count(), 3);
+        const int builds = model.heroBuildCountForTest();
+
+        // Opening the player changes nothing.
+        model.setPlayerActive(true);
+        QCOMPARE(model.heroBuildCountForTest(), builds);
+
+        for (int tick = 1; tick <= 6; ++tick) {
+            model.applyWatchProgress(QStringLiteral("root/Coco"), tick * 10'000, 3'600'000, false);
+        }
+        QCOMPARE(model.heroBuildCountForTest(), builds);
+        // The rows still follow the viewing.
+        QCOMPARE(rowIdAt(&model, 0), QStringLiteral("continue-watching"));
+
+        // A library that changes under the player is held for the close too.
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017)});
+        QCOMPARE(model.heroBuildCountForTest(), builds);
+        QCOMPARE(model.hero()->count(), 3);
+
+        model.setPlayerActive(false);
+        QCOMPARE(model.heroBuildCountForTest(), builds + 1);
+        QCOMPARE(model.hero()->count(), 2);
+
+        // A player that opened and closed with nothing recorded rebuilds nothing.
+        model.setPlayerActive(true);
+        model.setPlayerActive(false);
+        QCOMPARE(model.heroBuildCountForTest(), builds + 1);
+
+        // Out of the player, a record is a change like any other.
+        model.applyWatchProgress(QStringLiteral("root/Coco"), 90'000, 3'600'000, false);
+        QCOMPARE(model.heroBuildCountForTest(), builds + 2);
     }
 
     // The title bar, and the capsule in it, is hidden while the library holds

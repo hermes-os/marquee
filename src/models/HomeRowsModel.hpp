@@ -216,6 +216,13 @@ public:
     /// that tapped a card rather than moved the remote to it.
     [[nodiscard]] Q_INVOKABLE QVariantMap cardForId(int row, const QString &mediaId) const;
 
+    /// While the player is up the hero is not rebuilt: it is not on screen, and
+    /// its sort would run on the GUI thread for every progress record. It is
+    /// rebuilt once, from the then-current items, when the player closes.
+    void setPlayerActive(bool active);
+    /// How many times the hero has been built from the items, for tests.
+    [[nodiscard]] int heroBuildCountForTest() const;
+
     /// Replaces the clock the idle window reads, for tests.
     void setClockForTest(std::function<QDateTime()> clock);
     /// Replaces the source of the shuffle salt a press draws, for tests.
@@ -245,6 +252,7 @@ private:
     };
 
     void recompose();
+    void rebuildHero();
     void setPlaySomethingFocused(bool focused);
     void setHeroSelected(bool selected);
     void syncHeroFocused();
@@ -266,4 +274,7 @@ private:
     // (:21); it only takes effect while a spotlight exists.
     bool m_heroSelected{true};
     bool m_heroFocusedShown{false};
+    bool m_playerActive{false};
+    bool m_heroStale{false};
+    int m_heroBuilds{0};
 };

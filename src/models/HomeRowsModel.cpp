@@ -737,10 +737,37 @@ HomeCardModel *HomeRowsModel::cardModelFor(const QString &rowId)
     return model;
 }
 
+void HomeRowsModel::setPlayerActive(bool active)
+{
+    if (m_playerActive == active) {
+        return;
+    }
+    m_playerActive = active;
+    if (!active && m_heroStale) {
+        rebuildHero();
+    }
+}
+
+int HomeRowsModel::heroBuildCountForTest() const
+{
+    return m_heroBuilds;
+}
+
+void HomeRowsModel::rebuildHero()
+{
+    m_heroStale = false;
+    ++m_heroBuilds;
+    m_hero.replaceSpotlights(hero_spotlight::build(m_items, now()));
+}
+
 void HomeRowsModel::recompose()
 {
     QVector<home_rows::Row> composed = home_rows::compose(m_items, now());
-    m_hero.replaceSpotlights(hero_spotlight::build(m_items, now()));
+    if (m_playerActive) {
+        m_heroStale = true;
+    } else {
+        rebuildHero();
+    }
 
     // The remote follows the card it rests on, not its row and column number:
     // a row inserted above it would otherwise hand it a different title.

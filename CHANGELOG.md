@@ -30,7 +30,9 @@ intermediate version bump.
   The carousel also stops advancing while the window is minimized or hidden.
   On a GPU-drawn window the hero shares one rounded mask between its cards and
   skips the blurred-poster pass once a backdrop covers it, which takes about
-  half the full-size layers and effects off each frame.
+  half the full-size layers and effects off each frame. While a film plays,
+  Home no longer re-sorts its hero on every progress save; it is built once
+  when the player closes.
   The title bar takes its own clicks, hover and drags: a hero arrow, dot or
   card scrolled under it no longer moves the carousel, takes the remote or
   scrolls the page.

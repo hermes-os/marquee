@@ -114,9 +114,13 @@ ApplicationController::ApplicationController(QObject *parent)
     // Leaving the player is the end of a viewing, whether the film finished or
     // the viewer walked out of it.
     connect(&m_navigation, &NavigationController::routeChanged, this, [this] {
-        if (m_navigation.route() != NavigationController::Route::Player) {
+        const bool playing = m_navigation.route() == NavigationController::Route::Player;
+        if (!playing) {
             m_player.endSession();
         }
+        // After endSession, so the viewing it records is in the one hero
+        // rebuild that follows the player's close.
+        m_homeRows.setPlayerActive(playing);
     });
 
     try {
