@@ -72,7 +72,8 @@ SettingsStore::SettingsStore(QObject *parent)
             QStringLiteral("ui/leanBackMode"), true).toBool();
         m_interfaceSounds = settings.value(
             QStringLiteral("audio/interfaceSounds"), true).toBool();
-        // UserSettings.swift:182 seeds a fresh install with the switch on.
+        // UserSettings.swift:182 seeds the switch on; here it is on for any
+        // settings that never stored a choice, not only for a new install.
         m_onlineMetadataEnabled = settings.value(
             QStringLiteral("metadata/onlineEnabled"), true).toBool();
         m_hardwareDecodingEnabled = settings.value(

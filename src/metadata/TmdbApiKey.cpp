@@ -69,13 +69,3 @@ QString tmdb_key::masked(const QUrl &url)
     copy.setQuery(query);
     return copy.toString(QUrl::FullyEncoded);
 }
-
-QString tmdb_key::scrub(const QString &text, const QString &key)
-{
-    if (key.isEmpty()) {
-        return text;
-    }
-    QString result = text;
-    result.replace(key, QStringLiteral("***"));
-    return result;
-}

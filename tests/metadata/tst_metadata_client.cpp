@@ -714,10 +714,6 @@ private slots:
         QVERIFY(masked.contains(QStringLiteral("api_key=***")));
         QVERIFY(masked.contains(QStringLiteral("append_to_response=credits")));
         QVERIFY(masked.contains(QStringLiteral("/3/movie/9001")));
-
-        QCOMPARE(tmdb_key::scrub(QStringLiteral("GET ?api_key=%1 failed").arg(kFakeKey), kFakeKey),
-                 QStringLiteral("GET ?api_key=*** failed"));
-        QCOMPARE(tmdb_key::scrub(QStringLiteral("nothing here"), QString()), QStringLiteral("nothing here"));
     }
 
     void noLogLineOfAFailingRequestHoldsTheKey()

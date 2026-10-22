@@ -31,6 +31,4 @@ inline constexpr const char *environmentVariable = "MARQUEE_TMDB_API_KEY";
 
 /// `url` with the `api_key` value replaced, for logs and diagnostics.
 [[nodiscard]] QString masked(const QUrl &url);
-/// `text` with every occurrence of `key` replaced; a no-op for an empty key.
-[[nodiscard]] QString scrub(const QString &text, const QString &key);
 }
