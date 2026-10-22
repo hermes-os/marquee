@@ -116,6 +116,8 @@ qt_add_qml_module(marquee_core
 
         src/models/BrowseSemantics.hpp
         src/models/BrowseSemantics.cpp
+        src/models/HeroSpotlight.hpp
+        src/models/HeroSpotlight.cpp
         src/models/HomeRowsModel.hpp
         src/models/HomeRowsModel.cpp
         src/models/LibraryModel.hpp

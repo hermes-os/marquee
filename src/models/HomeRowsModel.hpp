@@ -14,6 +14,7 @@
 #include <functional>
 
 #include "catalog/MediaItem.hpp"
+#include "models/HeroSpotlight.hpp"
 #include "navigation/FocusNavigator.hpp"
 
 /// The rules behind Home's titled rows, as plain functions over projected
@@ -150,6 +151,14 @@ class HomeRowsModel final : public QAbstractListModel
     Q_OBJECT
 
     Q_PROPERTY(FocusNavigator *focus READ focus CONSTANT)
+    /// The hero carousel above the rows (HomeDetailView.swift:202-203).
+    Q_PROPERTY(HeroSpotlightModel *hero READ hero CONSTANT)
+    /// True while the remote rests on the hero, which is where Home's focus
+    /// starts (HomeDetailView.swift:21) and where the first row's Up leads
+    /// (:47-77). False when the library has no spotlight, and while the
+    /// capsule or a card holds the remote. While it is true no card is
+    /// focused.
+    Q_PROPERTY(bool heroFocused READ heroFocused NOTIFY heroFocusedChanged)
     /// True while the remote rests on the Play Something capsule in the title
     /// bar, which the released focus tree puts above the rows
     /// (HomeDetailView.swift:47, :1056). While it is true no card is focused.
@@ -173,6 +182,8 @@ public:
     [[nodiscard]] QHash<int, QByteArray> roleNames() const override;
 
     [[nodiscard]] FocusNavigator *focus();
+    [[nodiscard]] HeroSpotlightModel *hero();
+    [[nodiscard]] bool heroFocused() const;
     [[nodiscard]] bool playSomethingFocused() const;
 
     /// The remote's moves over the capsule and the rows as one vertical tree
@@ -184,8 +195,11 @@ public:
     Q_INVOKABLE bool moveDown();
     Q_INVOKABLE bool moveLeft();
     Q_INVOKABLE bool moveRight();
-    /// Puts the remote on a card a pointer touched, off the capsule.
+    /// Puts the remote on a card a pointer touched, off the capsule and the
+    /// hero.
     Q_INVOKABLE void focusCard(int row, int column);
+    /// Puts the remote on the hero a pointer touched.
+    Q_INVOKABLE void focusHero();
     /// The ids one press of Play Something may play, best first: a fresh
     /// shuffle of the unwatched movies the profile may see (AppState.swift:
     /// 238-247). Empty when there is none. It plays nothing itself.
@@ -209,6 +223,7 @@ public:
 
 signals:
     void playSomethingFocusedChanged();
+    void heroFocusedChanged();
 
 public slots:
     /// Recomposes the rows from the projection the active profile may see.
@@ -231,10 +246,13 @@ private:
 
     void recompose();
     void setPlaySomethingFocused(bool focused);
+    void setHeroSelected(bool selected);
+    void syncHeroFocused();
     [[nodiscard]] HomeCardModel *cardModelFor(const QString &rowId);
     [[nodiscard]] QDateTime now() const;
 
     FocusNavigator m_focus;
+    HeroSpotlightModel m_hero;
     QVector<MediaItem> m_items;
     QVector<RowSlot> m_rows;
     // One card model per row id, kept across compositions so a delegate never
@@ -243,4 +261,9 @@ private:
     std::function<QDateTime()> m_clock;
     std::function<QString()> m_saltSource;
     bool m_playSomethingFocused{false};
+    // Whether the remote's section is the hero rather than the rows
+    // (HomeFocusIDs.hero, HomeDetailView.swift:55-63). Home starts here
+    // (:21); it only takes effect while a spotlight exists.
+    bool m_heroSelected{true};
+    bool m_heroFocusedShown{false};
 };

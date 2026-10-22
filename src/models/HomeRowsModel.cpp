@@ -457,8 +457,12 @@ const home_rows::Card *HomeCardModel::cardAt(int column) const
 
 HomeRowsModel::HomeRowsModel(QObject *parent)
     : QAbstractListModel(parent),
-      m_focus(this)
+      m_focus(this),
+      m_hero(this)
 {
+    // The hero's position is one value the remote, the pointer and the timer
+    // all move; the focus here only says whether the remote is on it.
+    connect(&m_hero, &HeroSpotlightModel::countChanged, this, &HomeRowsModel::syncHeroFocused);
 }
 
 int HomeRowsModel::rowCount(const QModelIndex &parent) const
@@ -529,6 +533,32 @@ QVariantMap HomeRowsModel::cardForId(int row, const QString &mediaId) const
     return {};
 }
 
+HeroSpotlightModel *HomeRowsModel::hero()
+{
+    return &m_hero;
+}
+
+bool HomeRowsModel::heroFocused() const
+{
+    return m_heroSelected && !m_playSomethingFocused && m_hero.count() > 0;
+}
+
+void HomeRowsModel::syncHeroFocused()
+{
+    const bool focused = heroFocused();
+    if (focused == m_heroFocusedShown) {
+        return;
+    }
+    m_heroFocusedShown = focused;
+    emit heroFocusedChanged();
+}
+
+void HomeRowsModel::setHeroSelected(bool selected)
+{
+    m_heroSelected = selected;
+    syncHeroFocused();
+}
+
 bool HomeRowsModel::playSomethingFocused() const
 {
     return m_playSomethingFocused;
@@ -541,6 +571,7 @@ void HomeRowsModel::setPlaySomethingFocused(bool focused)
     }
     m_playSomethingFocused = focused;
     emit playSomethingFocusedChanged();
+    syncHeroFocused();
 }
 
 bool HomeRowsModel::moveUp()
@@ -549,13 +580,18 @@ bool HomeRowsModel::moveUp()
         // The capsule is the top of the tree: Up is spent without moving.
         return true;
     }
-    if (m_focus.moveUp()) {
+    if (!heroFocused() && m_focus.moveUp()) {
         return true;
     }
-    // Up from the first row is the capsule above it. The title bar, and the
-    // capsule with it, is hidden while the library holds nothing, so the
-    // remote must not come to rest on a control nobody can see. Up is still
-    // spent.
+    // Up from the first row is the hero when there is one (HomeDetailView
+    // .swift:52-65 puts it between the capsule and the rows), and Up from the
+    // hero is the capsule. The title bar, and the capsule with it, is hidden
+    // while the library holds nothing, so the remote must not come to rest on
+    // a control nobody can see. Up is still spent.
+    if (!heroFocused() && m_hero.count() > 0) {
+        setHeroSelected(true);
+        return true;
+    }
     if (!m_items.isEmpty()) {
         setPlaySomethingFocused(true);
     }
@@ -565,8 +601,19 @@ bool HomeRowsModel::moveUp()
 bool HomeRowsModel::moveDown()
 {
     if (m_playSomethingFocused) {
-        // The card the remote left is still the focused one.
+        // The hero or the card the remote left is still the focused one.
         setPlaySomethingFocused(false);
+        return true;
+    }
+    if (heroFocused()) {
+        // :57-60 guides Down from every hero item to the first row. Without
+        // one it is spent where it is.
+        if (!m_focus.empty()) {
+            if (m_focus.row() != 0) {
+                m_focus.setPosition(0, m_focus.column());
+            }
+            setHeroSelected(false);
+        }
         return true;
     }
     return m_focus.moveDown();
@@ -576,18 +623,45 @@ bool HomeRowsModel::moveLeft()
 {
     // Left on the capsule is spent without moving: the oracle hands the remote
     // to the sidebar only from a card (HomeDetailView.swift:993).
-    return m_playSomethingFocused || m_focus.moveLeft();
+    if (m_playSomethingFocused) {
+        return true;
+    }
+    // :985-991 wraps the hero instead of handing it to the sidebar.
+    if (heroFocused()) {
+        m_hero.step(-1);
+        return true;
+    }
+    return m_focus.moveLeft();
 }
 
 bool HomeRowsModel::moveRight()
 {
-    return m_playSomethingFocused || m_focus.moveRight();
+    if (m_playSomethingFocused) {
+        return true;
+    }
+    if (heroFocused()) {
+        m_hero.step(1);
+        return true;
+    }
+    return m_focus.moveRight();
 }
 
 void HomeRowsModel::focusCard(int row, int column)
 {
+    m_heroSelected = false;
     setPlaySomethingFocused(false);
     m_focus.setPosition(row, column);
+    syncHeroFocused();
+}
+
+void HomeRowsModel::focusHero()
+{
+    if (m_hero.count() == 0) {
+        return;
+    }
+    m_heroSelected = true;
+    setPlaySomethingFocused(false);
+    syncHeroFocused();
 }
 
 QStringList HomeRowsModel::playSomethingCandidates() const
@@ -667,6 +741,7 @@ HomeCardModel *HomeRowsModel::cardModelFor(const QString &rowId)
 void HomeRowsModel::recompose()
 {
     QVector<home_rows::Row> composed = home_rows::compose(m_items, now());
+    m_hero.replaceSpotlights(hero_spotlight::build(m_items, now()));
 
     // The remote follows the card it rests on, not its row and column number:
     // a row inserted above it would otherwise hand it a different title.
@@ -767,8 +842,9 @@ void HomeRowsModel::recompose()
     if (found == m_rows.cend()) {
         // The row the remote rested on is gone. The oracle's repair
         // (HomeFocusContentPolicy.repair, :1128-1134) sends focus to the first
-        // card of the first row that has one, and so does this; Home has no
-        // hero to prefer.
+        // card of the first row that has one, and so does this; with a hero,
+        // the oracle sends it there (:1128-1130), which `heroFocused` does
+        // while the remote's section is the hero.
         const auto first = std::find_if(m_rows.cbegin(), m_rows.cend(), [](const RowSlot &row) {
             return row.cards->rowCount() > 0;
         });
