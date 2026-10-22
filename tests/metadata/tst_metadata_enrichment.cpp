@@ -7,6 +7,8 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QSignalSpy>
+#include <QSqlDatabase>
+#include <QSqlQuery>
 #include <QTemporaryDir>
 #include <QThread>
 #include <QTimeZone>
@@ -225,6 +227,21 @@ struct Setup
         qFatal("the run did not finish");
     }
     return qvariant_cast<MetadataEnrichment::Summary>(finished.first().first());
+}
+
+// Runs SQL against the catalog the way an older build left it.
+[[nodiscard]] bool sql(const QString &catalogPath, const QString &statement)
+{
+    CatalogDatabase database(catalogPath);
+    QSqlQuery query(database.connection());
+    return query.exec(statement);
+}
+
+[[nodiscard]] QVariant scalar(const QString &catalogPath, const QString &statement)
+{
+    CatalogDatabase database(catalogPath);
+    QSqlQuery query(database.connection());
+    return query.exec(statement) && query.next() ? query.value(0) : QVariant();
 }
 
 [[nodiscard]] int filesUnder(const QString &directory)
@@ -568,6 +585,141 @@ private slots:
             (void)runOnce(third, library.rootList());
         }
         QCOMPARE(searchesFor(QStringLiteral("Obscure Nothing")), 2 * firstRunSearches);
+    }
+
+    void rowsAnOlderMatcherWroteAreMatchedAgainAndOnlyAChangedMatchReplacesTheData()
+    {
+        Library library;
+        QVERIFY(library.build());
+        {
+            MetadataEnrichment first(library.catalogPath(), makeSetup(library, m_transport, m_state));
+            (void)runOnce(first, library.rootList());
+        }
+        const QString odysseyId = library.movie(QStringLiteral("Synthetic Odyssey")).id;
+        const QString bareId = library.movie(QStringLiteral("Bare Synthetic")).id;
+        QVERIFY(!odysseyId.isEmpty() && !bareId.isEmpty());
+
+        // The catalog as an older matcher left it: Bare Synthetic matched to
+        // the wrong film with that film's cast and keywords, Odyssey matched
+        // right with data that must survive, and Obscure Nothing unmatched.
+        const QString path = library.catalogPath();
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 123, "
+                                         "overview = 'Wrong film', fetched_at = '2020-01-01T00:00:00.000Z' "
+                                         "WHERE owner_key = '%1'").arg(bareId)));
+        QVERIFY(sql(path, QStringLiteral("INSERT INTO title_cast (owner_key, ordinal, person_id, name, character) "
+                                         "VALUES ('%1', 0, 1, 'Wrong Actor', 'Wrong')").arg(bareId)));
+        QVERIFY(sql(path, QStringLiteral("INSERT INTO title_keyword (owner_key, keyword_id, name) "
+                                         "VALUES ('%1', 1, 'wrong')").arg(bareId)));
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET overview = 'Kept as it was' "
+                                         "WHERE owner_key = '%1'").arg(odysseyId)));
+
+        m_transport->setResponder([](const QUrl &url) {
+            // Obscure Nothing is now findable.
+            if (url.path() == QLatin1String("/3/search/movie")
+                && FakeTransport::queryValue(url, QStringLiteral("query")) == QLatin1String("Obscure Nothing")) {
+                return FakeTransport::json(searchAnswer(9010, QStringLiteral("title"), QStringLiteral("Obscure Nothing")));
+            }
+            return tmdbAnswer(url);
+        });
+        const int requestsBefore = m_transport->count();
+
+        MetadataEnrichment second(path, makeSetup(library, m_transport, m_state));
+        const auto summary = runOnce(second, library.rootList());
+        QCOMPARE(summary.outcome, MetadataEnrichment::Outcome::Finished);
+
+        // The changed match replaced the data, cast and keywords.
+        const MediaItem bare = library.movie(QStringLiteral("Bare Synthetic"));
+        QVERIFY(bare.metadata);
+        QCOMPARE(bare.metadata->tmdbId, 9010);
+        QVERIFY(bare.metadata->overview != QLatin1String("Wrong film"));
+        for (const CastMember &member : bare.metadata->cast) {
+            QVERIFY(member.name != QLatin1String("Wrong Actor"));
+        }
+        QCOMPARE(scalar(path, QStringLiteral("SELECT COUNT(*) FROM title_keyword WHERE name = 'wrong'")).toInt(), 0);
+
+        // The unchanged match kept its data and was not fetched again.
+        QCOMPARE(library.movie(QStringLiteral("Synthetic Odyssey")).metadata->overview,
+                 QStringLiteral("Kept as it was"));
+        for (qsizetype index = requestsBefore; index < m_transport->count(); ++index) {
+            QVERIFY2(m_transport->urls().at(index).path() != QLatin1String("/3/movie/9001"),
+                     "an unchanged match must not fetch its details again");
+        }
+
+        // The title the old rules missed is matched now.
+        const MediaItem obscure = library.movie(QStringLiteral("Obscure Nothing"));
+        QVERIFY(obscure.metadata);
+        QCOMPARE(obscure.metadata->tmdbId, 9010);
+
+        // Everything carries the current matcher version, so a third run
+        // has nothing to do.
+        QCOMPARE(scalar(path, QStringLiteral("SELECT COUNT(*) FROM title_metadata WHERE matcher_version < %1")
+                                  .arg(MetadataStore::matcherVersion)).toInt(), 0);
+        MetadataEnrichment third(path, makeSetup(library, m_transport, m_state));
+        QCOMPARE(runOnce(third, library.rootList()).outcome, MetadataEnrichment::Outcome::UpToDate);
+    }
+
+    void aRematchThatFindsNothingKeepsTheOldMatchAndCountsItAsChecked()
+    {
+        Library library;
+        QVERIFY(library.build());
+        {
+            MetadataEnrichment first(library.catalogPath(), makeSetup(library, m_transport, m_state));
+            (void)runOnce(first, library.rootList());
+        }
+        const QString path = library.catalogPath();
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // TMDB answers nothing for any search now.
+        m_transport->setResponder([](const QUrl &url) {
+            if (url.path().startsWith(QLatin1String("/3/search/"))) {
+                return FakeTransport::json(QByteArrayLiteral(R"({"results":[]})"));
+            }
+            return tmdbAnswer(url);
+        });
+        MetadataEnrichment second(path, makeSetup(library, m_transport, m_state));
+        (void)runOnce(second, library.rootList());
+        QVERIFY(library.movie(QStringLiteral("Synthetic Odyssey")).metadata);
+        QCOMPARE(scalar(path, QStringLiteral("SELECT COUNT(*) FROM title_metadata WHERE matcher_version = 0")).toInt(), 0);
+    }
+
+    void aShowMatchedToAnotherShowByAnOlderMatcherLosesItsEpisodeFacts()
+    {
+        Library library;
+        QVERIFY(library.build());
+        {
+            MetadataEnrichment first(library.catalogPath(), makeSetup(library, m_transport, m_state));
+            (void)runOnce(first, library.rootList());
+        }
+        const QString path = library.catalogPath();
+        const QString showKey = QStringLiteral("show:Synthetic Harbor|2015");
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 555, overview = 'Wrong show' "
+                                         "WHERE owner_key = '%1'").arg(showKey)));
+        QVERIFY(sql(path, QStringLiteral("UPDATE episode_metadata SET title = 'Wrong episode', "
+                                         "overview = 'Wrong'")));
+
+        MetadataEnrichment second(path, makeSetup(library, m_transport, m_state));
+        (void)runOnce(second, library.rootList());
+        QCOMPARE(library.episode(1).tmdbEpisodeTitle, QStringLiteral("Arrivals"));
+        QCOMPARE(library.episode(1).metadata->tmdbId, 9101);
+    }
+
+    void aMalformedSearchAnswerCountsAsFailedAndIsStoredAsFailed()
+    {
+        Library library;
+        QVERIFY(library.build());
+        m_transport->setResponder([](const QUrl &url) {
+            if (url.path() == QLatin1String("/3/search/movie")) {
+                return FakeTransport::json("not json at all");
+            }
+            return tmdbAnswer(url);
+        });
+        MetadataEnrichment enrichment(library.catalogPath(), makeSetup(library, m_transport, m_state));
+        const auto summary = runOnce(enrichment, library.rootList());
+        QCOMPARE(summary.titlesFailed, 3);
+        QCOMPARE(summary.titlesUnmatched, 0);
+        QCOMPARE(scalar(library.catalogPath(),
+                        QStringLiteral("SELECT COUNT(*) FROM title_metadata WHERE fetch_state = 'failed'")).toInt(), 3);
     }
 
     void anImageThatFailedToDecodeIsAskedForAgainWithoutAskingAboutTheTitle()

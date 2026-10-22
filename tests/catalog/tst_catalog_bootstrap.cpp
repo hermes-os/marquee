@@ -260,7 +260,7 @@ private slots:
         catalog.migrate();
 
         QVERIFY(QFileInfo::exists(path));
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(tableNames(catalog),
                  QStringList({"episode_metadata", "library_roots", "media_items",
                                       "title_cast", "title_keyword", "title_metadata",
@@ -281,7 +281,7 @@ private slots:
         CatalogDatabase reopened(path);
         reopened.migrate();
 
-        QCOMPARE(schemaVersionOf(reopened), 6);
+        QCOMPARE(schemaVersionOf(reopened), 7);
         QCOMPARE(rowCount(reopened, "library_roots"), 1);
     }
 
@@ -419,7 +419,7 @@ private slots:
         }
 
         CatalogDatabase catalog(path);
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(tableNames(catalog),
                  QStringList({"episode_metadata", "library_roots", "media_items",
                                       "title_cast", "title_keyword", "title_metadata",
@@ -458,7 +458,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(tableNames(catalog),
                  QStringList({"episode_metadata", "library_roots", "media_items",
                                       "title_cast", "title_keyword", "title_metadata",
@@ -538,7 +538,7 @@ private slots:
         }
 
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
     }
 
     void startupLoadsTheReadableFilesOfRootsWithUnreadableEntries()
@@ -630,7 +630,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main"), kids});
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "watch_progress"), 4);
         for (const QString &profile : {QStringLiteral("main"), kids}) {
             QCOMPARE(progressOf(catalog, profile, "item-1"),
@@ -682,7 +682,7 @@ private slots:
         CatalogDatabase reopened(path);
         reopened.migrate({QStringLiteral("main"), QStringLiteral("added")});
 
-        QCOMPARE(schemaVersionOf(reopened), 6);
+        QCOMPARE(schemaVersionOf(reopened), 7);
         QCOMPARE(rowCount(reopened, "watch_progress"), 2);
         QCOMPARE(progressOf(reopened, "main", "item-1").at(0).toLongLong(), 1);
         QVERIFY(progressOf(reopened, "added", "item-1").isEmpty());
@@ -700,7 +700,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "watch_progress"), 0);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
@@ -733,7 +733,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QString()});
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
     }
 
@@ -749,7 +749,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({odd, QStringLiteral("a")});
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "watch_progress"), 4);
         QCOMPARE(progressOf(catalog, odd, "item-1"),
                  (QVariantList{600000, 7200000, 0}));
@@ -770,7 +770,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate();
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "watch_progress"), 0);
     }
 
@@ -796,7 +796,7 @@ private slots:
 
         QVERIFY(execute(catalog, "DROP TABLE watch_progress_v5"));
         catalog.migrate({QStringLiteral("main")});
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "watch_progress"), 2);
     }
 
@@ -834,7 +834,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main")});
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "library_roots"), 1);
         QCOMPARE(rowCount(catalog, "media_items"), 1);
         QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
@@ -855,7 +855,7 @@ private slots:
         CatalogDatabase catalog(path);
         catalog.migrate({QStringLiteral("main")});
 
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
         QCOMPARE(progressOf(catalog, "main", "item-1"), (QVariantList{600000, 7200000, 0}));
         QVERIFY(tableNames(catalog).contains("title_metadata"));
@@ -887,7 +887,7 @@ private slots:
 
         QVERIFY(execute(catalog, "DROP TABLE title_keyword"));
         catalog.migrate({QStringLiteral("main")});
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "media_items"), 1);
     }
 
@@ -935,7 +935,7 @@ private slots:
         }
 
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         QCOMPARE(rowCount(catalog, "media_items"), 2);
         QCOMPARE(rowCount(catalog, "watch_progress_v4_unowned"), 2);
     }
@@ -959,7 +959,7 @@ private slots:
 
         QCOMPARE(profileIds.size(), 2);
         CatalogDatabase catalog(AppPaths::catalogFile());
-        QCOMPARE(schemaVersionOf(catalog), 6);
+        QCOMPARE(schemaVersionOf(catalog), 7);
         for (const QString &profile : profileIds) {
             QCOMPARE(progressOf(catalog, profile, "item-1"),
                      (QVariantList{600000, 7200000, 0}));

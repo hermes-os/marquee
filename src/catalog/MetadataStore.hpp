@@ -20,9 +20,10 @@
 ///
 /// The fetch rules are the released ones (`TMDBEnrichmentService.ownerNeedsEnrichment`):
 /// a title with no row is fetched; a fetched title is left alone; a title whose
-/// artwork was named but never cached is asked for that artwork alone. One
-/// rule is new: the released app searched again for a title TMDB could not
-/// match on every scan, and here a title that found no match waits a week and
+/// artwork was named but never cached is asked for that artwork alone. Two
+/// rules are new. A title whose row an older matcher version wrote (or whose
+/// failure to match it recorded) is matched again, once. And the released app
+/// searched again for a title TMDB could not match on every scan, where a title that found no match waits a week and
 /// one whose details could not be read waits a day before it is tried again.
 class MetadataStore final
 {
@@ -48,8 +49,13 @@ public:
                                                          const QDateTime &now,
                                                          const CacheDirectories &cache);
 
+    /// Replaces the title's metadata, cast and keywords. A rematched show that
+    /// turned out to be another show also loses its episodes' stored facts.
     void saveTitle(const MetadataTarget &target, const TitleMetadata &metadata,
                    const QDateTime &now);
+    /// Records that the current matcher looked at a title whose stored match
+    /// it keeps, so the title is not looked at again.
+    void keepMatch(const QString &ownerKey);
     /// Records that TMDB found no match (`unmatched`) or that the details of a
     /// match could not be read (`failed`). A title already matched is kept.
     void saveAttempt(const MetadataTarget &target, const QString &state, const QDateTime &now,
@@ -68,6 +74,11 @@ public:
     /// `items`. A title with none keeps what it had; nothing is created for it.
     static void attach(QSqlDatabase &database, QVector<MediaItem> &items,
                        const CacheDirectories &cache);
+
+    /// The version of the rules that match a file to a TMDB title (title and
+    /// year parse, normalization, ranking). Raise it when they change: rows
+    /// written by an older version are matched again on the next run.
+    static constexpr int matcherVersion = 1;
 
     static constexpr int unmatchedRetryDays = 7;
     static constexpr int failedRetryDays = 1;

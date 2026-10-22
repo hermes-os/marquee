@@ -16,7 +16,8 @@ intermediate version bump.
   "L A Confidential" and "Richie Rich" are found (initials compare equal with
   or without dots, and TMDB's "Ri¢hie Ri¢h" reads as "Richie Rich"). Titles
   matched or missed by the earlier rules are matched again once, in the
-  background.
+  background, and a changed match replaces that title's stored metadata. The
+  catalog is migrated to schema 7; titles and watch progress are kept.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's
@@ -34,8 +35,8 @@ intermediate version bump.
   into a library folder. A title that was fetched is not asked again, a run cut
   short resumes after a restart, and with no network, no key or the switch off
   the app works exactly as before. The Online Metadata switch in Settings now
-  does this, starts on for new installs, and says "No TMDB key" when there is
-  none; the key is never logged or shown. Nothing on screen uses the new data
+  does this, starts on for settings that never stored a choice, and says "No
+  TMDB key" when there is none; the key is never logged or shown. Nothing on screen uses the new data
   yet: rows and Details sections come in later changes. The catalog is migrated
   to schema 6 on first start; titles and watch progress are kept.
 - A few unreadable files no longer empty the whole library. A file the drive

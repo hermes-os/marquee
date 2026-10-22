@@ -341,7 +341,13 @@ struct Migration
             BEGIN
                 DELETE FROM title_metadata WHERE owner_key = old.id;
             END
-         )SQL")}}
+         )SQL")}},
+        {7,
+         // Which matcher version chose the row's TMDB match, so a better
+         // matcher can look again at what an older one matched or missed.
+         // Rows written before this column existed are version 0.
+         {QStringLiteral("ALTER TABLE title_metadata "
+                         "ADD COLUMN matcher_version INTEGER NOT NULL DEFAULT 0")}}
     };
 }
 }

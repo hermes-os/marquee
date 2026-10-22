@@ -119,6 +119,19 @@ struct MetadataTarget
     /// What TMDB named earlier, for an artwork-only retry.
     QString posterRemotePath;
     QString backdropRemotePath;
+    /// Set when an older matcher made the stored row (or failed to match the
+    /// title), so the title is searched again. `tmdbId` is then empty;
+    /// `previousTmdbId` and `previousState` are what the row held. `wantPoster`
+    /// and `wantBackdrop` then say only that no local sidecar covers the
+    /// image; the `*Cached` flags say whether the stored image is on disk.
+    bool rematch{false};
+    std::optional<int> previousTmdbId;
+    QString previousState;
+    bool posterCached{false};
+    bool backdropCached{false};
+    /// A rematched show's every episode, to be fetched afresh when the show
+    /// turns out to be another one.
+    QVector<EpisodeTarget> allEpisodes;
     /// A show's episodes, in catalog order.
     QVector<EpisodeTarget> episodes;
 };

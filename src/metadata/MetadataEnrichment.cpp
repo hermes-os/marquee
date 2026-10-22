@@ -242,22 +242,55 @@ void MetadataEnrichment::searchThenDetails()
         }
         if (result.status == MetadataClient::Status::Ok) {
             m_run->tmdbId = result.value;
+            Run &run = *m_run;
+            if (run.target.rematch && run.target.previousState == metadata_state::matched
+                && run.target.previousTmdbId == std::optional<int>(result.value)) {
+                // The current matcher agrees with the old one: the stored
+                // data stays, and only what is still missing is fetched.
+                try {
+                    m_store->keepMatch(run.target.ownerKey);
+                } catch (const std::exception &error) {
+                    qCWarning(logMetadata) << "enrichment could not write the catalog:"
+                                           << error.what();
+                    finish(Outcome::Failed);
+                    return;
+                }
+                run.target.wantPoster = run.target.wantPoster && !run.posterRemote.isEmpty()
+                    && !run.target.posterCached;
+                run.target.wantBackdrop = run.target.wantBackdrop && !run.backdropRemote.isEmpty()
+                    && !run.target.backdropCached;
+                afterDetails();
+                return;
+            }
             fetchDetails(result.value);
             return;
         }
         // TMDB answered and has nobody by that name: wait before asking again.
+        const bool notFound = result.status == MetadataClient::Status::NotFound;
         try {
-            m_store->saveAttempt(m_run->target,
-                                 result.status == MetadataClient::Status::NotFound
-                                     ? metadata_state::unmatched
-                                     : metadata_state::failed,
-                                 m_setup.now());
+            if (m_run->target.previousState == metadata_state::matched) {
+                // A match made by an older matcher stays when the new one
+                // finds nothing better; only a clean "no match" settles it,
+                // anything else is asked again on the next run.
+                if (notFound) {
+                    m_store->keepMatch(m_run->target.ownerKey);
+                }
+            } else {
+                m_store->saveAttempt(m_run->target,
+                                     notFound ? metadata_state::unmatched : metadata_state::failed,
+                                     m_setup.now());
+            }
         } catch (const std::exception &error) {
             qCWarning(logMetadata) << "enrichment could not write the catalog:" << error.what();
             finish(Outcome::Failed);
             return;
         }
-        ++m_run->summary.titlesUnmatched;
+        // A Malformed answer is stored as failed, so it counts as failed.
+        if (notFound) {
+            ++m_run->summary.titlesUnmatched;
+        } else {
+            ++m_run->summary.titlesFailed;
+        }
         titleDone();
     };
     if (target.kind == MetadataTarget::Kind::Movie) {
@@ -286,6 +319,12 @@ void MetadataEnrichment::fetchDetails(int tmdbId)
                 return;
             }
             m_store->saveTitle(m_run->target, result.value, m_setup.now());
+            if (m_run->target.rematch && m_run->target.previousState == metadata_state::matched
+                && m_run->target.previousTmdbId != std::optional<int>(tmdbId)) {
+                // Another show than before: nothing stored about the old
+                // one's episodes applies, so all of them are fetched afresh.
+                m_run->target.episodes = m_run->target.allEpisodes;
+            }
             m_run->posterRemote = result.value.posterRemotePath;
             m_run->backdropRemote = result.value.backdropRemotePath;
             ++m_run->summary.titlesSaved;

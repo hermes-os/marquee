@@ -123,6 +123,7 @@ struct StoredTitle
     QString backdropRemotePath;
     QString posterCachePath;
     QString backdropCachePath;
+    int matcherVersion{0};
 };
 
 [[nodiscard]] QHash<QString, StoredTitle> storedTitles(QSqlDatabase &database)
@@ -131,7 +132,7 @@ struct StoredTitle
         database,
         QStringLiteral("SELECT owner_key, kind, fetch_state, fetched_at, tmdb_id, "
                        "poster_remote_path, backdrop_remote_path, poster_cache_path, "
-                       "backdrop_cache_path FROM title_metadata"));
+                       "backdrop_cache_path, matcher_version FROM title_metadata"));
     executeOrThrow(query);
 
     QHash<QString, StoredTitle> titles;
@@ -146,7 +147,8 @@ struct StoredTitle
                        .posterRemotePath = query.value(5).toString(),
                        .backdropRemotePath = query.value(6).toString(),
                        .posterCachePath = query.value(7).toString(),
-                       .backdropCachePath = query.value(8).toString()});
+                       .backdropCachePath = query.value(8).toString(),
+                       .matcherVersion = query.value(9).toInt()});
     }
     return titles;
 }
@@ -211,6 +213,7 @@ struct StoredEpisode
 struct ShowAccumulator
 {
     MetadataTarget target;
+    QVector<EpisodeTarget> allEpisodes;
     bool anySidecarPoster{false};
     bool anySidecarBackdrop{false};
 };
@@ -276,6 +279,28 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
         return need;
     };
 
+    // A row an older matcher wrote is matched again whatever its state: the
+    // search runs, and the stored match is kept only if it comes out the same.
+    const auto isStale = [](const StoredTitle *stored) {
+        return stored != nullptr && stored->matcherVersion < MetadataStore::matcherVersion;
+    };
+    const auto fillFromRow = [&](MetadataTarget &target, const StoredTitle *row) {
+        if (row == nullptr) {
+            return;
+        }
+        target.posterRemotePath = row->posterRemotePath;
+        target.backdropRemotePath = row->backdropRemotePath;
+        if (isStale(row)) {
+            target.rematch = true;
+            target.previousTmdbId = row->tmdbId;
+            target.previousState = row->state;
+            target.posterCached = cached(cache.thumbnailDirectory, row->posterCachePath);
+            target.backdropCached = cached(cache.thumbnailDirectory, row->backdropCachePath);
+        } else {
+            target.tmdbId = row->tmdbId;
+        }
+    };
+
     QVector<MetadataTarget> targets;
 
     {
@@ -297,7 +322,7 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
             // fills a gap that is always there; the poster only when the
             // folder has none (a local sidecar still wins).
             const bool sidecarPoster = !query.value(3).toString().isEmpty();
-            const Need need = needOf(row, !sidecarPoster, true);
+            const Need need = needOf(isStale(row) ? nullptr : row, !sidecarPoster, true);
             if (!need.any()) {
                 continue;
             }
@@ -309,11 +334,7 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
             target.needsDetails = need.details;
             target.wantPoster = need.poster;
             target.wantBackdrop = need.backdrop;
-            if (row != nullptr) {
-                target.tmdbId = row->tmdbId;
-                target.posterRemotePath = row->posterRemotePath;
-                target.backdropRemotePath = row->backdropRemotePath;
-            }
+            fillFromRow(target, row);
             targets.push_back(target);
         }
     }
@@ -377,6 +398,13 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
             if (episode.needsDetails || episode.wantStill) {
                 show.target.episodes.push_back(episode);
             }
+            // If a rematch finds another show, none of what is stored about
+            // these episodes belongs to it.
+            EpisodeTarget fresh = episode;
+            fresh.needsDetails = true;
+            fresh.wantStill = stillGap;
+            fresh.stillRemotePath.clear();
+            show.allEpisodes.push_back(fresh);
         }
     }
 
@@ -384,16 +412,16 @@ QVector<MetadataTarget> MetadataStore::pendingTargets(const QStringList &rootPat
         MetadataTarget target = show.target;
         const auto stored = titles.constFind(key);
         const StoredTitle *row = stored == titles.constEnd() ? nullptr : &*stored;
-        const Need need = needOf(row, !show.anySidecarPoster, !show.anySidecarBackdrop);
+        const Need need =
+            needOf(isStale(row) ? nullptr : row, !show.anySidecarPoster, !show.anySidecarBackdrop);
         const bool matched = row != nullptr && row->state == QLatin1String("matched");
 
         target.needsDetails = need.details;
         target.wantPoster = need.poster;
         target.wantBackdrop = need.backdrop;
-        if (row != nullptr) {
-            target.tmdbId = row->tmdbId;
-            target.posterRemotePath = row->posterRemotePath;
-            target.backdropRemotePath = row->backdropRemotePath;
+        fillFromRow(target, row);
+        if (target.rematch) {
+            target.allEpisodes = show.allEpisodes;
         }
         // Episodes can only be asked about under a show TMDB matched.
         if (!matched && !need.details) {
@@ -431,8 +459,8 @@ void MetadataStore::saveTitle(const MetadataTarget &target, const TitleMetadata 
                 "tmdb_id, overview, genres, director, certification, vote_average, "
                 "vote_count, popularity, collection_id, collection_name, "
                 "similar_tmdb_ids, recommended_tmdb_ids, release_date, runtime_minutes, "
-                "poster_remote_path, backdrop_remote_path) "
-                "VALUES (?, ?, 'matched', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
+                "poster_remote_path, backdrop_remote_path, matcher_version) "
+                "VALUES (?, ?, 'matched', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) "
                 "ON CONFLICT(owner_key) DO UPDATE SET "
                 "kind = excluded.kind, fetch_state = 'matched', "
                 "fetched_at = excluded.fetched_at, tmdb_id = excluded.tmdb_id, "
@@ -451,7 +479,8 @@ void MetadataStore::saveTitle(const MetadataTarget &target, const TitleMetadata 
                 "backdrop_cache_path = CASE WHEN backdrop_remote_path IS "
                 "excluded.backdrop_remote_path THEN backdrop_cache_path ELSE NULL END, "
                 "poster_remote_path = excluded.poster_remote_path, "
-                "backdrop_remote_path = excluded.backdrop_remote_path"));
+                "backdrop_remote_path = excluded.backdrop_remote_path, "
+                "matcher_version = excluded.matcher_version"));
         upsert.addBindValue(target.ownerKey);
         upsert.addBindValue(target.kind == MetadataTarget::Kind::Movie ? QStringLiteral("movie")
                                                                        : QStringLiteral("show"));
@@ -473,7 +502,21 @@ void MetadataStore::saveTitle(const MetadataTarget &target, const TitleMetadata 
                                                         : QVariant());
         upsert.addBindValue(optionalText(metadata.posterRemotePath));
         upsert.addBindValue(optionalText(metadata.backdropRemotePath));
+        upsert.addBindValue(matcherVersion);
         executeOrThrow(upsert);
+
+        // Another show than the stored one: its episodes' facts are the old
+        // show's, and the episodes are asked about again.
+        if (target.kind == MetadataTarget::Kind::Show && target.rematch
+            && target.previousState == QLatin1String("matched")
+            && target.previousTmdbId != std::optional<int>(metadata.tmdbId)) {
+            for (const EpisodeTarget &episode : target.allEpisodes) {
+                QSqlQuery drop = prepared(
+                    database, QStringLiteral("DELETE FROM episode_metadata WHERE media_id = ?"));
+                drop.addBindValue(episode.mediaId);
+                executeOrThrow(drop);
+            }
+        }
 
         for (const QString &table : {QStringLiteral("title_cast"), QStringLiteral("title_keyword")}) {
             QSqlQuery clear = prepared(
@@ -524,10 +567,14 @@ void MetadataStore::saveAttempt(const MetadataTarget &target, const QString &sta
     QSqlQuery query = prepared(
         m_database.connection(),
         QStringLiteral("INSERT INTO title_metadata (owner_key, kind, fetch_state, fetched_at, "
-                       "tmdb_id) VALUES (?, ?, ?, ?, ?) "
+                       "tmdb_id, matcher_version) VALUES (?, ?, ?, ?, ?, ?) "
                        "ON CONFLICT(owner_key) DO UPDATE SET fetch_state = excluded.fetch_state, "
                        "fetched_at = excluded.fetched_at, "
-                       "tmdb_id = COALESCE(excluded.tmdb_id, tmdb_id) "
+                       "matcher_version = excluded.matcher_version, "
+                       // A title the matcher no longer finds must not keep an id an older
+                       // matcher gave it, or the retry would go straight to that title.
+                       "tmdb_id = CASE WHEN excluded.fetch_state = 'unmatched' THEN NULL "
+                       "ELSE COALESCE(excluded.tmdb_id, tmdb_id) END "
                        "WHERE fetch_state != 'matched'"));
     query.addBindValue(target.ownerKey);
     query.addBindValue(target.kind == MetadataTarget::Kind::Movie ? QStringLiteral("movie")
@@ -535,6 +582,17 @@ void MetadataStore::saveAttempt(const MetadataTarget &target, const QString &sta
     query.addBindValue(state);
     query.addBindValue(formatTimestamp(now));
     query.addBindValue(optionalValue(tmdbId));
+    query.addBindValue(matcherVersion);
+    executeOrThrow(query);
+}
+
+void MetadataStore::keepMatch(const QString &ownerKey)
+{
+    QSqlQuery query = prepared(
+        m_database.connection(),
+        QStringLiteral("UPDATE title_metadata SET matcher_version = ? WHERE owner_key = ?"));
+    query.addBindValue(matcherVersion);
+    query.addBindValue(ownerKey);
     executeOrThrow(query);
 }
 
