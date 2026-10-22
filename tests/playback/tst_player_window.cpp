@@ -263,6 +263,37 @@ private slots:
         QTRY_VERIFY(env.controller.navigation()->route() != NavigationController::Route::Player);
         QTRY_COMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
     }
+
+    // PlayerView.swift:226-233: a failed player keeps its controls and its
+    // pointer however long the pointer moves and waits.
+    void aFailedPlayerKeepsItsControlsAndPointer()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *scrim = itemNamed(env.window, "playerScrim");
+        QQuickItem *video = itemNamed(env.window, "videoSurface");
+        QVERIFY(scrim != nullptr && video != nullptr);
+
+        // The file's own load clears an earlier error, so the failure comes
+        // once playback has started.
+        QTRY_VERIFY_WITH_TIMEOUT(!video->property("startupPending").toBool(), 15000);
+        QVERIFY(QMetaObject::invokeMethod(video, "setError",
+                                          Q_ARG(QString, QStringLiteral("Cannot open file"))));
+        QTRY_VERIFY(video->property("failed").toBool());
+        QTest::mouseMove(env.window, QPoint(300, 300));
+        QTest::mouseMove(env.window, QPoint(320, 310));
+        // Longer than the three seconds the controls wait.
+        QTest::qWait(3500);
+        QVERIFY(scrim->isVisible());
+        QCOMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+
+        // Moving again restarts the wait; it must still not hide anything.
+        QTest::mouseMove(env.window, QPoint(340, 330));
+        QTest::qWait(3500);
+        QVERIFY(scrim->isVisible());
+        QCOMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+    }
 };
 
 int main(int argc, char *argv[])

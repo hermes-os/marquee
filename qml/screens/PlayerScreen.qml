@@ -16,8 +16,11 @@ FocusScope {
     signal fullscreenRequested()
     // PlayerView.swift:243-257 hides the mouse cursor when the controls
     // auto-hide and shows it again on movement. "Still watching?" keeps it:
-    // its buttons are for the pointer.
-    readonly property bool pointerHidden: !root.controlsVisible && !root.stillWatching
+    // its buttons are for the pointer. A failed player keeps its pointer and
+    // its controls too (:226-233): the failure card's Close is a pointer
+    // target.
+    readonly property bool pointerHidden:
+        !root.controlsVisible && !root.stillWatching && !video.failed
     // Where a drag along the progress bar would land, as a fraction of the
     // film; -1 when none is under way.
     property real barDragFraction: -1
@@ -1007,7 +1010,7 @@ FocusScope {
             // Hiding the scrim under a focused control, or under an open
             // track menu, would leave the remote pointed at something the
             // viewer can no longer see.
-            if (!root.hudHeld) {
+            if (!root.hudHeld && !video.failed) {
                 root.controlsVisible = false
             }
         }
