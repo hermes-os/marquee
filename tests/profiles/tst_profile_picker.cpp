@@ -40,7 +40,8 @@ namespace
 }
 
 // A catalog holding scanned movies, so Home has cards to take the remote.
-[[nodiscard]] bool seedMovies(const QString &moviesDir, int count = 1)
+// `ids` receives the catalog ids of the movies, in creation order.
+[[nodiscard]] bool seedMovies(const QString &moviesDir, int count = 1, QStringList *ids = nullptr)
 {
     AppPaths::ensureDirectories();
     for (int index = 0; index < count; ++index) {
@@ -58,6 +59,10 @@ namespace
     const QVector<LibraryRoot> roots = store.registerRoots(paths);
     for (const LibraryRoot &root : roots) {
         store.applyScan(root, LibraryScanner::scan(root));
+        for (int index = 0; ids != nullptr && index < count; ++index) {
+            ids->push_back(LibraryScanner::mediaIdFor(
+                root.id, QStringLiteral("Arrival %1 (%2).mkv").arg(index).arg(2016 + index)));
+        }
     }
     return !roots.isEmpty();
 }
@@ -476,6 +481,68 @@ private slots:
         QTest::keyClick(window, Qt::Key_Return);
         QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
         QCOMPARE(controller.navigation()->selectedMediaId(), firstCard);
+    }
+
+    // The profile choice resets Home's focus on the previous profile's
+    // projection; the chosen profile's own projection then adds a Continue
+    // Watching row above, and the first Return must still open the top card.
+    void theFirstReturnOpensTheTopCardWhenTheNewProfileAddsARowAbove()
+    {
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QStringList ids;
+        QVERIFY(seedMovies(movies.path(), 4, &ids));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        const QString second = controller.profiles()->addProfile(
+            QStringLiteral("Second"), QStringLiteral("hare.fill"), QStringLiteral("#3366CC"),
+            static_cast<int>(ProfileStore::Maturity::Adult));
+        QVERIFY(!second.isEmpty());
+        const QString watched = ids.at(0);
+        {
+            CatalogStore store(AppPaths::catalogFile());
+            store.recordWatchProgress(second, watched, 600'000, 3'600'000, false);
+        }
+
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        QVERIFY(window != nullptr);
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+
+        // The first profile has no progress: Home has no Continue Watching.
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+        QVERIFY(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString() != watched);
+        QTest::keyClick(window, Qt::Key_Right);
+        QTest::keyClick(window, Qt::Key_Down);
+        QCOMPARE(home->focus()->row(), 1);
+
+        controller.switchProfile();
+        QQuickItem *reopened = pickerOf(window);
+        QVERIFY(reopened != nullptr);
+        QTRY_VERIFY(reopened->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Right);
+        QTest::keyClick(window, Qt::Key_Right);
+        QCOMPARE(focusProfileId(reopened), second);
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+
+        // The second profile's projection lands with the new row on top.
+        QTRY_COMPARE(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString(), watched);
+        QCOMPARE(home->focus()->row(), 0);
+        QCOMPARE(home->focus()->column(), 0);
+        QVERIFY(!home->playSomethingFocused());
+
+        QTest::keyClick(window, Qt::Key_Return);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+        QCOMPARE(controller.navigation()->selectedMediaId(), watched);
     }
 
     // Home is rebuilt at its first target on every profile choice

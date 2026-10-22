@@ -6,6 +6,11 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Choosing a different profile now lands the remote on Home's top card even
+  when that profile has progress. Before, a Continue Watching row that arrived
+  above the rows after the choice left the remote on the card it had been on,
+  now one row lower, so the first Return opened a card that was not the top
+  one.
 - A pointer resting over the profile picker no longer moves the remote. As in
   the released app, hovering a card only tints it; a real pointer click still
   chooses. Before, when the picker opened under a pointer that had not moved,

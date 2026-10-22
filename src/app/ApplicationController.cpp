@@ -214,6 +214,13 @@ void ApplicationController::startCatalogWorker()
         m_projection = items;
         m_projectionReceived = true;
         publishProjection();
+        // The first projection of a new profile can add rows above the card
+        // the remote kept (a Continue Watching row); Home starts at its first
+        // target, so the first Return opens the top card, not a lower one.
+        if (m_homeRestartPending) {
+            m_homeRestartPending = false;
+            m_homeRows.resetFocus();
+        }
     };
     connect(worker, &CatalogWorker::projectionReady, this, adoptProjection);
     connect(worker, &CatalogWorker::projectionReloaded, this, adoptProjection);
@@ -492,12 +499,16 @@ bool ApplicationController::chooseProfile(const QString &profileId)
     }
     // ProfileSession.swift:29-86: the profile is active and remembered at
     // once, whichever maturity it carries.
+    const bool profileSwitched = activeProfileId() != profile->id;
     setActiveProfile(profile);
     m_profiles.selectProfile(profile->id);
     // ContentView.swift:391-407 rebuilds Home at its top after a choice, so
     // the first Return acts on Home's first target whatever the last viewer
     // left focused, including when the same profile is chosen again.
     m_homeRows.resetFocus();
+    // A different profile's progress arrives with the reloaded projection and
+    // reshapes Home's rows; that projection restarts Home's focus again.
+    m_homeRestartPending = profileSwitched;
     qCInfo(logApp) << "profile selected id=" << profile->id
                    << "maturity=" << profile->maturityLevel;
 
