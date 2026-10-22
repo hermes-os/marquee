@@ -13,11 +13,6 @@ appearance and interaction; a "released" comparison below means that source.
 "Not run on a display" means the finding comes from reading the source and the
 headless CTest suites, not from the theater host.
 
-## A scrubbing hold shows no live frame
-Where: `src/playback/MpvVideoItem.cpp`, `src/playback/SeekScrubber.*`, `qml/screens/PlayerScreen.qml`.
-What happens: while Left or Right is held past half a second the film is paused and the clock and progress bar show where letting go would land, but the picture stays on the frame where the hold began until the key is let go. The released app sets mpv's `hr-seek` to `no` and previews the target (`PlayerView.swift:478-523`, `MPVPlayerService.swift:3050-3059`).
-Found: implementing the hold-to-scrub; `SeekScrubber` emits only the final seek.
-
 ## The player never hides the pointer with the HUD
 Where: `qml/screens/PlayerScreen.qml`.
 What happens: the released HUD hides the mouse cursor when its controls auto-hide and shows it again on movement (`PlayerView.swift:222-257`); the Linux player leaves the cursor visible over the film.
