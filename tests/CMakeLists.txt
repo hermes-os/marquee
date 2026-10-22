@@ -1,4 +1,4 @@
-find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui Qml Quick QuickControls2 Test)
+find_package(Qt6 6.8 REQUIRED COMPONENTS Core Gui GuiPrivate Qml Quick QuickControls2 Test)
 
 function(marquee_add_test target)
     qt_add_executable(${target} ${ARGN})
@@ -202,6 +202,17 @@ marquee_add_test(tst_subtitle_discovery
 # context the scene graph would, so the track lists need no display.
 marquee_add_test(tst_player_tracks
     playback/tst_player_tracks.cpp
+)
+
+# The window system's state reports are fed in by hand, as a compositor sends
+# them; the minimal platform adds none of its own. QWindowSystemInterface is Qt's
+# own private GUI API, shipped with Qt6::Gui.
+marquee_add_test(tst_playback_fullscreen
+    playback/tst_playback_fullscreen.cpp
+)
+target_link_libraries(tst_playback_fullscreen PRIVATE Qt6::GuiPrivate)
+set_tests_properties(tst_playback_fullscreen PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=minimal;QT_QPA_PLATFORMTHEME=none"
 )
 
 marquee_add_test(tst_player_window

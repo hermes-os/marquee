@@ -220,7 +220,9 @@ private slots:
     }
 
     // A window manager's own fullscreen key (Super+F on Hyprland) changes the
-    // window without going through toggle(); it is the viewer's all the same.
+    // window without going through toggle(). What is left is decided at close
+    // from the state then, never from when or in what order the states were
+    // reported.
     void aWindowManagerToggleDuringPlaybackIsLeftAsSet()
     {
         {
@@ -229,19 +231,15 @@ private slots:
             QVERIFY(play(env));
             QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
 
-            // Out of fullscreen and back in: the window ends where playback
-            // put it, which is not the state to give back. Entering has
-            // settled by now.
-            QTest::qWait(700);
+            // Out of fullscreen and back in cannot be told from the window
+            // system's late echo of playback's own request, so it is given
+            // back like an untouched window.
             env.window->showNormal();
             QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
             env.window->showFullScreen();
             QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
             closePlayer(env);
-            QTRY_VERIFY(env.controller.navigation()->route()
-                        != NavigationController::Route::Player);
-            QTest::qWait(300);
-            QCOMPARE(env.window->visibility(), QWindow::FullScreen);
+            QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
         }
         {
             Env env;
@@ -251,14 +249,26 @@ private slots:
 
             // Out of fullscreen to maximized: the viewer's choice, not the
             // windowed state from before.
-            QTest::qWait(700);
             env.window->showMaximized();
             QTRY_COMPARE(env.window->visibility(), QWindow::Maximized);
             closePlayer(env);
             QTRY_VERIFY(env.controller.navigation()->route()
                         != NavigationController::Route::Player);
-            QTest::qWait(300);
             QCOMPARE(env.window->visibility(), QWindow::Maximized);
+        }
+        {
+            Env env;
+            QVERIFY(load(env, false));
+            QVERIFY(play(env));
+            QTRY_COMPARE(env.window->visibility(), QWindow::FullScreen);
+
+            // Out of fullscreen to windowed and left there.
+            env.window->showNormal();
+            QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
+            closePlayer(env);
+            QTRY_VERIFY(env.controller.navigation()->route()
+                        != NavigationController::Route::Player);
+            QCOMPARE(env.window->visibility(), QWindow::Windowed);
         }
     }
 

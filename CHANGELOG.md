@@ -11,12 +11,16 @@ intermediate version bump.
   as in the released app; closing the player brings the shell back on the same
   route with the remote on the content, as before.
 - Playback goes fullscreen. Starting a film (a card, Play Something, Continue
-  Watching, `--play`) puts the window fullscreen if it is not already; closing
-  the player puts it back the way it was (windowed or maximized) unless you
-  changed the window yourself during playback (the Fullscreen control, F or
-  F11, or your window manager's own fullscreen or maximize key), in which case
-  the window stays as you left it. Moving to the next episode changes
-  nothing. This differs from the released macOS app on purpose.
+  Watching, `--play`) puts the window fullscreen if it is not already. When the
+  player closes, the window is decided from how it is then: if you used the
+  Fullscreen control, F or F11 during playback, it stays as you left it; if
+  your window manager took it out of fullscreen (its own fullscreen or
+  maximize key), it stays where the manager put it; if it is still fullscreen,
+  it goes back the way it was (windowed or maximized). A window that was
+  already fullscreen stays fullscreen. A window manager that leaves fullscreen
+  and returns during one film is treated as untouched, so the window goes
+  back. Moving to the next episode changes nothing. This differs from the
+  released macOS app on purpose.
 - The mouse pointer hides with the player controls: when they fade out after
   three seconds (or Back hides them) the pointer disappears over the picture,
   and any pointer movement brings it and the controls back, as in the released
