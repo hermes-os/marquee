@@ -331,6 +331,19 @@ FocusScope {
     Keys.onReturnPressed: event => activateFocused(event)
     Keys.onEnterPressed: event => activateFocused(event)
 
+    // AppRouter.swift:8-12 and ContentView.swift:391-407: leaving for the
+    // profile picker puts the remote's remembered stop back on Home, so the
+    // next viewer's first Return on the sidebar is not the profile control.
+    function resetFocusedIndex() {
+        for (let index = 0; index < root.entries.length; ++index) {
+            if (root.entries[index].route === NavigationController.Home) {
+                root.focusedIndex = index
+                return
+            }
+        }
+        root.focusedIndex = 0
+    }
+
     function activateFocused(event) {
         if (focusedIndex < entries.length)
             routeActivated(entries[focusedIndex].route)

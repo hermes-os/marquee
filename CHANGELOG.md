@@ -6,6 +6,12 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Choosing a profile again no longer sends the next Return back to the profile
+  picker. After any profile choice, the first Return opens a Home card:
+  Home's content holds the remote with a visible ring, and the sidebar's
+  remembered stop is back on Home instead of the profile control, as in the
+  released app. Before, the remote went to the collapsed sidebar still resting
+  on the profile control, so every Return reopened the picker.
 - A few unreadable files no longer empty the whole library. A file the drive
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the

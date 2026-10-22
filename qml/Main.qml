@@ -256,11 +256,15 @@ ApplicationWindow {
     Connections {
         target: appController
         // Once the exit fade has ended the shell owns the remote again, on
-        // the sidebar as ContentView.swift:117 restores it.
+        // Home's content: ContentView.swift:391-407 leaves the sidebar
+        // without remote focus, so the browse surface is the remote's owner
+        // (FocusCoordinator.swift:42-47) and the first Return opens a card
+        // rather than the sidebar's control the viewer last stood on.
         function onProfileExitInFlightChanged() {
             if (!appController.profileExitInFlight && window.shellShowing
                 && !window.playerShowing) {
-                sidebar.forceActiveFocus()
+                sidebar.resetFocusedIndex()
+                contentFocus.forceActiveFocus()
             }
         }
     }
@@ -269,6 +273,7 @@ ApplicationWindow {
         target: appController.navigation
         function onRouteChanged() {
             if (appController.navigation.route === NavigationController.ProfilePicker) {
+                sidebar.resetFocusedIndex()
                 if (profilePickerLoader.item) {
                     profilePickerLoader.item.forceActiveFocus()
                 }
