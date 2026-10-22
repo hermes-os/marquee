@@ -99,6 +99,10 @@ QtObject {
     readonly property int motionFast: 120
     readonly property int motionNormal: 250
     readonly property int motionPage: 350
+    // Marquee/Theme/MarqueeTheme.swift:258's hero spring (response 0.5,
+    // damping 0.82), as an ease that settles in the same half second; the
+    // 0.82 damping's small overshoot is not reproduced.
+    readonly property int motionHero: 500
 
     function scaled(compact, leanBack, enabled) {
         return enabled ? leanBack : compact

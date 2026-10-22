@@ -6,6 +6,25 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home has its hero carousel, above the rows, as the released app has it. It
+  spotlights up to five titles in the released order: Continue Watching (the
+  title or show you were last in), Featured (the best-scored title: artwork and
+  a long runtime count, and a title as new as your newest file), Holiday Pick,
+  Recently Added, From the Vault (a film from before 2000), then Smart Picks.
+  A franchise is not shown twice while other titles remain, and a Kids profile
+  is only spotlit what its policy allows. Home opens on the hero. Left and Right
+  move between spotlights and wrap, Down enters the first row, Up from it comes
+  back (and Up again reaches Play Something), Return or a click on Watch Now
+  plays the spotlight in front, and Back hands the remote to the sidebar. The
+  carousel moves on every 15 seconds on its own, and stops while the remote is
+  on it or Reduce Motion is on. The arrows, the dots, a tap on a side card, and
+  a drag also move it. A movie's `-backdrop`/`-fanart` sidecar, or its folder's
+  `fanart`/`backdrop`, is its hero picture; a title without one shows the
+  poster and the fallback tile. A spotlight for a show plays the episode you are
+  up to rather than always the first, which differs from the released app.
+  Ratings, taste, genres, and online artwork are not in the catalog, so those
+  terms of the released selection are left out (see `issues.md`). The next
+  scan of an existing library picks up a movie's backdrop; no migration.
 - A few unreadable files no longer empty the whole library. A file the drive
   lists but cannot open or stat (a name the filesystem driver cannot map, a
   file deleted mid-scan) is skipped and logged, and every other file in the

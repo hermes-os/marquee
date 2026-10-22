@@ -7,10 +7,12 @@ import Marquee 3.0
 // state or :477-492's empty state instead of that surface. Under the bar sit
 // the titled horizontal rows (:612-648): Continue Watching, Recently Watched,
 // Play Something, Recently Added, a row per decade, and All Movies, composed by
-// the C++ `HomeRowsModel` so this file only draws them. The hero spotlight
-// (:496-608) is not composed here yet. The Play Something capsule in the title
-// bar is the first stop of the remote's vertical tree (:47, :1056): Up from the
-// first row reaches it, Down returns to the card it left.
+// the C++ `HomeRowsModel` so this file only draws them. Above the rows sits the
+// hero carousel (:202-203, :496-508), `HeroCarousel.qml`, over the model's
+// `hero`. The remote's vertical tree is the Play Something capsule in the title
+// bar, then the hero, then the rows (:43-77, :1056): Home opens on the hero
+// (:21), Down from it is the first row, Up from the first row is the hero, and
+// Up from the hero is the capsule.
 FocusScope {
     id: root
 
@@ -43,11 +45,17 @@ FocusScope {
     // is owned by `libraryEmptyState` below (:477-492 via :191-196).
     readonly property bool libraryEmpty: root.movieCount === 0 && root.episodeCount === 0
     readonly property bool hasContent: !root.libraryEmpty
+    // :147-153: the hero is there while the library has a spotlight.
+    readonly property bool hasHero: root.rows.hero.count > 0
 
     // HomeDetailView.swift:329 and :1008 run `appState.playSomething()` for a
     // tap on the capsule and for Enter while the remote rests on it. The shell
     // owns the pick and the player, as it does for the sidebar's control.
     signal playSomethingActivated()
+
+    // HomeDetailView.swift:1021 hands the remote to the sidebar on Back, the
+    // way the Movies and TV Shows routes do (`onRemoteBackAtRoot`).
+    signal requestSidebarFocus()
 
     readonly property var rows: appController.homeRows
     readonly property var focusState: appController.homeRows.focus
@@ -101,7 +109,7 @@ FocusScope {
             anchors.fill: parent
 
             contentWidth: width
-            contentHeight: pageColumn.height
+            contentHeight: pageColumn.y + pageColumn.height
             boundsBehavior: Flickable.StopAtBounds
 
             // :201's leading spacer and :647's trailing padding, which are the
@@ -122,12 +130,40 @@ FocusScope {
                 easing.type: Easing.OutCubic
             }
 
+            // :202-203 puts the hero first in the page, after the bar's
+            // spacer, and :204-210 gives it the page's whole width: only the
+            // rows below it are inset by the outer padding. :511 leaves 12/20
+            // points between it and them. A library with no spotlight has no
+            // hero at all.
+            HeroCarousel {
+                id: heroBlock
+                objectName: "homeHero"
+
+                x: 0
+                y: 0
+                width: scroll.width
+                height: root.hasHero ? implicitHeight : 0
+                visible: root.hasHero
+
+                hero: root.rows.hero
+                remoteFocused: root.activeFocus && root.rows.heroFocused
+                leanBack: root.leanBack
+                reduceMotion: root.reduceMotion
+
+                // :499-501 plays the spotlight at once, with no page between.
+                onPlayRequested: spotlight => root.playSpotlight(spotlight, true)
+                onPointerTouched: root.rows.focusHero()
+            }
+
             // :632 spaces the rows 36/54 points apart, :640's content padding
             // opens the stack 32/48 points below the bar's spacer, and :641
             // insets it by the page's outer padding.
             Column {
                 id: pageColumn
 
+                y: root.hasHero
+                    ? heroBlock.height + Theme.scaled(12, 20, root.leanBack)
+                    : 0
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: Theme.outerPadding(root.leanBack)
@@ -154,6 +190,7 @@ FocusScope {
 
                         totalCount: itemCount
                         focusedIndex: root.activeFocus && !root.rows.playSomethingFocused
+                            && !root.rows.heroFocused
                             && root.focusState.row === index
                             ? root.focusState.column
                             : -1
@@ -724,6 +761,10 @@ FocusScope {
     // the released row anchor, and leave the page alone while that row is
     // already comfortably placed, so moving along a row does not drag the page.
     function placeFocusedRow(animated) {
+        if (root.rows.heroFocused) {
+            root.placeHero(animated)
+            return
+        }
         const item = rowRepeater.itemAt(root.focusState.row)
         if (item === null || scroll.height <= 0) {
             return
@@ -754,6 +795,39 @@ FocusScope {
         scrollSpring.from = scroll.contentY
         scrollSpring.to = target
         scrollSpring.start()
+    }
+
+    // :761-768 puts the page back at its origin when the remote returns to the
+    // hero, whatever offset a row had left it at
+    // (`RemoteHomeHeroScrollPlacement.targetOffset` is always the origin).
+    function placeHero(animated) {
+        const target = -scroll.topMargin
+        if (Math.abs(scroll.contentY - target) < 1) {
+            return
+        }
+        scrollSpring.stop()
+        if (!animated || root.reduceMotion) {
+            scroll.contentY = target
+            return
+        }
+        scrollSpring.from = scroll.contentY
+        scrollSpring.to = target
+        scrollSpring.start()
+    }
+
+    // HomeDetailView.swift:1010-1011 plays the spotlight in front. The tap
+    // path is refused under the sticky bar like a card's.
+    function playSpotlight(spotlight, fromPointer) {
+        if (spotlight === undefined || spotlight.mediaId === undefined
+                || spotlight.mediaId.length === 0) {
+            return
+        }
+        if (fromPointer === true && root.lastPressWasOnTheBar) {
+            return
+        }
+        // Playing replaces this screen, and with it the delegate the key or
+        // tap is still unwinding through.
+        Qt.callLater(appController.playMediaId, spotlight.mediaId, false)
     }
 
     // The sticky bar is opaque (:367), so a card scrolled under it is neither
@@ -823,6 +897,19 @@ FocusScope {
         function onStructureChanged() { root.placeFocusedRow(false) }
     }
 
+    Connections {
+        target: root.rows
+
+        // The remote reaching the hero, or leaving it for the first row, moves
+        // the page the way a row change does (:747-768). Reaching the capsule
+        // moves nothing: it is in the title bar, over the page.
+        function onHeroFocusedChanged() {
+            if (!root.rows.playSomethingFocused) {
+                root.placeFocusedRow(true)
+            }
+        }
+    }
+
     // Every arrow key is handled in one handler, because Keys mixes a generic
     // handler and per-key handlers on the same item in an order that is not
     // worth depending on. Left at the first column stays unaccepted, so the
@@ -844,10 +931,20 @@ FocusScope {
             root.rows.moveDown()
             event.accepted = true
             return
+        case Qt.Key_Escape:
+        case Qt.Key_Back:
+        case Qt.Key_Backspace:
+            // :1021 answers Back by handing the remote to the sidebar rather
+            // than leaving Home.
+            root.requestSidebarFocus()
+            event.accepted = true
+            return
         case Qt.Key_Return:
         case Qt.Key_Enter:
             if (root.rows.playSomethingFocused) {
                 root.playSomethingActivated()
+            } else if (root.rows.heroFocused) {
+                root.playSpotlight(root.rows.hero.current(), false)
             } else {
                 root.openCard(root.rows.cardAt(root.focusState.row, root.focusState.column), false)
             }

@@ -153,6 +153,9 @@ ApplicationWindow {
             // HomeDetailView.swift:329 and :1008 run the same `playSomething()`
             // the sidebar's control does (ContentView.swift:207).
             onPlaySomethingActivated: appController.playSomething()
+            // HomeDetailView.swift:1021: Back on Home hands the remote to the
+            // sidebar, as it does on the other routes.
+            onRequestSidebarFocus: sidebar.forceActiveFocus()
         }
     }
 
