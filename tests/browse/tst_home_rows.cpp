@@ -396,6 +396,33 @@ private slots:
         QVERIFY(home_rows::compose({}, kNow).isEmpty());
     }
 
+    // BrowseSnapshotStore.swift:2876-2881 puts Holiday Movies after Recently
+    // Added and before the decades, once two titles qualify, in the order
+    // sortedHolidayMovies gives (:2063-2071).
+    void holidayMoviesFollowRecentlyAddedAndAreOrderedByTheSharedScore()
+    {
+        const QVector<home_rows::Row> rows = home_rows::compose(
+            {movie(QStringLiteral("Scrooged"), 1988), movie(QStringLiteral("Arrival"), 2016),
+             movie(QStringLiteral("The Santa Clause"), 1994)},
+            kNow);
+
+        QCOMPARE(rowIds(rows),
+                 (QStringList{QStringLiteral("play-something"), QStringLiteral("recently-added"),
+                              QStringLiteral("holiday-movies"), QStringLiteral("all-movies")}));
+        const home_rows::Row *holiday = rowNamed(rows, QStringLiteral("holiday-movies"));
+        QCOMPARE(holiday->title, QStringLiteral("Holiday Movies"));
+        QCOMPARE(holiday->cards.size(), 2);
+        // 100 for the keyword title, then 86 for the named film.
+        QCOMPARE(holiday->cards.at(0).mediaId, QStringLiteral("root/The Santa Clause"));
+        QCOMPARE(holiday->cards.at(1).mediaId, QStringLiteral("root/Scrooged"));
+
+        QVERIFY(rowNamed(home_rows::compose({movie(QStringLiteral("Scrooged"), 1988),
+                                             movie(QStringLiteral("Arrival"), 2016)},
+                                            kNow),
+                         QStringLiteral("holiday-movies"))
+                == nullptr);
+    }
+
     void aRowDrawsAtMostEightCardsAndStillCountsItsWholeLength()
     {
         QVector<MediaItem> items;

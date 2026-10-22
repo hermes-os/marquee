@@ -53,9 +53,9 @@ Found: the TMDB enrichment task, comparing `Marquee/Services/` with `src/`.
 Where: `qml/screens/HomeScreen.qml`, `src/models/HomeRowsModel.cpp` (`compose`
 leaves the place after Play Something and before Recently Added open).
 What happens: Home has no hero spotlight or carousel. Its rows are Continue
-Watching, Recently Watched, Play Something, Recently Added, a row per decade,
-and All Movies; the released Because You Watched, Hidden Gems, Short Tonight,
-seasonal, and Holiday Movies rows are not built, and the hero has no place in
+Watching, Recently Watched, Play Something, Recently Added, Holiday Movies, a
+row per decade, and All Movies; the released Because You Watched, Hidden Gems,
+Short Tonight, and seasonal rows are not built, and the hero has no place in
 the Home focus tree.
 Found: parity inventory in the retired plan, re-checked against source at 81c8fa8.
 

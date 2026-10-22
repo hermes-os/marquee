@@ -1,4 +1,5 @@
 #include "models/HomeRowsModel.hpp"
+#include "models/BrowseSemantics.hpp"
 
 #include "models/PlaySomething.hpp"
 #include "models/ShowsModel.hpp"
@@ -364,7 +365,23 @@ QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items, cons
                    recentlyAdded(items)));
 
     // :2876-2881 puts Holiday Movies after Recently Added and before the
-    // decades. MovieRowsModel already composes that row for the Movies route.
+    // decades, from the one holiday score the Movies route reads.
+    {
+        QVector<MediaItem> holidayCandidates;
+        for (const MediaItem &item : items) {
+            if (item.isMovie() && browse::isHolidayMovie(item)) {
+                holidayCandidates.push_back(item);
+            }
+        }
+        if (holidayCandidates.size() >= 2) {
+            QVector<Card> cards;
+            for (const MediaItem &movie : browse::sortedHolidayMovies(std::move(holidayCandidates))) {
+                cards.push_back(movieCard(movie));
+            }
+            append(makeRow(QStringLiteral("holiday-movies"), QStringLiteral("Holiday Movies"),
+                           std::move(cards)));
+        }
+    }
 
     for (Row &row : decadeRows(items)) {
         append(std::move(row));

@@ -6,6 +6,9 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home shows a Holiday Movies row after Recently Added, as the released app
+  does, once two movies qualify: a holiday word in the title, in TMDB's genres
+  or in its overview, or a named holiday film. No migration.
 - After an update, every title whose online metadata an older matcher wrote is
   checked again once in the background, including the ones fetched in the last
   day (before, those skipped the check). A title waits a day only after a check
