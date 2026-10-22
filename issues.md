@@ -137,8 +137,9 @@ to movies before `replaceItems`.
 ## A partially readable library root is only logged
 Where: `src/catalog/CatalogStore.cpp` (`applyScan`, `Incomplete`),
 `src/catalog/CatalogWorker.cpp`.
-What happens: when part of a root cannot be read, its rows are kept and a warning
-goes to the log. The viewer is told nothing, unlike an unavailable root.
+What happens: when part of a root cannot be read, or a file in it cannot be
+stat'ed, what did scan is stored, its existing rows are kept, and a warning goes
+to the log. The viewer is told nothing, unlike an unavailable root.
 Found: source read at 81c8fa8.
 
 ## A moved library is treated as a new library

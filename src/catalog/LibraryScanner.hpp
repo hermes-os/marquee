@@ -32,8 +32,9 @@ struct ParsedEpisode
 enum class ScanOutcome {
     /// The root is missing, unreadable, or not a directory.
     RootUnavailable,
-    /// Part of the root could not be enumerated, so the walk is not evidence of
-    /// what the root no longer holds.
+    /// Part of the root could not be enumerated, or a media entry in it could
+    /// not be stat'ed. `items` holds everything that was read, but the walk is
+    /// not evidence of what the root no longer holds.
     Incomplete,
     /// Every directory under the root was enumerated.
     Complete
@@ -80,7 +81,10 @@ struct ScanResult
 /// files outside any season folder are kept as movies the way the released
 /// projection keeps them. Symlinks are never followed, so everything reported
 /// lies inside the configured root. Only a `Complete` outcome states what the
-/// root holds; the other two mean the catalog must preserve what it already
-/// stored for this root.
+/// root holds; `Incomplete` items may be stored but nothing may be removed on
+/// their account, and `RootUnavailable` means the catalog preserves everything
+/// it already stored for this root. A media entry the filesystem lists but
+/// cannot stat is skipped and logged; a sidecar that cannot be stat'ed is
+/// treated as missing.
 [[nodiscard]] ScanResult scan(const LibraryRoot &root);
 }

@@ -534,6 +534,53 @@ private slots:
         QCOMPARE(schemaVersionOf(catalog), 5);
     }
 
+    void startupLoadsTheReadableFilesOfRootsWithUnreadableEntries()
+    {
+        QTemporaryDir runtimeRoot;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restorePaths = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+
+        QTemporaryDir movies;
+        QTemporaryDir shows;
+        const auto write = [](const QString &root, const QString &relativePath) {
+            const QFileInfo target(QDir(root).filePath(relativePath));
+            QFile file(target.absoluteFilePath());
+            return QDir().mkpath(target.absolutePath()) && file.open(QIODevice::WriteOnly)
+                && file.write("media") == 5;
+        };
+        const auto linkToNowhere = [](const QString &root, const QString &relativePath) {
+            const QFileInfo target(QDir(root).filePath(relativePath));
+            return QDir().mkpath(target.absolutePath())
+                && QFile::link(QDir(root).filePath(QStringLiteral("nowhere.mkv")),
+                               target.absoluteFilePath());
+        };
+        QVERIFY(write(movies.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(linkToNowhere(movies.path(), QStringLiteral("Broken Movie (2020).mkv")));
+        QVERIFY(write(movies.path(), QStringLiteral("Archive/Heat.1995.mkv")));
+        const QString locked = QDir(movies.path()).filePath(QStringLiteral("Archive"));
+        QVERIFY(QFile::setPermissions(locked, QFileDevice::ExeOwner));
+        const auto restoreListing = qScopeGuard([&locked] {
+            QFile::setPermissions(locked,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                      | QFileDevice::ExeOwner);
+        });
+        QVERIFY(write(shows.path(), QStringLiteral("Show (2001)/Season 1/Show S01E02.mkv")));
+        QVERIFY(linkToNowhere(shows.path(), QStringLiteral("Show (2001)/Season 1/Show S01E01.mkv")));
+
+        {
+            ApplicationController controller;
+            QVERIFY2(!controller.hasError(), qPrintable(controller.errorMessage()));
+            controller.setTemporaryLibraryRoot(movies.path());
+            controller.setTemporaryTvShowsRoot(shows.path());
+            QTRY_COMPARE(controller.library()->rowCount(), 1);
+            QTRY_COMPARE(controller.shows()->rowCount(), 1);
+            QVERIFY2(!controller.hasError(), qPrintable(controller.errorMessage()));
+        }
+
+        CatalogDatabase catalog(AppPaths::catalogFile());
+        QCOMPARE(rowCount(catalog, "media_items"), 2);
+    }
+
     void startupReportsAnUnwritableCatalogInsteadOfFailing()
     {
         QTemporaryDir runtimeRoot;

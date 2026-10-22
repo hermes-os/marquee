@@ -1,7 +1,9 @@
 #include <QDir>
 #include <QFile>
+#include <QFileDevice>
 #include <QFileInfo>
 #include <QIODevice>
+#include <QScopeGuard>
 #include <QSignalSpy>
 #include <QTemporaryDir>
 #include <QVariant>
@@ -300,6 +302,50 @@ private slots:
         QCOMPARE(wire->showPosterAbsolutePath,
                  QDir(library.path()).filePath(QStringLiteral("The Wire (2002)/poster.jpg")));
         QVERIFY(!wire->watched);
+    }
+
+    // Qt's listing already leaves a link to nowhere out, so the unreadable
+    // season folder is what makes the root partial; the walk must still hand
+    // over, and the catalog store, every episode it could read.
+    void aTvRootWithUnreadableEntriesStoresTheEpisodesItCouldRead()
+    {
+        QTemporaryDir library;
+        QTemporaryDir catalogDir;
+        QVERIFY(writeTvFixture(library.path()));
+        QVERIFY(QDir().mkpath(QDir(library.path()).filePath(QStringLiteral("Show (2001)/Season 1"))));
+        QVERIFY(QFile::link(QDir(library.path()).filePath(QStringLiteral("nowhere.mkv")),
+                            QDir(library.path()).filePath(
+                                QStringLiteral("Show (2001)/Season 1/Show S01E01.mkv"))));
+        const QString locked =
+            QDir(library.path()).filePath(QStringLiteral("Show (2001)/Season 2"));
+        QVERIFY(writeMediaFile(library.path(),
+                               QStringLiteral("Show (2001)/Season 2/Show S02E01.mkv")));
+        QVERIFY(QFile::setPermissions(locked, QFileDevice::ExeOwner));
+        const auto restore = qScopeGuard([&locked] {
+            QFile::setPermissions(locked,
+                                  QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                      | QFileDevice::ExeOwner);
+        });
+        const QString catalogPath = catalogDir.filePath(QStringLiteral("catalog.sqlite"));
+        {
+            CatalogDatabase catalog(catalogPath);
+            catalog.migrate();
+        }
+
+        CatalogStore store(catalogPath);
+        const QVector<LibraryRoot> roots =
+            store.registerRoots(LibraryRootPaths{.movies = {}, .tvShows = {library.path()}});
+        QCOMPARE(roots.size(), 1);
+        const LibraryScanner::ScanResult result = LibraryScanner::scan(roots.constFirst());
+        QCOMPARE(result.outcome, LibraryScanner::ScanOutcome::Incomplete);
+        QCOMPARE(result.items.size(), 5);
+
+        try {
+            store.applyScan(roots.constFirst(), result);
+        } catch (const std::exception &error) {
+            QFAIL(error.what());
+        }
+        QCOMPARE(store.projection(roots).size(), 5);
     }
 
     void aFolderListedUnderBothRolesIsRegisteredAsTv()

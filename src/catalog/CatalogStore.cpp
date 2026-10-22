@@ -203,6 +203,16 @@ void executeOrThrow(QSqlDatabase &database, const QString &sql)
     return fingerprints;
 }
 
+// Every NOT NULL media_items column. A null QString or an invalid QDateTime
+// binds NULL, which would fail the insert and roll back the whole root.
+[[nodiscard]] bool hasRequiredColumns(const MediaItem &item)
+{
+    return !item.id.isEmpty() && !item.libraryRootId.isEmpty()
+        && !item.relativePath.isEmpty() && !item.mediaKind.isEmpty()
+        && !item.title.isNull() && !item.sortTitle.isNull() && item.fileSize >= 0
+        && item.modifiedAt.isValid();
+}
+
 void insertItem(QSqlDatabase &database, const MediaItem &item, const QString &now)
 {
     QSqlQuery query = prepared(
@@ -331,13 +341,14 @@ void CatalogStore::applyScan(const LibraryRoot &root,
         return;
     case LibraryScanner::ScanOutcome::Incomplete:
         // A walk that could not read part of the root says nothing about what
-        // the unread part still holds, so the root's rows are left alone
-        // entirely rather than diffed against a partial picture.
+        // the unread part still holds, so what it did read is stored but no
+        // row is removed on the strength of a partial picture.
         qCWarning(logCatalog) << "kept stored rows for partially readable root"
                               << root.path;
+        applyAvailableScan(root, result.items, false);
         return;
     case LibraryScanner::ScanOutcome::Complete:
-        applyAvailableScan(root, result.items);
+        applyAvailableScan(root, result.items, true);
         return;
     }
 }
@@ -483,7 +494,8 @@ QVector<LibraryRoot> CatalogStore::knownRoots() const
 }
 
 void CatalogStore::applyAvailableScan(const LibraryRoot &root,
-                                      const QVector<MediaItem> &items)
+                                      const QVector<MediaItem> &items,
+                                      bool removeMissing)
 {
     QSqlDatabase &database = m_database.connection();
     const QString now = formatTimestamp(QDateTime::currentDateTimeUtc());
@@ -496,7 +508,14 @@ void CatalogStore::applyAvailableScan(const LibraryRoot &root,
         QSet<QString> scanned;
 
         for (const MediaItem &item : items) {
+            // Counted as scanned even when dropped below, so a bad item never
+            // costs the row it already has.
             scanned.insert(item.id);
+            if (!hasRequiredColumns(item)) {
+                qCWarning(logCatalog) << "dropped media item with a missing required value:"
+                                      << item.absolutePath;
+                continue;
+            }
             const auto existing = stored.constFind(item.id);
             if (existing == stored.constEnd()) {
                 insertItem(database, item, now);
@@ -505,10 +524,12 @@ void CatalogStore::applyAvailableScan(const LibraryRoot &root,
             }
         }
 
-        const QList<QString> storedIds = stored.keys();
-        for (const QString &id : storedIds) {
-            if (!scanned.contains(id)) {
-                deleteItem(database, id);
+        if (removeMissing) {
+            const QList<QString> storedIds = stored.keys();
+            for (const QString &id : storedIds) {
+                if (!scanned.contains(id)) {
+                    deleteItem(database, id);
+                }
             }
         }
 

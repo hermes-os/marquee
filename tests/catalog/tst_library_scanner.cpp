@@ -289,6 +289,127 @@ private slots:
         QCOMPARE(result.outcome, LibraryScanner::ScanOutcome::Incomplete);
     }
 
+    void scanSkipsAMediaEntryItCannotStatAndKeepsTheGoodFiles()
+    {
+        QTemporaryDir library;
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Arrival (2016)/Arrival (2016).mkv")));
+        QVERIFY(QFile::link(QDir(library.path()).filePath(QStringLiteral("nowhere.mkv")),
+                            QDir(library.path()).filePath(QStringLiteral("Broken Movie (2020).mkv"))));
+
+        const LibraryScanner::ScanResult result = LibraryScanner::scan(rootAt(library.path()));
+
+        QVERIFY(result.outcome != LibraryScanner::ScanOutcome::RootUnavailable);
+        QCOMPARE(relativePathsOf(result.items),
+                 QStringList({QStringLiteral("Arrival (2016)/Arrival (2016).mkv"),
+                              QStringLiteral("Moon.2009.mkv")}));
+        for (const MediaItem &item : result.items) {
+            QVERIFY(item.modifiedAt.isValid());
+        }
+    }
+
+    void aBrokenSymlinkNamedLikeMediaDoesNotFailTheCatalogWrite()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Arrival (2016)/Arrival (2016).mkv")));
+        QVERIFY(QFile::link(QDir(library.path()).filePath(QStringLiteral("nowhere.mkv")),
+                            QDir(library.path()).filePath(QStringLiteral("Broken Movie (2020).mkv"))));
+
+        CatalogStore store(catalogPath);
+        QStringList titles;
+        try {
+            titles = titlesOf(refresh(store, {library.path()}));
+        } catch (const std::exception &error) {
+            QFAIL(error.what());
+        }
+
+        QCOMPARE(titles, QStringList({QStringLiteral("Arrival"), QStringLiteral("Moon")}));
+    }
+
+    // The same rule as an unreadable file, one level up: what a partial walk did
+    // read is stored, because a library that is empty until every directory is
+    // readable is no better than one that failed to load.
+    void aPartiallyReadableRootStoresWhatItReadAndRemovesNothing()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        const QString locked = QDir(library.path()).filePath(QStringLiteral("Archive"));
+        QVERIFY(writeMediaFile(locked, QStringLiteral("Arrival.2016.mkv")));
+
+        CatalogStore store(catalogPath);
+        QVERIFY(blockDirectoryListing(locked));
+        const auto restore = qScopeGuard([&locked] { restoreDirectoryListing(locked); });
+
+        // Nothing is cataloged yet, so the readable file must still arrive.
+        QCOMPARE(titlesOf(refresh(store, {library.path()})),
+                 QStringList({QStringLiteral("Moon")}));
+
+        restoreDirectoryListing(locked);
+        QCOMPARE(titlesOf(refresh(store, {library.path()})),
+                 QStringList({QStringLiteral("Arrival"), QStringLiteral("Moon")}));
+
+        // Now the file that scanned is removed while the other directory is
+        // unreadable: neither the unread nor the removed row may be deleted on
+        // the strength of a partial walk.
+        QVERIFY(QFile::remove(QDir(library.path()).filePath(QStringLiteral("Moon.2009.mkv"))));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Heat.1995.mkv")));
+        QVERIFY(blockDirectoryListing(locked));
+        QCOMPARE(titlesOf(refresh(store, {library.path()})),
+                 QStringList({QStringLiteral("Arrival"), QStringLiteral("Heat"),
+                              QStringLiteral("Moon")}));
+    }
+
+    void anItemWithoutAModificationTimeIsDroppedAloneByTheCatalogWrite()
+    {
+        QTemporaryDir dataDirectory;
+        QTemporaryDir library;
+        const QString catalogPath =
+            QDir(dataDirectory.path()).filePath(QStringLiteral("catalog.sqlite"));
+        migrateCatalog(catalogPath);
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Moon.2009.mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Arrival (2016)/Arrival (2016).mkv")));
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Heat.1995.mkv")));
+
+        CatalogStore store(catalogPath);
+        const QVector<LibraryRoot> roots = store.registerRoots({library.path()});
+        QCOMPARE(roots.size(), 1);
+
+        // Heat is cataloged before its time goes missing, so the dropped update
+        // must not cost it the row it already has.
+        store.applyScan(roots.constFirst(), LibraryScanner::scan(roots.constFirst()));
+        QCOMPARE(store.projection(roots).size(), 3);
+
+        QVERIFY(writeMediaFile(library.path(), QStringLiteral("Zodiac.2007.mkv")));
+        LibraryScanner::ScanResult result = LibraryScanner::scan(roots.constFirst());
+        QCOMPARE(result.items.size(), 4);
+        for (MediaItem &item : result.items) {
+            if (item.title == QStringLiteral("Heat") || item.title == QStringLiteral("Zodiac")) {
+                item.modifiedAt = QDateTime();
+                item.fileSize += 1;
+            }
+        }
+
+        try {
+            store.applyScan(roots.constFirst(), result);
+        } catch (const std::exception &error) {
+            QFAIL(error.what());
+        }
+
+        QCOMPARE(titlesOf(store.projection(roots)),
+                 QStringList({QStringLiteral("Arrival"), QStringLiteral("Heat"),
+                              QStringLiteral("Moon")}));
+    }
+
     void scanPrefersATitlesOwnSidecarOverTheFolderArtwork()
     {
         QTemporaryDir library;

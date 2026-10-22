@@ -75,7 +75,8 @@ public:
     [[nodiscard]] QVector<LibraryRoot> knownRoots() const;
 
 private:
-    void applyAvailableScan(const LibraryRoot &root, const QVector<MediaItem> &items);
+    void applyAvailableScan(const LibraryRoot &root, const QVector<MediaItem> &items,
+                            bool removeMissing);
     void markRootUnavailable(const LibraryRoot &root);
 
     CatalogDatabase m_database;

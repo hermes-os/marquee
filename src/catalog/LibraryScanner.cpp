@@ -10,6 +10,7 @@
 #include <QStringList>
 
 #include <algorithm>
+#include <optional>
 
 #include "support/Logging.hpp"
 
@@ -57,14 +58,28 @@ const QStringList &imageExtensions()
     return {};
 }
 
+/// A listing can name an entry the filesystem then refuses to open or stat (a
+/// name the driver cannot map, a link to nowhere, a file deleted mid-scan).
+/// The listing's own `QFileInfo` may answer from the directory read alone, so
+/// the entry is stat'ed afresh by path.
+[[nodiscard]] std::optional<QFileInfo> statableFile(const QFileInfo &listed)
+{
+    const QFileInfo fresh(listed.absoluteFilePath());
+    if (!fresh.exists() || !fresh.isFile()) {
+        return std::nullopt;
+    }
+    return fresh;
+}
+
 /// The names a directory's own listing holds, under the walk's containment
 /// rules, so folder artwork is adopted by the same evidence as media files.
+/// A sidecar that cannot be stat'ed is missing, not an error.
 [[nodiscard]] QSet<QString> fileNamesIn(const QString &directoryPath)
 {
     QSet<QString> names;
     const QFileInfoList entries = QDir(directoryPath).entryInfoList(libraryEntryFilters);
     for (const QFileInfo &entry : entries) {
-        if (!entry.isDir()) {
+        if (!entry.isDir() && statableFile(entry)) {
             names.insert(entry.fileName());
         }
     }
@@ -230,9 +245,10 @@ const QVector<QRegularExpression> &episodeExpressions()
 }
 
 /// Appends `directoryPath`'s media files and recurses into its subdirectories.
-/// Returns false when any directory in the subtree cannot be enumerated, because
-/// a walk that silently skipped a subtree would look like proof that the rows it
-/// missed are gone.
+/// Returns false when any directory in the subtree cannot be enumerated or any
+/// media entry in it cannot be stat'ed, because a walk that silently skipped
+/// part of the tree would look like proof that the rows it missed are gone. A
+/// failure never stops the walk: everything readable is still collected.
 [[nodiscard]] bool collectInto(const QString &directoryPath, const QDir &rootDirectory,
                                const LibraryRoot &root, QVector<MediaItem> &items)
 {
@@ -242,6 +258,8 @@ const QVector<QRegularExpression> &episodeExpressions()
         return false;
     }
 
+    bool complete = true;
+
     const QFileInfoList entries =
         QDir(directoryPath).entryInfoList(libraryEntryFilters);
 
@@ -250,7 +268,7 @@ const QVector<QRegularExpression> &episodeExpressions()
     // item.
     QSet<QString> fileNames;
     for (const QFileInfo &entry : entries) {
-        if (!entry.isDir()) {
+        if (!entry.isDir() && statableFile(entry)) {
             fileNames.insert(entry.fileName());
         }
     }
@@ -286,7 +304,7 @@ const QVector<QRegularExpression> &episodeExpressions()
     for (const QFileInfo &entry : entries) {
         if (entry.isDir()) {
             if (!collectInto(entry.absoluteFilePath(), rootDirectory, root, items)) {
-                return false;
+                complete = false;
             }
             continue;
         }
@@ -317,6 +335,15 @@ const QVector<QRegularExpression> &episodeExpressions()
                 continue;
             }
 
+            const std::optional<QFileInfo> episodeFile = statableFile(entry);
+            const QDateTime episodeModifiedAt =
+                episodeFile ? episodeFile->lastModified().toUTC() : QDateTime();
+            if (!episodeModifiedAt.isValid()) {
+                qCWarning(logScanner) << "skipped unreadable media file:" << entry.absoluteFilePath();
+                complete = false;
+                continue;
+            }
+
             const QString showName = !showFolder.name.isEmpty() ? showFolder.name
                 : !episode.showName.isEmpty()                   ? episode.showName
                                                                 : QStringLiteral("Unknown Show");
@@ -341,8 +368,8 @@ const QVector<QRegularExpression> &episodeExpressions()
                 .year = showFolder.year,
                 .posterRelativePath = relativeOrEmpty(posterPath),
                 .posterAbsolutePath = posterPath,
-                .fileSize = entry.size(),
-                .modifiedAt = entry.lastModified().toUTC(),
+                .fileSize = episodeFile->size(),
+                .modifiedAt = episodeModifiedAt,
                 .showName = showName,
                 .seasonNumber = episode.seasonNumber,
                 .episodeNumber = episode.episodeNumber,
@@ -355,6 +382,15 @@ const QVector<QRegularExpression> &episodeExpressions()
                 .seasonPosterAbsolutePath = seasonArtwork.poster,
                 .episodeStillRelativePath = relativeOrEmpty(episodeStillPath),
                 .episodeStillAbsolutePath = episodeStillPath});
+            continue;
+        }
+
+        const std::optional<QFileInfo> movieFile = statableFile(entry);
+        const QDateTime movieModifiedAt =
+            movieFile ? movieFile->lastModified().toUTC() : QDateTime();
+        if (!movieModifiedAt.isValid()) {
+            qCWarning(logScanner) << "skipped unreadable media file:" << entry.absoluteFilePath();
+            complete = false;
             continue;
         }
 
@@ -374,8 +410,8 @@ const QVector<QRegularExpression> &episodeExpressions()
                 posterPath.isEmpty() ? QString()
                                      : rootDirectory.relativeFilePath(posterPath),
             .posterAbsolutePath = posterPath,
-            .fileSize = entry.size(),
-            .modifiedAt = entry.lastModified().toUTC(),
+            .fileSize = movieFile->size(),
+            .modifiedAt = movieModifiedAt,
             // Movies store NULL in every episode column, so the projection's
             // defaults (empty text, zero numbers) are restated here.
             .showName = QString(),
@@ -392,7 +428,7 @@ const QVector<QRegularExpression> &episodeExpressions()
             .episodeStillAbsolutePath = QString()});
     }
 
-    return true;
+    return complete;
 }
 }
 
