@@ -6,6 +6,10 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Movie titles no longer carry the year of a `Title (YYYY)` file or folder
+  name: "1917 (2019)" is now "1917" from 2019 and "2001 A Space Odyssey (1968)"
+  is "2001 A Space Odyssey" from 1968, and the year is what online metadata
+  searches with. The library shows the corrected titles after the next scan.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's

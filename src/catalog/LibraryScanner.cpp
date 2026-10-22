@@ -468,6 +468,21 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
     QString stem = file.completeBaseName();
     int year = 0;
 
+    // FilenameParser.swift:243-255: a trailing `(YYYY)` is the release year
+    // and never part of the title, so `1917 (2019)` is "1917" from 2019.
+    // This runs first because a title may itself start with a year.
+    static const QRegularExpression trailingYear(QStringLiteral(R"(^(.+?)\s*\((\d{4})\)$)"));
+    const QRegularExpressionMatch plex = trailingYear.match(stem);
+    if (plex.hasMatch() && !plex.captured(1).trimmed().isEmpty()) {
+        const QString plexTitle = plex.captured(1).trimmed().replace(separators, QStringLiteral(" ")).simplified();
+        if (!plexTitle.isEmpty()) {
+            return {.title = plexTitle, .year = plex.captured(2).toInt()};
+        }
+    }
+
+    // A year at the very start would leave no title, so it is only the
+    // release year when nothing later in the name is (`1917.2019.BluRay`).
+    int leadingYear = 0;
     QRegularExpressionMatchIterator matches = yearExpression.globalMatch(stem);
     while (matches.hasNext()) {
         const QRegularExpressionMatch match = matches.next();
@@ -475,9 +490,16 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
         if (!isPlausibleReleaseYear(candidate)) {
             continue;
         }
+        if (match.capturedStart(1) == 0) {
+            leadingYear = candidate;
+            continue;
+        }
         year = candidate;
         stem.truncate(match.capturedStart(1));
         break;
+    }
+    if (year == 0) {
+        year = leadingYear;
     }
 
     stem.replace(separators, QStringLiteral(" "));

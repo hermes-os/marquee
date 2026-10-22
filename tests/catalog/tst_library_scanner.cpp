@@ -174,6 +174,30 @@ private slots:
         QCOMPARE(parsed.year, 2016);
     }
 
+    void takesTheTrailingParenthesizedYearAndKeepsItOutOfTheTitle()
+    {
+        // A title that is itself a year, or starts with one, must not lend
+        // its number to the release year.
+        const struct
+        {
+            const char *name;
+            const char *title;
+            int year;
+        } cases[] = {
+            {"1917 (2019).mkv", "1917", 2019},
+            {"2001 A Space Odyssey (1968).mkv", "2001 A Space Odyssey", 1968},
+            {"Blade Runner 2049 (2017).mkv", "Blade Runner 2049", 2017},
+            {"1917.2019.BluRay.mkv", "1917", 2019},
+            {"2001.A.Space.Odyssey.1968.1080p.mkv", "2001 A Space Odyssey", 1968},
+        };
+        for (const auto &c : cases) {
+            const LibraryScanner::ParsedFilename parsed =
+                LibraryScanner::parseMovieFilename(QFileInfo(QString::fromLatin1(c.name)));
+            QVERIFY2(parsed.title == QString::fromLatin1(c.title) && parsed.year == c.year,
+                     c.name);
+        }
+    }
+
     void mediaIdIsStablePerRootAndRelativePath()
     {
         const QString path = QStringLiteral("Arrival (2016)/Arrival (2016).mkv");
