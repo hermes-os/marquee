@@ -144,6 +144,8 @@ qt_add_qml_module(marquee_core
         src/models/MovieRowsModel.cpp
         src/models/PlaySomething.hpp
         src/models/PlaySomething.cpp
+        src/models/SeasonalRows.hpp
+        src/models/SeasonalRows.cpp
         src/models/ShowsModel.hpp
         src/models/ShowsModel.cpp
         src/models/SimilarityIndex.hpp

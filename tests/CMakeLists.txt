@@ -114,6 +114,11 @@ marquee_add_test(tst_taste_model
     browse/tst_taste_model.cpp
 )
 
+# October Horror and Summer Blockbusters, with the date they read pinned.
+marquee_add_test(tst_seasonal_rows
+    browse/tst_seasonal_rows.cpp
+)
+
 # The similarity ranking behind Because You Watched: plain functions over
 # projected items.
 marquee_add_test(tst_similarity_index
