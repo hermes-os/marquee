@@ -301,48 +301,18 @@ QVector<home_rows::Card> home_rows::playSomethingCards(const QVector<MediaItem> 
     return cards;
 }
 
-QVector<home_rows::Row> home_rows::decadeRows(const QVector<MediaItem> &items)
-{
-    QHash<int, QVector<MediaItem>> byDecade;
-    for (const MediaItem &item : items) {
-        if (item.isMovie() && item.year > 0) {
-            byDecade[(item.year / 10) * 10].push_back(item);
-        }
-    }
-    QList<int> decades;
-    for (auto it = byDecade.cbegin(); it != byDecade.cend(); ++it) {
-        if (it.value().size() >= 2) {
-            decades.push_back(it.key());
-        }
-    }
-    std::sort(decades.begin(), decades.end(), std::greater<>());
-
-    QCollator collator;
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
-    QVector<Row> rows;
-    for (const int decade : std::as_const(decades)) {
-        QVector<MediaItem> movies = byDecade.value(decade);
-        std::stable_sort(movies.begin(), movies.end(),
-                         [&collator](const MediaItem &left, const MediaItem &right) {
-                             return collator.compare(left.title, right.title) < 0;
-                         });
-        QVector<Card> cards;
-        cards.reserve(movies.size());
-        for (const MediaItem &movie : std::as_const(movies)) {
-            cards.push_back(movieCard(movie));
-        }
-        rows.push_back(makeRow(QStringLiteral("decade-%1s").arg(decade),
-                               QStringLiteral("The %1s").arg(decade), std::move(cards)));
-    }
-    return rows;
-}
-
 QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items,
                                            const QDateTime &now,
-                                           DerivedRowsCache *cache)
+                                           DerivedRowsCache *cache,
+                                           LibraryRows *library)
 {
-    DerivedRowsCache uncached;
-    const DerivedRows &derived = (cache != nullptr ? *cache : uncached).rows(items, now);
+    DerivedRowsCache uncachedDerived;
+    LibraryRows uncachedLibrary;
+    LibraryRows &libraryRows = library != nullptr ? *library : uncachedLibrary;
+    // Built first: the similarity index the taste rows ask for reuses its
+    // holiday scores.
+    const LibraryRows::Built &fromLibrary = libraryRows.built(items);
+    const DerivedRows &derived = (cache != nullptr ? *cache : uncachedDerived).rows(items, now, &libraryRows);
     QHash<QString, const MediaItem *> movieById;
     for (const MediaItem &item : items) {
         if (item.isMovie()) {
@@ -387,25 +357,9 @@ QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items,
 
     // :2876-2881 puts Holiday Movies after Recently Added and before the
     // decades, from the one holiday score the Movies route reads.
-    {
-        QVector<MediaItem> holidayCandidates;
-        for (const MediaItem &item : items) {
-            if (item.isMovie() && browse::isHolidayMovie(item)) {
-                holidayCandidates.push_back(item);
-            }
-        }
-        if (holidayCandidates.size() >= 2) {
-            QVector<Card> cards;
-            for (const MediaItem &movie : browse::sortedHolidayMovies(std::move(holidayCandidates))) {
-                cards.push_back(movieCard(movie));
-            }
-            append(makeRow(QStringLiteral("holiday-movies"), QStringLiteral("Holiday Movies"),
-                           std::move(cards)));
-        }
-    }
-
-    for (Row &row : decadeRows(items)) {
-        append(std::move(row));
+    append(idRow(fromLibrary.holiday));
+    for (const IdRow &row : fromLibrary.decades) {
+        append(idRow(row));
     }
 
     QVector<Card> allMovies;
@@ -672,6 +626,7 @@ void HomeRowsModel::replaceItems(QVector<MediaItem> items)
 {
     m_items = std::move(items);
     m_derived.invalidate();
+    m_library.invalidate();
     if (m_items.isEmpty()) {
         // The capsule goes with the title bar when the library empties.
         setPlaySomethingFocused(false);
@@ -716,7 +671,7 @@ HomeCardModel *HomeRowsModel::cardModelFor(const QString &rowId)
 
 void HomeRowsModel::recompose()
 {
-    QVector<home_rows::Row> composed = home_rows::compose(m_items, now(), &m_derived);
+    QVector<home_rows::Row> composed = home_rows::compose(m_items, now(), &m_derived, &m_library);
 
     // The remote follows the card it rests on, not its row and column number:
     // a row inserted above it would otherwise hand it a different title.

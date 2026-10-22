@@ -351,7 +351,12 @@ private slots:
             movie(QStringLiteral("Arrival"), 2016),
         };
 
-        const QVector<home_rows::Row> rows = home_rows::decadeRows(items);
+        QVector<home_rows::Row> rows;
+        for (const home_rows::Row &row : home_rows::compose(items, kNow)) {
+            if (row.id.startsWith(QStringLiteral("decade-"))) {
+                rows.push_back(row);
+            }
+        }
 
         QCOMPARE(rowIds(rows), (QStringList{QStringLiteral("decade-2010s"),
                                             QStringLiteral("decade-1990s")}));

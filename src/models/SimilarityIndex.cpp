@@ -6,8 +6,10 @@
 #include <QLatin1String>
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
 #include <limits>
+#include <utility>
 
 namespace
 {
@@ -83,9 +85,22 @@ namespace
 }
 }
 
-browse::SimilarityIndex::SimilarityIndex(const QVector<MediaItem> &movies)
-    : m_movies(movies)
+namespace
 {
+std::atomic<int> g_constructed{0};
+}
+
+int browse::SimilarityIndex::constructedForTest()
+{
+    return g_constructed.load(std::memory_order_relaxed);
+}
+
+browse::SimilarityIndex::SimilarityIndex(const QVector<MediaItem> &movies,
+                                         QHash<QString, int> holidayScores)
+    : m_movies(movies),
+      m_holidayScores(std::move(holidayScores))
+{
+    g_constructed.fetch_add(1, std::memory_order_relaxed);
     m_profiles.reserve(movies.size());
     QHash<QString, int> documentFrequency;
     for (qsizetype position = 0; position < movies.size(); ++position) {
@@ -268,6 +283,12 @@ QVector<QString> browse::SimilarityIndex::rankedMovieIds(const QString &sourceId
     return ids;
 }
 
+bool browse::SimilarityIndex::isHoliday(const MediaItem &item) const
+{
+    const auto known = m_holidayScores.constFind(item.id);
+    return (known != m_holidayScores.cend() ? *known : holidayScore(item)) > 0;
+}
+
 // :2265-2311, scored on the profiles composed once.
 int browse::SimilarityIndex::olderScore(const Profile &source,
                                         const Profile &candidate,
@@ -306,28 +327,28 @@ int browse::SimilarityIndex::olderScore(const Profile &source,
 
     // The holiday score reads the overview and genres, so only a holiday
     // source pays for scoring its candidates.
-    if (sourceIsHoliday && isHolidayMovie(m_movies.at(candidate.position))) {
+    if (sourceIsHoliday && isHoliday(m_movies.at(candidate.position))) {
         score += 120;
     }
     return score;
 }
 
-QVector<MediaItem> browse::SimilarityIndex::similarMovies(const MediaItem &source, int limit) const
+QVector<QString> browse::SimilarityIndex::similarMovieIds(const MediaItem &source, int limit) const
 {
-    QVector<MediaItem> results;
+    QVector<QString> results;
     const auto found = m_positionById.constFind(source.id);
     if (limit <= 0 || found == m_positionById.cend()) {
         return results;
     }
     const Profile &sourceProfile = m_profiles.at(found.value());
     QSet<QString> seen{source.id};
-    const bool sourceIsHoliday = isHolidayMovie(source);
+    const bool sourceIsHoliday = isHoliday(source);
 
     for (const QString &id : rankedMovieIds(source.id)) {
         if (seen.contains(id)) {
             continue;
         }
-        results.push_back(m_movies.at(m_positionById.value(id)));
+        results.push_back(id);
         seen.insert(id);
         if (results.size() == limit) {
             return results;
@@ -360,11 +381,20 @@ QVector<MediaItem> browse::SimilarityIndex::similarMovies(const MediaItem &sourc
         if (seen.contains(entry.profile->id)) {
             continue;
         }
-        results.push_back(m_movies.at(m_positionById.value(entry.profile->id)));
+        results.push_back(entry.profile->id);
         seen.insert(entry.profile->id);
         if (results.size() == limit) {
             break;
         }
     }
     return results;
+}
+
+QVector<MediaItem> browse::SimilarityIndex::similarMovies(const MediaItem &source, int limit) const
+{
+    QVector<MediaItem> movies;
+    for (const QString &id : similarMovieIds(source, limit)) {
+        movies.push_back(m_movies.at(m_positionById.value(id)));
+    }
+    return movies;
 }

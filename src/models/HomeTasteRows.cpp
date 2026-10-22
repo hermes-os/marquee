@@ -42,23 +42,36 @@ std::optional<int> home_rows::runtimeSeconds(const MediaItem &item)
 }
 
 QVector<home_rows::IdRow> home_rows::becauseYouWatchedRows(const QVector<MediaItem> &movies,
-                                                           const browse::TasteModel &taste)
+                                                           const browse::TasteModel &taste,
+                                                           LibraryRows *library)
 {
     QVector<IdRow> rows;
     const QVector<MediaItem> seeds = taste.completedSeeds(movies, kCompletedSeedLimit);
     if (seeds.isEmpty()) {
         return rows;
     }
-    const browse::SimilarityIndex index(movies);
+    std::optional<browse::SimilarityIndex> own;
+    if (library == nullptr) {
+        own.emplace(movies);
+    }
+    const browse::SimilarityIndex &index = library != nullptr ? library->similarityIndex(movies) : *own;
+    // The index may be older than the watch state, so a candidate is judged by
+    // the movie as it is now.
+    QHash<QString, const MediaItem *> current;
+    current.reserve(movies.size());
+    for (const MediaItem &movie : movies) {
+        current.insert(movie.id, &movie);
+    }
     for (const MediaItem &seed : seeds) {
         // :2951-2958: everything the released ranking names, then the unwatched
         // twelve of it.
         QStringList ids;
-        for (const MediaItem &candidate : index.similarMovies(seed, static_cast<int>(movies.size()))) {
-            if (!taste.isUnwatched(candidate)) {
+        for (const QString &id : index.similarMovieIds(seed, static_cast<int>(movies.size()))) {
+            const MediaItem *candidate = current.value(id, nullptr);
+            if (candidate == nullptr || !taste.isUnwatched(*candidate)) {
                 continue;
             }
-            ids.push_back(candidate.id);
+            ids.push_back(id);
             if (ids.size() == kBecauseYouWatchedRowLimit) {
                 break;
             }
@@ -74,14 +87,15 @@ QVector<home_rows::IdRow> home_rows::becauseYouWatchedRows(const QVector<MediaIt
 }
 
 QVector<home_rows::IdRow> home_rows::tasteRows(const QVector<MediaItem> &movies,
-                                               const std::optional<browse::TasteModel> &taste)
+                                               const std::optional<browse::TasteModel> &taste,
+                                               LibraryRows *library)
 {
     QVector<IdRow> rows;
     if (!taste) {
         return rows;
     }
 
-    for (IdRow &row : becauseYouWatchedRows(movies, *taste)) {
+    for (IdRow &row : becauseYouWatchedRows(movies, *taste, library)) {
         rows.push_back(std::move(row));
     }
 
@@ -124,7 +138,9 @@ QVector<home_rows::IdRow> home_rows::tasteRows(const QVector<MediaItem> &movies,
     return rows;
 }
 
-home_rows::DerivedRows home_rows::deriveRows(const QVector<MediaItem> &items, const QDateTime &now)
+home_rows::DerivedRows home_rows::deriveRows(const QVector<MediaItem> &items,
+                                             const QDateTime &now,
+                                             LibraryRows *library)
 {
     DerivedRows derived;
     const QVector<MediaItem> movies = moviesOf(items);
@@ -143,17 +159,18 @@ home_rows::DerivedRows home_rows::deriveRows(const QVector<MediaItem> &items, co
         derived.playSomething.mediaIds.push_back(item.id);
     }
 
-    derived.taste = tasteRows(movies, taste);
+    derived.taste = tasteRows(movies, taste, library);
     derived.seasonal = seasonalRows(movies, now);
     return derived;
 }
 
 const home_rows::DerivedRows &home_rows::DerivedRowsCache::rows(const QVector<MediaItem> &items,
-                                                                const QDateTime &now)
+                                                                const QDateTime &now,
+                                                                LibraryRows *library)
 {
     const QDate day = now.toLocalTime().date();
     if (!m_rows || m_day != day) {
-        m_rows = deriveRows(items, now);
+        m_rows = deriveRows(items, now, library);
         m_day = day;
         ++m_builds;
     }

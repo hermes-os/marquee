@@ -5,7 +5,9 @@
 #include <memory>
 
 #include "catalog/MediaItem.hpp"
+#include "models/BrowseSemantics.hpp"
 #include "models/HomeRowsModel.hpp"
+#include "models/SimilarityIndex.hpp"
 #include "profiles/ContentPolicy.hpp"
 #include "profiles/ProfileStore.hpp"
 
@@ -460,6 +462,61 @@ private slots:
         QCOMPARE(model.derivedRowBuildsForTest(), afterFirst + 2);
         model.setClockForTest([] { return kOctober.addDays(1); });
         QCOMPARE(model.derivedRowBuildsForTest(), afterFirst + 3);
+    }
+
+    // What the titles and their metadata alone decide is built when the items
+    // are replaced: a progress record scores no overview and ranks no library.
+    void aProgressRecordDoesNotScoreOrIndexTheLibraryAgain()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kMarch; });
+        QVector<MediaItem> items = libraryWithHistory();
+        for (int index = 0; index < 20; ++index) {
+            MediaItem film = movie(QStringLiteral("Film %1").arg(index), 2010, {QStringLiteral("Drama")});
+            editable(film).overview = QStringLiteral("A quiet town waits for winter and the ")
+                + (index < 3 ? QStringLiteral("Christmas fair.") : QStringLiteral("harvest fair."));
+            items.push_back(film);
+        }
+        const int scoredBefore = browse::holidayScoreCallsForTest();
+        const int indexedBefore = browse::SimilarityIndex::constructedForTest();
+        model.replaceItems(items);
+        const int scored = browse::holidayScoreCallsForTest() - scoredBefore;
+        const int indexed = browse::SimilarityIndex::constructedForTest() - indexedBefore;
+        QVERIFY(scored >= 21);
+        QCOMPARE(indexed, 1);
+        const auto rowIdsNow = [&model] {
+            QStringList ids;
+            for (int row = 0; row < model.rowCount(); ++row) {
+                ids.push_back(model.data(model.index(row), HomeRowsModel::RowIdRole).toString());
+            }
+            return ids;
+        };
+        QVERIFY(rowIdsNow().contains(QStringLiteral("holiday-movies")));
+        QVERIFY(rowIdsNow().contains(QStringLiteral("decade-2010s")));
+        QVERIFY(rowIdsNow().contains(QStringLiteral("because-you-watched-root/Seen")));
+
+        // A position, then more of it with the length known, then a title
+        // finished: none of them changes a title or its metadata.
+        model.applyWatchProgress(QStringLiteral("root/Film 7"), 600'000, 7'200'000, false);
+        model.applyWatchProgress(QStringLiteral("root/Film 7"), 610'000, 7'200'000, false);
+        model.applyWatchProgress(QStringLiteral("root/Film 9"), 0, 7'200'000, true);
+        QCOMPARE(browse::holidayScoreCallsForTest() - scoredBefore, scored);
+        QCOMPARE(browse::SimilarityIndex::constructedForTest() - indexedBefore, indexed);
+        QVERIFY(rowIdsNow().contains(QStringLiteral("holiday-movies")));
+        // The finished film left the row built from the index made before it.
+        for (int row = 0; row < model.rowCount(); ++row) {
+            if (model.data(model.index(row), HomeRowsModel::RowIdRole).toString()
+                != QStringLiteral("because-you-watched-root/Seen")) {
+                continue;
+            }
+            const QVariantMap card = model.cardForId(row, QStringLiteral("root/Film 9"));
+            QVERIFY(card.isEmpty());
+        }
+
+        // A new projection does score and index again.
+        model.replaceItems(items);
+        QVERIFY(browse::holidayScoreCallsForTest() - scoredBefore >= scored * 2);
+        QCOMPARE(browse::SimilarityIndex::constructedForTest() - indexedBefore, indexed + 1);
     }
 
     // A finished movie leaves Play Something and Hidden Gems at once and

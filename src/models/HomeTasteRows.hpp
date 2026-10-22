@@ -7,6 +7,7 @@
 #include <optional>
 
 #include "catalog/MediaItem.hpp"
+#include "models/HomeLibraryRows.hpp"
 #include "models/HomeRowIds.hpp"
 #include "models/TasteModel.hpp"
 
@@ -39,13 +40,15 @@ inline constexpr int kBecauseYouWatchedMinimumCount = 4; // :2903
 /// `browse::SimilarityIndex`, shown when it holds four. The row id carries the
 /// seed's media id.
 [[nodiscard]] QVector<IdRow> becauseYouWatchedRows(const QVector<MediaItem> &movies,
-                                                   const browse::TasteModel &taste);
+                                                   const browse::TasteModel &taste,
+                                                   LibraryRows *library = nullptr);
 
 /// :2906-2943 `tasteRows`: Because You Watched, Hidden Gems, Short Tonight,
 /// in that order. `movies` are the profile's visible movies. Empty when
 /// `taste` is absent (nothing finished yet).
 [[nodiscard]] QVector<IdRow> tasteRows(const QVector<MediaItem> &movies,
-                                       const std::optional<browse::TasteModel> &taste);
+                                       const std::optional<browse::TasteModel> &taste,
+                                       LibraryRows *library = nullptr);
 
 /// :2968-2976: the file's length when known, else TMDB's runtime.
 [[nodiscard]] std::optional<int> runtimeSeconds(const MediaItem &item);
@@ -61,7 +64,11 @@ struct DerivedRows
     QVector<IdRow> seasonal;
 };
 
-[[nodiscard]] DerivedRows deriveRows(const QVector<MediaItem> &items, const QDateTime &now);
+/// `library`, when given, keeps the similarity index between calls; without
+/// it the index is built for this call alone.
+[[nodiscard]] DerivedRows deriveRows(const QVector<MediaItem> &items,
+                                     const QDateTime &now,
+                                     LibraryRows *library = nullptr);
 
 /// Keeps `deriveRows` between recompositions. The rows depend on the items
 /// (their metadata, which the projection replaces), on which titles are
@@ -73,7 +80,9 @@ struct DerivedRows
 class DerivedRowsCache
 {
 public:
-    [[nodiscard]] const DerivedRows &rows(const QVector<MediaItem> &items, const QDateTime &now);
+    [[nodiscard]] const DerivedRows &rows(const QVector<MediaItem> &items,
+                                          const QDateTime &now,
+                                          LibraryRows *library = nullptr);
     void invalidate();
     /// How many times the rows were built, for tests.
     [[nodiscard]] int buildCount() const { return m_builds; }

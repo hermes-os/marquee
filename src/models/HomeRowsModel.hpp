@@ -14,6 +14,7 @@
 #include <functional>
 
 #include "catalog/MediaItem.hpp"
+#include "models/HomeLibraryRows.hpp"
 #include "models/HomeTasteRows.hpp"
 #include "navigation/FocusNavigator.hpp"
 
@@ -96,11 +97,6 @@ struct Row
 /// watched, as in the oracle.
 [[nodiscard]] QVector<Card> recentlyAdded(const QVector<MediaItem> &items);
 
-/// BrowseSnapshotStore.swift:3126-3144: one row per decade of at least two
-/// movies, newest decade first, each in title order. The row id carries the
-/// decade ("decade-1990s") and its title reads "The 1990s".
-[[nodiscard]] QVector<Row> decadeRows(const QVector<MediaItem> &items);
-
 /// BrowseSnapshotStore.swift:369-385: up to `play_something::kRowLimit`
 /// unwatched movies in the shuffle of `play_something::kHomeSalt`. Movie cards
 /// only; Play Something never offers an episode.
@@ -110,12 +106,16 @@ struct Row
 /// Continue Watching, Recently Watched, Play Something, the taste rows
 /// (Because You Watched, Hidden Gems, Short Tonight), the seasonal rows
 /// (October Horror, Summer Blockbusters), Recently Added, Holiday Movies, a
-/// row per decade, All Movies. An empty row is not returned. The taste,
-/// seasonal and Play Something rows come from `HomeTasteRows.hpp`; `cache`,
-/// when given, keeps them between calls until its owner invalidates it.
+/// row per decade (BrowseSnapshotStore.swift:3126-3144: one per decade of at
+/// least two movies, newest first, each in title order), All Movies. An empty
+/// row is not returned. The taste, seasonal and Play Something rows come from
+/// `HomeTasteRows.hpp`, and the holiday and decade rows from
+/// `HomeLibraryRows.hpp`; `cache` and `library`, when given, keep them between
+/// calls until their owner invalidates them.
 [[nodiscard]] QVector<Row> compose(const QVector<MediaItem> &items,
                                    const QDateTime &now,
-                                   DerivedRowsCache *cache = nullptr);
+                                   DerivedRowsCache *cache = nullptr,
+                                   LibraryRows *library = nullptr);
 }
 
 /// One row's cards, with the roles the shared poster card reads.
@@ -254,5 +254,9 @@ private:
     // The rows that rank the library against the profile's history, which a
     // progress record cannot change (see `DerivedRowsCache`).
     home_rows::DerivedRowsCache m_derived;
+    // What the titles and their metadata alone decide (holiday scores and
+    // rows, decade rows, the similarity index): built when the items are
+    // replaced, never on a progress record.
+    home_rows::LibraryRows m_library;
     bool m_playSomethingFocused{false};
 };

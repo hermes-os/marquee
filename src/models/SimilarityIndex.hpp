@@ -34,7 +34,14 @@ public:
     /// How many movies the released index keeps per source (:2351 `limit`).
     static constexpr int kIndexedPerMovie = 12;
 
-    explicit SimilarityIndex(const QVector<MediaItem> &movies);
+    /// `holidayScores` are the movies' `holidayScore`s by id when the caller
+    /// already holds them; a movie missing from it is scored when needed.
+    explicit SimilarityIndex(const QVector<MediaItem> &movies,
+                             QHash<QString, int> holidayScores = {});
+
+    /// How many indexes were built in this process, for tests of what a
+    /// progress record costs.
+    [[nodiscard]] static int constructedForTest();
 
     /// :2369-2371, built as :2377-2410: the movies most like `sourceId`, best
     /// first, at most `limit`. Empty with fewer than two movies.
@@ -45,6 +52,10 @@ public:
     /// of everything else (:2244-2324), at most `limit`. The source is never
     /// among them.
     [[nodiscard]] QVector<MediaItem> similarMovies(const MediaItem &source, int limit) const;
+    /// The ids of `similarMovies`, for a caller that reads the movies' current
+    /// state from elsewhere: the index keeps the copies it was built from, and
+    /// it is kept across progress records that change a title's watch state.
+    [[nodiscard]] QVector<QString> similarMovieIds(const MediaItem &source, int limit) const;
 
 private:
     struct Profile
@@ -65,6 +76,7 @@ private:
         MovieBrowseSortKey browseKey;
     };
 
+    [[nodiscard]] bool isHoliday(const MediaItem &item) const;
     [[nodiscard]] double indexScore(const Profile &source, const Profile &candidate) const;
     [[nodiscard]] int olderScore(const Profile &source,
                                  const Profile &candidate,
@@ -80,5 +92,6 @@ private:
     QVector<Profile> m_profiles;
     QHash<QString, int> m_positionById;
     QHash<QString, double> m_genreWeights;
+    QHash<QString, int> m_holidayScores;
 };
 }

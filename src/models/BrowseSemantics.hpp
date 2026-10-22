@@ -54,6 +54,10 @@ struct MovieBrowseSortKey
 /// The one score every caller reads: the Movies rows, and the Home hero.
 [[nodiscard]] int holidayScore(const MediaItem &item);
 
+/// How many times `holidayScore` ran in this process, for tests of what a
+/// progress record costs.
+[[nodiscard]] int holidayScoreCallsForTest();
+
 /// BrowseSnapshotStore.swift:2055-2057.
 [[nodiscard]] bool isHolidayMovie(const MediaItem &item);
 

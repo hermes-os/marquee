@@ -9,11 +9,22 @@
 #include <QStringList>
 
 #include <algorithm>
+#include <atomic>
 #include <limits>
 #include <utility>
 
 namespace browse
 {
+namespace
+{
+std::atomic<int> g_holidayScoreCalls{0};
+}
+
+int holidayScoreCallsForTest()
+{
+    return g_holidayScoreCalls.load(std::memory_order_relaxed);
+}
+
 // BrowseSnapshotStore.swift:1784-1802 folds diacritics and width, lowercases,
 // and reduces every run of non-alphanumerics to one space.
 QString normalizedText(const QString &value)
@@ -198,6 +209,7 @@ bool compareFranchiseOrder(const MediaItem &lhs, const MediaItem &rhs)
 // containment rather than whole tokens (:2083, :2096). It reads no keywords.
 int holidayScore(const MediaItem &item)
 {
+    g_holidayScoreCalls.fetch_add(1, std::memory_order_relaxed);
     const QString title = normalizedText(item.title);
     QStringList parts{title};
     if (item.metadata) {

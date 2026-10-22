@@ -6,6 +6,10 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home no longer scores every movie's holiday words, groups the decades or ranks
+  the library against itself for each progress record while a film plays: they
+  are built when the library or its metadata changes. With 2000 movies a
+  progress record took 52 ms and now takes 5 ms (Release build). No migration.
 - Home's Recently Added keeps the movies and shows a profile has watched, as the
   released app does: it lists every movie and show by file date. Before, it hid
   watched movies and shows watched through. No migration.

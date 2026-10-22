@@ -101,7 +101,10 @@ the reason. Read these before copying an example.
   the profile's history, so `HomeRowsModel` builds them once per set of items
   and calendar day and again only when a title becomes watched, a movie's length
   becomes known, or the projection is replaced, never for the progress record
-  playback writes every ten seconds. The Play Something capsule
+  playback writes every ten seconds. What the titles and their metadata alone
+  decide (the holiday scores and row, the decade rows, the similarity index) is
+  built by `LibraryRows` (`HomeLibraryRows.*`) when the items are replaced and
+  kept until they are replaced again. The Play Something capsule
   in the title bar is the first stop of the remote's vertical order
   (`HomeRowsModel::moveUp`/`moveDown`), and `play_something::pick` is the one
   rule behind the capsule, the sidebar control, and the row: unwatched movies in
