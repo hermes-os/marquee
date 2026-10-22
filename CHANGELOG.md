@@ -6,6 +6,10 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Online metadata keeps a title the folder name only begins with ("Star Trek"
+  for "Star Trek The Original Series") when the second search, without the
+  year, fails on the network or is rate limited, instead of dropping it and
+  trying again on the next run. No migration.
 - Kids, Family and Teen profiles judge a title by its TMDB certification when
   it has one, as the released app does: a G or TV-Y title with no genre shows
   for Kids, and an R or TV-MA title no longer shows there because of its

@@ -153,6 +153,18 @@ void MetadataClient::search(const SearchKind &kind, const QString &title, int ye
     getJson(kind.path, query,
             [this, kind, title, year, yearInQuery, prefixMatch, done = std::move(done)](JsonOutcome outcome) mutable {
                 if (outcome.status != Status::Ok) {
+                    // The search without the year failed (no network, a 5xx, a
+                    // 429 after its retries, an unreadable answer) while the
+                    // search with the year held a title the name begins with.
+                    // That title is the best answer there is; asking again
+                    // later would only repeat the question. A refused key
+                    // stays a failure, as every request would be refused. A
+                    // stop requested meanwhile is the enrichment's to honor
+                    // before it reads the answer.
+                    if (!yearInQuery && prefixMatch && outcome.status != Status::Rejected) {
+                        done({Status::Ok, *prefixMatch});
+                        return;
+                    }
                     done({outcome.status, 0});
                     return;
                 }

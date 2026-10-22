@@ -570,6 +570,55 @@ private slots:
         QCOMPARE(transport.count(), 2);
     }
 
+    // The search without the year is the second request; when it fails the
+    // title the name begins with, held from the first, is still the answer.
+    void aTitleTheNameOnlyBeginsWithIsUsedWhenTheSearchWithoutTheYearFails_data()
+    {
+        QTest::addColumn<int>("status");
+        QTest::addColumn<int>("expectedId");
+        QTest::addColumn<int>("expectedStatus");
+        QTest::newRow("server error") << 503 << 253 << static_cast<int>(MetadataClient::Status::Ok);
+        QTest::newRow("throttled after its retries") << 429 << 253 << static_cast<int>(MetadataClient::Status::Ok);
+        QTest::newRow("key refused") << 401 << 0 << static_cast<int>(MetadataClient::Status::Rejected);
+    }
+
+    void aTitleTheNameOnlyBeginsWithIsUsedWhenTheSearchWithoutTheYearFails()
+    {
+        QFETCH(int, status);
+        QFETCH(int, expectedId);
+        QFETCH(int, expectedStatus);
+        FakeTransport transport([status](const QUrl &url) {
+            if (!FakeTransport::queryValue(url, QStringLiteral("first_air_date_year")).isEmpty()) {
+                return FakeTransport::json(QByteArrayLiteral(
+                    R"({"results":[{"id":253,"name":"Star Trek","first_air_date":"1966-09-08"}]})"));
+            }
+            return FakeTransport::status(status);
+        });
+        MetadataClient client(transport, fastConfig());
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findShow(QStringLiteral("Star Trek The Original Series"), 1966,
+                        [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY_WITH_TIMEOUT(answer.has_value(), 3000);
+        QCOMPARE(static_cast<int>(answer->status), expectedStatus);
+        QCOMPARE(answer->value, expectedId);
+    }
+
+    void aFailedSearchWithoutTheYearHoldingNoPrefixMatchStillFails()
+    {
+        FakeTransport transport([](const QUrl &url) {
+            if (!FakeTransport::queryValue(url, QStringLiteral("first_air_date_year")).isEmpty()) {
+                return FakeTransport::json(QByteArrayLiteral(R"({"results":[]})"));
+            }
+            return FakeTransport::status(503);
+        });
+        MetadataClient client(transport, fastConfig());
+        std::optional<MetadataClient::Result<int>> answer;
+        client.findShow(QStringLiteral("Star Trek The Original Series"), 1966,
+                        [&answer](MetadataClient::Result<int> result) { answer = result; });
+        QTRY_VERIFY(answer.has_value());
+        QCOMPARE(answer->status, MetadataClient::Status::Unavailable);
+    }
+
     void aHugeRetryAfterIsCappedWithoutOverflowing()
     {
         int calls = 0;
