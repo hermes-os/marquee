@@ -6,6 +6,12 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Switching profile while a library scan is running no longer snaps Home to
+  its top card when the scan finishes. Home restarts at its first target only
+  while the profile picker is still leaving or the remote has not moved on Home
+  since the choice, and a failed reload no longer leaves that restart armed for
+  a later refresh. Before, a viewer browsing the instant republish was pulled
+  back to the top card, or a later refresh did it.
 - When the row the remote rested on leaves Home (un-watching the last title
   of Recently Watched), the remote moves to the first card as one step and the
   other rows keep the columns they were left on, as in the released app.

@@ -26,6 +26,21 @@ namespace
 // 0.24 seconds.
 constexpr int kProfileExitDurationMs = 240;
 
+// Marks the stretch in which the shell, not the viewer, changes Home's rows or
+// remote, so a focus change announced inside it is not a move.
+class ShellDrivesHome
+{
+public:
+    explicit ShellDrivesHome(bool &flag) : m_flag(flag), m_previous(flag) { m_flag = true; }
+    ~ShellDrivesHome() { m_flag = m_previous; }
+    ShellDrivesHome(const ShellDrivesHome &) = delete;
+    ShellDrivesHome &operator=(const ShellDrivesHome &) = delete;
+
+private:
+    bool &m_flag;
+    bool m_previous;
+};
+
 [[nodiscard]] bool isPlayableFile(const QString &path)
 {
     const QFileInfo file(path);
@@ -57,6 +72,15 @@ ApplicationController::ApplicationController(QObject *parent)
             raiseError(QStringLiteral("Profiles"), m_profiles.storageError());
         }
     });
+    // A pending restart of Home is for a remote the viewer has not touched. A
+    // move behind the picker's fade is not one: the picker still holds the keys.
+    const auto remoteMoved = [this] {
+        if (!m_shellDrivesHome && !profileExitInFlight()) {
+            m_homeRestartPending = false;
+        }
+    };
+    QObject::connect(m_homeRows.focus(), &FocusNavigator::focusChanged, this, remoteMoved);
+    QObject::connect(&m_homeRows, &HomeRowsModel::playSomethingFocusedChanged, this, remoteMoved);
     // ProfilePickerView.swift:1101, :1107, and :1195: every edit, addition,
     // and deletion is followed by a reconcile so the shell's active profile
     // never shows stale fields or a profile that no longer exists.
@@ -217,8 +241,11 @@ void ApplicationController::startCatalogWorker()
         // The first projection of a new profile can add rows above the card
         // the remote kept (a Continue Watching row); Home starts at its first
         // target, so the first Return opens the top card, not a lower one.
+        // Only for a remote the viewer has not moved since the choice: a
+        // reload queued behind a running scan lands while they browse.
         if (m_homeRestartPending) {
             m_homeRestartPending = false;
+            const ShellDrivesHome shell(m_shellDrivesHome);
             m_homeRows.resetFocus();
         }
     };
@@ -234,6 +261,8 @@ void ApplicationController::startCatalogWorker()
     connect(worker, &CatalogWorker::projectionReady, this,
             [this] { finishCatalogRefresh(); });
     connect(worker, &CatalogWorker::scanFailed, this, [this](const QString &message) {
+        // A reload that failed brings no projection to restart Home for.
+        m_homeRestartPending = false;
         finishCatalogRefresh();
         raiseError(QStringLiteral("Library scan"), message);
     });
@@ -277,6 +306,7 @@ void ApplicationController::startCatalogWorker()
                     return;
                 }
                 m_shows.applyWatchProgress(mediaId, positionMs, durationMs, completed);
+                const ShellDrivesHome shell(m_shellDrivesHome);
                 m_homeRows.applyWatchProgress(mediaId, positionMs, durationMs, completed);
             });
     // The echo of a write applies only to the profile it was written for; the
@@ -319,6 +349,7 @@ void ApplicationController::publishProjection()
     m_shows.replaceItems(visible);
     // Home reads the same visible projection, so a Kids profile's rows hold
     // only what Movies and TV Shows hold for it.
+    const ShellDrivesHome shell(m_shellDrivesHome);
     m_homeRows.replaceItems(visible);
 }
 
@@ -505,7 +536,10 @@ bool ApplicationController::chooseProfile(const QString &profileId)
     // ContentView.swift:391-407 rebuilds Home at its top after a choice, so
     // the first Return acts on Home's first target whatever the last viewer
     // left focused, including when the same profile is chosen again.
-    m_homeRows.resetFocus();
+    {
+        const ShellDrivesHome shell(m_shellDrivesHome);
+        m_homeRows.resetFocus();
+    }
     // A different profile's progress arrives with the reloaded projection and
     // reshapes Home's rows; that projection restarts Home's focus again.
     m_homeRestartPending = profileSwitched;
