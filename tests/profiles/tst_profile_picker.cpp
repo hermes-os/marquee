@@ -422,7 +422,7 @@ private slots:
         QTemporaryDir movies;
         AppPaths::setRuntimeRoot(runtimeRoot.path());
         const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
-        QVERIFY(seedMovies(movies.path()));
+        QVERIFY(seedMovies(movies.path(), 3));
 
         ApplicationController controller;
         controller.setTemporaryLibraryRoot(movies.path());
@@ -435,14 +435,29 @@ private slots:
 
         QTest::keyClick(window, Qt::Key_Return);
         verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+        const QString firstCard = home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!firstCard.isEmpty());
+        // Off the first card, so a Home that kept the remote where it stood
+        // would open another card after the re-choice.
+        QTest::keyClick(window, Qt::Key_Right);
+        QTest::keyClick(window, Qt::Key_Down);
+        QCOMPARE(home->focus()->row(), 1);
+        QVERIFY(home->focus()->column() > 0);
         QTest::keyClick(window, Qt::Key_Return);
         QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+        QVERIFY(controller.navigation()->selectedMediaId() != firstCard);
 
         QTest::keyClick(window, Qt::Key_Escape);
         QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Home);
         QQuickItem *sidebar = itemNamed(window, QStringLiteral("sidebar"));
         QVERIFY(sidebar != nullptr);
-        QTest::keyClick(window, Qt::Key_Left);
+        // Left walks the row back to its first card, then hands the remote
+        // to the sidebar.
+        for (int step = 0; step < 6 && !sidebar->hasActiveFocus(); ++step) {
+            QTest::keyClick(window, Qt::Key_Left);
+        }
         QTRY_VERIFY(sidebar->hasActiveFocus());
         const int profileIndex = sidebar->property("profileIndex").toInt();
         for (int step = 0; step < profileIndex; ++step) {
@@ -457,9 +472,10 @@ private slots:
         QTest::keyClick(window, Qt::Key_Return);
         verifyHomeHoldsTheRemote(window, controller);
 
-        QTest::qWait(5000);
+        QTRY_VERIFY(home->focus()->row() == 0 && home->focus()->column() == 0);
         QTest::keyClick(window, Qt::Key_Return);
         QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+        QCOMPARE(controller.navigation()->selectedMediaId(), firstCard);
     }
 
     // Home is rebuilt at its first target on every profile choice
