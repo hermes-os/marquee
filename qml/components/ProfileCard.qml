@@ -30,7 +30,6 @@ Item {
     property bool managementPanel: false
 
     signal activated()
-    signal pointerEntered()
 
     readonly property real discDiameter: Theme.scaled(130, 190, root.leanBack)
     readonly property real ringOutset: Theme.scaled(4, 6, root.leanBack)
@@ -187,13 +186,10 @@ Item {
         }
     }
 
+    // ProfilePickerView.swift:805-807: hover only tints. The remote's focus
+    // moves by key or click, so a pointer resting under a card cannot choose.
     HoverHandler {
-        onHoveredChanged: {
-            root.hovered = hovered
-            if (hovered) {
-                root.pointerEntered()
-            }
-        }
+        onHoveredChanged: root.hovered = hovered
     }
 
     TapHandler {

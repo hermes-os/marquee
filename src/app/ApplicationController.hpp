@@ -305,6 +305,10 @@ private:
     // False until the first scan result arrives; an empty m_projection before
     // then is not evidence that a file is outside the catalog.
     bool m_projectionReceived{false};
+    // Set from a profile switch until its projection lands, the viewer moves
+    // the remote on Home, or the reload fails.
+    bool m_homeRestartPending{false};
+    bool m_shellDrivesHome{false};
     // Derived from m_projection and the active profile's ceiling; dropped
     // whenever either changes and built again on the next loose-file request.
     std::optional<HiddenFileIndex> m_hiddenFiles;

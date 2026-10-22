@@ -32,6 +32,37 @@ intermediate version bump.
 - A `Title - (YYYY)` or `Title (YYYY) (YYYY)` movie name now shows and sorts as
   "Title" (not "Title -" or "Title (YYYY)"), and a `Title (2099)` name no longer
   takes 2099 as its release year.
+- Choosing the same profile again while a profile switch is still loading no
+  longer cancels Home's restart at its top card. Before, the second choice
+  cleared it and the profile's own rows then arrived above the remote.
+- Switching profile while a library scan is running no longer snaps Home to
+  its top card when the scan finishes. Home restarts at its first target only
+  while the profile picker is still leaving or the remote has not moved on Home
+  since the choice, and a failed reload no longer leaves that restart armed for
+  a later refresh. Before, a viewer browsing the instant republish was pulled
+  back to the top card, or a later refresh did it.
+- When the row the remote rested on leaves Home (un-watching the last title
+  of Recently Watched), the remote moves to the first card as one step and the
+  other rows keep the columns they were left on, as in the released app.
+  Before, the repair moved twice and forgot every row's column, so the next
+  Down landed on the first card of each row.
+- Choosing a different profile now lands the remote on Home's top card even
+  when that profile has progress. Before, a Continue Watching row that arrived
+  above the rows after the choice left the remote on the card it had been on,
+  now one row lower, so the first Return opened a card that was not the top
+  one.
+- A pointer resting over the profile picker no longer moves the remote. As in
+  the released app, hovering a card only tints it; a real pointer click still
+  chooses. Before, when the picker opened under a pointer that had not moved,
+  the card that appeared beneath it took the remote and the next Return chose
+  that profile (Kids included) instead of the active one.
+- Choosing a profile now starts Home from its first target, as the released
+  app rebuilds Home after a choice. Before, the remote's place on Home
+  survived the choice: after the remote had rested on Home's Play Something
+  capsule, or deep in the rows, the first Return after choosing a profile acted
+  on that stale place (Play Something, or nothing when nothing was playable)
+  instead of opening the first card. A switch made with the pointer, or to the
+  same profile, is covered too.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's

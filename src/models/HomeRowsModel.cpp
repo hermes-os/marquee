@@ -663,6 +663,31 @@ void HomeRowsModel::focusHero()
     syncHeroFocused();
 }
 
+void HomeRowsModel::resetFocus()
+{
+    setPlaySomethingFocused(false);
+    QVector<int> rowLengths;
+    rowLengths.reserve(m_rows.size());
+    for (const RowSlot &row : std::as_const(m_rows)) {
+        rowLengths.push_back(row.cards->rowCount());
+    }
+    placeFirstTarget(std::move(rowLengths));
+    // A rebuilt Home keeps no column for any row; a repair after a vanished
+    // row keeps them, as the released one does.
+    m_focus.reset();
+}
+
+void HomeRowsModel::placeFirstTarget(QVector<int> rowLengths)
+{
+    const auto firstNonEmpty = std::find_if(rowLengths.cbegin(), rowLengths.cend(),
+                                            [](int count) { return count > 0; });
+    const int firstRow = firstNonEmpty == rowLengths.cend()
+        ? -1
+        : static_cast<int>(std::distance(rowLengths.cbegin(), firstNonEmpty));
+    // One placed call, so the move to the first target is one announcement.
+    m_focus.setRows(std::move(rowLengths), firstRow, 0);
+}
+
 QStringList HomeRowsModel::playSomethingCandidates() const
 {
     // A fresh salt per press (AppState.swift:239), so consecutive presses
@@ -871,14 +896,7 @@ void HomeRowsModel::recompose()
         // card of the first row that has one, and so does this; with a hero,
         // the oracle sends it there (:1128-1130), which `heroFocused` does
         // while the remote's section is the hero.
-        const auto first = std::find_if(m_rows.cbegin(), m_rows.cend(), [](const RowSlot &row) {
-            return row.cards->rowCount() > 0;
-        });
-        m_focus.setRows(std::move(rowLengths),
-                        first == m_rows.cend()
-                            ? 0
-                            : static_cast<int>(std::distance(m_rows.cbegin(), first)),
-                        0);
+        placeFirstTarget(std::move(rowLengths));
         return;
     }
     // The same card where the row still holds it; otherwise the column it was
