@@ -18,11 +18,6 @@ Where: `src/playback/MpvVideoItem.cpp`, `src/playback/SeekScrubber.*`, `qml/scre
 What happens: while Left or Right is held past half a second the film is paused and the clock and progress bar show where letting go would land, but the picture stays on the frame where the hold began until the key is let go. The released app sets mpv's `hr-seek` to `no` and previews the target (`PlayerView.swift:478-523`, `MPVPlayerService.swift:3050-3059`).
 Found: implementing the hold-to-scrub; `SeekScrubber` emits only the final seek.
 
-## The player never hides the pointer with the HUD
-Where: `qml/screens/PlayerScreen.qml`.
-What happens: the released HUD hides the mouse cursor when its controls auto-hide and shows it again on movement (`PlayerView.swift:222-257`); the Linux player leaves the cursor visible over the film.
-Found: comparing the new HUD with `PlayerView.swift` after adding pointer reveal.
-
 ## libmpv core is still owned by the render item
 Where: `src/playback/MpvVideoItem.cpp` (`mpv_create`, hwdec, play/seek commands), `src/playback/PlayerController.*`.
 What happens: the render item owns the libmpv handle and every playback command; `PlayerController` holds session state only. `docs/ARCHITECTURE_V3.md` (Player-facing API and spike ownership) puts the core behind `PlayerController` once the spike is proven, and HUD features (Restart) already drive playback through the item.

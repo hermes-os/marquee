@@ -14,6 +14,10 @@ FocusScope {
     // The window's fullscreen state belongs to the shell (Main.qml), which
     // tells the viewer's toggle from the one playback made on entry.
     signal fullscreenRequested()
+    // PlayerView.swift:243-257 hides the mouse cursor when the controls
+    // auto-hide and shows it again on movement. "Still watching?" keeps it:
+    // its buttons are for the pointer.
+    readonly property bool pointerHidden: !root.controlsVisible && !root.stillWatching
     // Where a drag along the progress bar would land, as a fraction of the
     // film; -1 when none is under way.
     property real barDragFraction: -1
@@ -1033,6 +1037,7 @@ FocusScope {
     // would bring itself back every time it faded.
     HoverHandler {
         id: pointerWatch
+        cursorShape: root.pointerHidden ? Qt.BlankCursor : Qt.ArrowCursor
         property point lastPlace: Qt.point(-1, -1)
         onPointChanged: {
             const place = point.scenePosition

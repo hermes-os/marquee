@@ -16,6 +16,10 @@ intermediate version bump.
   during playback (the Fullscreen control, F or F11), in which case the window
   stays as you left it. Moving to the next episode changes nothing. This
   differs from the released macOS app on purpose.
+- The mouse pointer hides with the player controls: when they fade out after
+  three seconds (or Back hides them) the pointer disappears over the picture,
+  and any pointer movement brings it and the controls back, as in the released
+  app. It stays visible over "Still watching?" and the failure card.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the

@@ -229,6 +229,40 @@ private slots:
         closePlayer(env);
         QTRY_COMPARE(env.window->visibility(), QWindow::Windowed);
     }
+
+    // PlayerView.swift:222-257: the pointer goes with the HUD and comes back
+    // with any movement.
+    void thePointerHidesWithTheHudAndReturnsOnMovement()
+    {
+        Env env;
+        QVERIFY(load(env, false));
+        QVERIFY(play(env));
+        QQuickItem *scrim = itemNamed(env.window, "playerScrim");
+        QVERIFY(scrim != nullptr);
+
+        QTest::mouseMove(env.window, QPoint(300, 300));
+        QTest::mouseMove(env.window, QPoint(320, 310));
+        QTRY_VERIFY(scrim->isVisible());
+        QCOMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+
+        QTRY_VERIFY_WITH_TIMEOUT(!scrim->isVisible(), 15000);
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::BlankCursor);
+
+        QTest::mouseMove(env.window, QPoint(340, 330));
+        QTRY_VERIFY(scrim->isVisible());
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+
+        // Back hides the HUD, and the pointer with it.
+        QTest::keyClick(env.window, Qt::Key_Escape);
+        QTRY_VERIFY(!scrim->isVisible());
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::BlankCursor);
+        QCOMPARE(env.controller.navigation()->route(), NavigationController::Route::Player);
+
+        // Leaving the player gives the pointer back to the shell.
+        closePlayer(env);
+        QTRY_VERIFY(env.controller.navigation()->route() != NavigationController::Route::Player);
+        QTRY_COMPARE(env.window->cursor().shape(), Qt::ArrowCursor);
+    }
 };
 
 int main(int argc, char *argv[])
