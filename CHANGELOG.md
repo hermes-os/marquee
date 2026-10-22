@@ -16,7 +16,12 @@ intermediate version bump.
   hold began. After a release the clock and progress bar go to the landing and
   stay there (on a film with a long keyframe interval they briefly jumped back
   to a preview's keyframe time), and the watch-progress position and the
-  next-episode card never take a preview time, only the landing.
+  next-episode card never take a preview time, only the landing. A tap, a
+  progress-bar click or Restart in the moment after a release moves the clock
+  to where it goes (it stayed on the old landing, for good while paused, when
+  the release landed where the film already was, for example a Left hold
+  clamped at 0), and a playing film's clock follows it at once after such a
+  release instead of after a second and a half.
 - A macOS 2.0.2 download is built from the frozen Swift app by a manual GitHub
   Actions workflow (`.github/workflows/macos-release.yml`): a universal (Apple
   silicon and Intel) `Marquee-2.0.2.dmg` with a checksum, built against the
