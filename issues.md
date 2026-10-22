@@ -434,3 +434,13 @@ Recently Added no longer hides watched titles (the released rule,
 `BrowseSnapshotStore.swift:2871-2874`), so clearing history does not change that
 row. The task that fixed the row could not touch QML.
 Found: Home taste rows task, comparing `home_rows::recentlyAdded` with the released row.
+
+## A finished title replayed part-way leaves the profile's taste
+Where: `src/models/TasteModel.cpp` (`build` reads `MediaItem::watched`),
+`src/catalog/CatalogStore.cpp` (`recordWatchProgress` overwrites `completed`).
+What happens: the released app keeps a per-profile ledger of every title ever
+finished (`WatchProgressStore.completedTitlePaths`, never cleared by a later
+viewing). v3 stores one `completed` flag per title and profile, so a title
+finished once and later played part-way is no longer watched: it can come back
+in Play Something and Because You Watched and stops shaping that profile's taste.
+Found: Home taste rows task, reading `LibraryState.currentTasteProfile` against `CatalogStore`.
