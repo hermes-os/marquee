@@ -18,6 +18,9 @@ intermediate version bump.
   matched or missed by the earlier rules are matched again once, in the
   background, and a changed match replaces that title's stored metadata. The
   catalog is migrated to schema 7; titles and watch progress are kept.
+- A `Title - (YYYY)` or `Title (YYYY) (YYYY)` movie name now shows and sorts as
+  "Title" (not "Title -" or "Title (YYYY)"), and a `Title (2099)` name no longer
+  takes 2099 as its release year.
 - Choosing a profile again no longer sends the next Return back to the profile
   picker. After any profile choice, the first Return opens a Home card:
   Home's content holds the remote with a visible ring, and the sidebar's

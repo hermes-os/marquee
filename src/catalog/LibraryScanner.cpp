@@ -24,6 +24,17 @@ namespace
     return year <= QDate::currentDate().year() + 1;
 }
 
+// Removing the year leaves the bracket or dash that introduced it.
+[[nodiscard]] QString chopTrailingIntroducer(QString title)
+{
+    while (title.endsWith(QLatin1Char('(')) || title.endsWith(QLatin1Char('['))
+           || title.endsWith(QLatin1Char('-'))) {
+        title.chop(1);
+        title = title.trimmed();
+    }
+    return title;
+}
+
 // Symlinks are excluded so nothing a link points at can enter the library from
 // outside the configured root, and hidden entries are excluded because trash and
 // sync directories inside a root hold ordinary-looking media files.
@@ -473,8 +484,14 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
     // This runs first because a title may itself start with a year.
     static const QRegularExpression trailingYear(QStringLiteral(R"(^(.+?)\s*\((\d{4})\)$)"));
     const QRegularExpressionMatch plex = trailingYear.match(stem);
-    if (plex.hasMatch() && !plex.captured(1).trimmed().isEmpty()) {
-        const QString plexTitle = plex.captured(1).trimmed().replace(separators, QStringLiteral(" ")).simplified();
+    if (plex.hasMatch() && isPlausibleReleaseYear(plex.captured(2).toInt())) {
+        // A second bracket group before the year (`X (1999) (2008)`) is not
+        // part of the title either, and neither is the dash that led to it
+        // (`Alien - (1979)`). FilenameParser.swift:98-104 drops one such group.
+        static const QRegularExpression trailingGroup(QStringLiteral(R"(\s*[\[(][^\])]+[\])]$)"));
+        QString plexTitle = plex.captured(1).trimmed();
+        plexTitle.remove(trailingGroup);
+        plexTitle = chopTrailingIntroducer(plexTitle.replace(separators, QStringLiteral(" ")).simplified());
         if (!plexTitle.isEmpty()) {
             return {.title = plexTitle, .year = plex.captured(2).toInt()};
         }
@@ -505,12 +522,7 @@ LibraryScanner::ParsedFilename LibraryScanner::parseMovieFilename(const QFileInf
     stem.replace(separators, QStringLiteral(" "));
     stem = stem.simplified();
 
-    // Removing the year leaves the bracket or dash that introduced it.
-    while (stem.endsWith(QLatin1Char('(')) || stem.endsWith(QLatin1Char('['))
-           || stem.endsWith(QLatin1Char('-'))) {
-        stem.chop(1);
-        stem = stem.trimmed();
-    }
+    stem = chopTrailingIntroducer(stem);
 
     if (stem.isEmpty()) {
         stem = file.completeBaseName();

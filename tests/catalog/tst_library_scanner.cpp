@@ -174,6 +174,30 @@ private slots:
         QCOMPARE(parsed.year, 2016);
     }
 
+    void cleansTheTitleBeforeAParenthesizedYearAndRejectsAFutureOne()
+    {
+        const struct
+        {
+            const char *name;
+            const char *title;
+            int year;
+        } cases[] = {
+            // The dash that led to the year goes with it.
+            {"Alien - (1979).mkv", "Alien", 1979},
+            // Another bracket group before the year is not the title.
+            {"X (1999) (2008).mkv", "X", 2008},
+            // A year no film has is not the release year.
+            {"Movie (2099).mkv", "Movie (2099)", 0},
+        };
+        for (const auto &c : cases) {
+            const LibraryScanner::ParsedFilename parsed =
+                LibraryScanner::parseMovieFilename(QFileInfo(QString::fromLatin1(c.name)));
+            QVERIFY2(parsed.title == QString::fromLatin1(c.title) && parsed.year == c.year,
+                     qPrintable(QStringLiteral("%1 gave '%2' %3").arg(QString::fromLatin1(c.name),
+                                                                    parsed.title).arg(parsed.year)));
+        }
+    }
+
     void takesTheTrailingParenthesizedYearAndKeepsItOutOfTheTitle()
     {
         // A title that is itself a year, or starts with one, must not lend
