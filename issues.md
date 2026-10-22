@@ -24,18 +24,32 @@ What happens: Interface Sounds, Launch Ident, and Sound Pack persist and say
 "Saved", but no code plays a cue.
 Found: source read at 81c8fa8; no audio module is linked in `CMakeLists.txt`.
 
-## Online Metadata is not implemented and its switch is not marked inert
-Where: `qml/screens/SettingsScreen.qml` (Online Metadata row),
-`src/settings/SettingsSession.cpp`, `src/catalog/`.
-What happens: the switch says "Fetch TMDB details and artwork during library
-scans", persists, and changes only the scan status text. Nothing fetches
-anything: there is no network code. Without enrichment the catalog holds no
-backdrop for movies, overview, director, cast, certification, rating, or genre,
-so details omit those sections, the Movies route has no genre rows, and scoped
-and genre search find nothing. The playback rows that are inert say "Saved"; this
-one does not.
-Found: source read at 81c8fa8; `git grep QNetwork` is empty and `CMakeLists.txt`
-has no Network component.
+## TMDB metadata is stored but no screen shows it yet
+Where: `qml/screens/DetailsScreen.qml`, `qml/screens/ShowDetailScreen.qml`,
+`src/models/MovieRowsModel.cpp`, `src/models/HomeRowsModel.cpp`,
+`src/search/SearchSession.cpp`, `src/profiles/ContentPolicy.cpp` (`maturityOf`).
+What happens: after a scan Marquee fetches TMDB details and artwork when a key
+exists (`src/metadata/`, catalog migration 6) and the models expose the fields
+as roles, but nothing reads them. Details has no overview, director, cast,
+rating or certification section; the Movies and TV routes still key their genre
+rows on `genresOf` (folder and title inference, not TMDB's genres); scoped and
+genre search find nothing from TMDB; a Kids profile still classifies from genres
+alone and ignores the stored certification; Home's Because You Watched, Hidden
+Gems and Short Tonight rows are not built. TMDB's similar and recommended movie
+ids are stored as TMDB ids and are not yet resolved to library titles. A movie
+backdrop is only ever TMDB's, because the scanner reads no movie `fanart` or
+`backdrop` sidecar, so with no key a movie has no backdrop.
+Found: the TMDB enrichment commits; `git grep -n "metadata->" src` outside
+`src/models/TitleMetadataView.cpp` and `src/profiles/ContentPolicy.cpp` is empty.
+
+## Character avatars are not fetched
+Where: `src/` (no counterpart of `Marquee/Services/Metadata/AvatarService.swift`).
+What happens: the released profile picker fetches character avatars from TMDB
+when Online Metadata is on; v3 has no avatar fetch, so profile avatars are the
+built-in icons only. Episode frame thumbnails generated from the video
+(`EpisodeFrameCache.swift`) are not ported either, so an episode with no still
+sidecar and no TMDB still draws its show backdrop.
+Found: the TMDB enrichment task, comparing `Marquee/Services/` with `src/`.
 
 ## Home has no hero spotlight, taste rows, or seasonal rows
 Where: `qml/screens/HomeScreen.qml`, `src/models/HomeRowsModel.cpp` (`compose`
