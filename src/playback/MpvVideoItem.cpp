@@ -693,6 +693,19 @@ void MpvVideoItem::previewTimedOut()
 
 void MpvVideoItem::handlePlaybackRestartEvent()
 {
+    if (m_scrubSettling) {
+        // The quiet fallback for a landing where libmpv already is (a hold
+        // clamped at 0): it sends no position report, so the restart that
+        // follows the landing's own command reply is the only sign the seek
+        // ran. The 0.25 s window stays the main rule, because the first
+        // restart after the reply can still be a preview's.
+        if (m_settleRestartsToSkip > 0) {
+            --m_settleRestartsToSkip;
+        } else if (m_settleAcknowledged && qAbs(m_position - m_settleLanding) < 1e-6) {
+            endSettle();
+        }
+        return;
+    }
     // A restart that reaches us before libmpv has taken this preview's seek
     // is the previous seek's (the last landing's, when a new hold starts
     // before that landing confirms): libmpv posts a seek's restart after the
@@ -731,6 +744,8 @@ void MpvVideoItem::handleCommandReply(uint64_t replyId, int error)
             qCWarning(logPlayback) << QStringLiteral("The seek ending a scrub failed: %1")
                                           .arg(mpvErrorText(error));
             endSettle();
+        } else {
+            m_settleAcknowledged = true;
         }
         return;
     }
@@ -749,6 +764,8 @@ void MpvVideoItem::handleCommandReply(uint64_t replyId, int error)
 
 void MpvVideoItem::beginSettle(double landing)
 {
+    m_settleRestartsToSkip = m_previewInFlight ? 1 : 0;
+    m_settleAcknowledged = false;
     m_scrubHolding = false;
     m_previewInFlight = false;
     m_previewPending.reset();

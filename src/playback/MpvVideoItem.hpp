@@ -508,6 +508,11 @@ private:
     double m_scrubOrigin{0.0};
     double m_settleLanding{0.0};
     uint64_t m_settleSerial{0};
+    // libmpv has taken the landing seek (its command reply came).
+    bool m_settleAcknowledged{false};
+    // Restarts still due from previews that were running at release; the
+    // landing's own restart comes after them.
+    int m_settleRestartsToSkip{0};
     int m_previewSeeksIssued{0};
     // libmpv can drop the restart report of a seek that a newer one replaced,
     // or never raise it without a video output; neither may wedge the scrub.

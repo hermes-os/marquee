@@ -937,6 +937,53 @@ private slots:
         QCOMPARE(video.position(), 30.0);
     }
 
+    // A Left hold clamped at 0 on a playing film: the exact seek lands where
+    // libmpv already is, so no position report marks the landing and only its
+    // restart does. The clock must follow playback well before the 1.5 s
+    // watchdog would let it.
+    void aPlayingHoldClampedAtZeroLetsTheClockFollowPlaybackAtOnce()
+    {
+        MpvVideoItem video;
+        open(video, m_scrubClip);
+        QTRY_VERIFY_WITH_TIMEOUT(video.duration() > 100.0, 10000);
+        QTRY_VERIFY_WITH_TIMEOUT(video.position() > 0.5, 10000);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+        video.previewScrub(0.0);
+        QTest::qWait(400);
+        QVERIFY(video.finishScrub(0.0));
+        QVERIFY(!video.paused());
+        QTest::qWait(800);
+        QVERIFY2(video.position() > 0.3, qPrintable(QString::number(video.position())));
+        QVERIFY(qAbs(video.position() - timePosition(video)) < kLandingTolerance);
+    }
+
+    // The landing's restart is the only sign a landing where libmpv already
+    // is has run, so it ends the settle: a position far from the landing
+    // delivered after it is taken, not dropped until the watchdog.
+    void theRestartOfALandingWithNoPositionChangeEndsTheSettle()
+    {
+        MpvVideoItem video;
+        openForScrub(video, 20.0);
+        video.beginScrub();
+        QTRY_COMPARE_WITH_TIMEOUT(video.propertyForTest(QStringLiteral("hr-seek")),
+                                  QStringLiteral("no"), 5000);
+        video.previewScrub(0.0);
+        QTRY_VERIFY_WITH_TIMEOUT(timePosition(video) < kLandingTolerance, 5000);
+        QTest::qWait(300);
+        QVERIFY(video.finishScrub(0.0));
+        QTest::qWait(300);
+
+        double reported = 5.0;
+        mpv_event_property property{"time-pos", MPV_FORMAT_DOUBLE, &reported};
+        mpv_event event{};
+        event.event_id = MPV_EVENT_PROPERTY_CHANGE;
+        event.data = &property;
+        QVERIFY(QMetaObject::invokeMethod(&video, "applyEvent", Q_ARG(mpv_event *, &event)));
+        QCOMPARE(video.position(), 5.0);
+    }
+
     // A hold that starts before the last landing has confirmed can see that
     // landing's PLAYBACK_RESTART arrive after its own first preview was
     // issued. It is not that preview's restart: counting it would let the
