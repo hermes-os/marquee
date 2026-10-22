@@ -21,9 +21,6 @@ intermediate version bump.
   and returns during one film is treated as untouched, so the window goes
   back. Moving to the next episode changes nothing. This differs from the
   released macOS app on purpose.
-- Holding the mouse button on the progress bar no longer stops Left, Right and
-  Down from working; the held button still keeps the controls and the pointer
-  up.
 - The mouse pointer hides with the player controls: when they fade out after
   three seconds (or Back hides them) the pointer disappears over the picture,
   and any pointer movement brings it and the controls back, as in the released
@@ -32,7 +29,8 @@ intermediate version bump.
   after three seconds.
 - The player controls and the mouse pointer stay up while the progress bar is
   pressed or dragged, including a press held still for longer than three
-  seconds; they hide three seconds after it ends.
+  seconds; they hide three seconds after it ends, and the arrow keys keep
+  working while it is held.
 - The player controls match the released HUD more closely: the bottom bar
   fades from clear to black at 0.8 instead of a flat 0.72 slab, the progress
   bar is the released 4 (7 in lean-back) capsule over a dim track, the slash
