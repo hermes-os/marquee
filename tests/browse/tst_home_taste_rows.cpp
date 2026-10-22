@@ -464,6 +464,40 @@ private slots:
         QCOMPARE(model.derivedRowBuildsForTest(), afterFirst + 3);
     }
 
+    // libmpv's estimate of a length drifts by seconds while a film plays; only
+    // a length that appears or crosses the 100-minute Short Tonight limit
+    // changes the rows.
+    void aDriftingDurationBuildsTheRowsOnlyWhenItCrossesTheShortLimit()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kOctober; });
+        QVector<MediaItem> items = libraryWithHistory();
+        for (int index = 0; index < 5; ++index) {
+            items.push_back(movie(QStringLiteral("Film %1").arg(index), 2010, {QStringLiteral("Drama")}));
+        }
+        model.replaceItems(items);
+        const QString id = QStringLiteral("root/Film 1");
+
+        const int built = model.derivedRowBuildsForTest();
+        model.applyWatchProgress(id, 10'000, 7'200'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 1);
+
+        for (const qint64 estimate : {7'201'500, 7'199'000, 7'204'250, 7'200'000, 7'198'999}) {
+            model.applyWatchProgress(id, 20'000, estimate, false);
+        }
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 1);
+
+        // 100 minutes is still short; a second over is not, and back again.
+        model.applyWatchProgress(id, 30'000, 6'000'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 2);
+        model.applyWatchProgress(id, 40'000, 6'000'900, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 2);
+        model.applyWatchProgress(id, 50'000, 6'001'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 3);
+        model.applyWatchProgress(id, 60'000, 5'999'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 4);
+    }
+
     // What the titles and their metadata alone decide is built when the items
     // are replaced: a progress record scores no overview and ranks no library.
     void aProgressRecordDoesNotScoreOrIndexTheLibraryAgain()

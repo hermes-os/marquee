@@ -648,9 +648,16 @@ void HomeRowsModel::applyWatchProgress(const QString &mediaId,
     // A position recorded every ten seconds of a film changes where the title
     // resumes and when it was played, and nothing the taste, seasonal and
     // Play Something rows rank on. Only a title newly watched (or unwatched)
-    // or one whose length became known sends them to be built again.
+    // or one whose length became known or crossed the Short Tonight limit
+    // sends them to be built again; libmpv's estimate of a length drifts by
+    // seconds while a film plays, and that must not.
     const qint64 durationSeconds = durationMs > 0 ? durationMs / 1000 : match->durationSeconds;
-    if (match->watched != completed || match->durationSeconds != durationSeconds) {
+    const bool wasKnown = match->durationSeconds > 0;
+    const bool isKnown = durationSeconds > 0;
+    const auto isShort = [](qint64 seconds) { return seconds <= home_rows::kShortTonightLimitSeconds; };
+    const bool lengthMatters = wasKnown != isKnown
+        || (wasKnown && isKnown && isShort(match->durationSeconds) != isShort(durationSeconds));
+    if (match->watched != completed || lengthMatters) {
         m_derived.invalidate();
     }
     match->resumePositionMs = completed ? 0 : positionMs;

@@ -6,6 +6,9 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home's taste rows are built again for a progress record only when a film's
+  length first becomes known or crosses the 100-minute Short Tonight limit, not
+  when the player's estimate of the length drifts by seconds. No migration.
 - Settings' Clear Watch History text reads as the released app's does ("Clears
   Continue Watching, Recently Watched, and all saved playback positions.");
   it no longer says watched titles return to Recently Added, which keeps them
