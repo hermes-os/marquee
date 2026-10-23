@@ -7,6 +7,8 @@
 #include "catalog/MediaItem.hpp"
 #include "models/BrowseSemantics.hpp"
 #include "models/HomeRowsModel.hpp"
+#include "models/HomeTasteRows.hpp"
+#include "models/SeasonalRows.hpp"
 #include "models/SimilarityIndex.hpp"
 #include "profiles/ContentPolicy.hpp"
 #include "profiles/ProfileStore.hpp"
@@ -467,7 +469,7 @@ private slots:
     // libmpv's estimate of a length drifts by seconds while a film plays; only
     // a length that appears or crosses the 100-minute Short Tonight limit
     // changes the rows.
-    void aDriftingDurationBuildsTheRowsOnlyWhenItCrossesTheShortLimit()
+    void aDriftingDurationBuildsTheRowsOnlyWhenItCrossesALengthBucket()
     {
         HomeRowsModel model;
         model.setClockForTest([] { return kOctober; });
@@ -496,6 +498,43 @@ private slots:
         QCOMPARE(model.derivedRowBuildsForTest(), built + 3);
         model.applyWatchProgress(id, 60'000, 5'999'000, false);
         QCOMPARE(model.derivedRowBuildsForTest(), built + 4);
+
+        // The seasonal order reads the length too: -180 under 1,200 s, +30
+        // from 4,500 s. 70 to 80 minutes moves neither, and 19 to 21 does.
+        model.applyWatchProgress(id, 70'000, 1'199'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 5);
+        model.applyWatchProgress(id, 80'000, 1'199'900, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 5);
+        model.applyWatchProgress(id, 90'000, 1'200'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 6);
+        model.applyWatchProgress(id, 100'000, 4'200'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 6);
+        model.applyWatchProgress(id, 110'000, 4'499'999, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 6);
+        model.applyWatchProgress(id, 120'000, 4'500'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 7);
+        model.applyWatchProgress(id, 130'000, 4'499'000, false);
+        QCOMPARE(model.derivedRowBuildsForTest(), built + 8);
+    }
+
+    // Two lengths in one bucket must score and qualify alike for Short
+    // Tonight, so a threshold a rule gains without joining lengthBucket fails
+    // here instead of leaving the cached rows stale.
+    void everyLengthTheRulesTellApartIsABucketBoundary()
+    {
+        MediaItem film = movie(QStringLiteral("Film"), 2010, {QStringLiteral("Drama")});
+        for (qint64 seconds = 1; seconds < 9'000; ++seconds) {
+            MediaItem shorter = film;
+            MediaItem longer = film;
+            shorter.durationSeconds = seconds;
+            longer.durationSeconds = seconds + 1;
+            if (home_rows::lengthBucket(seconds) == home_rows::lengthBucket(seconds + 1)) {
+                QCOMPARE(home_rows::heroScore(shorter, -1), home_rows::heroScore(longer, -1));
+                QCOMPARE(home_rows::runtimeSeconds(shorter) <= home_rows::kShortTonightLimitSeconds,
+                         home_rows::runtimeSeconds(longer) <= home_rows::kShortTonightLimitSeconds);
+            }
+        }
+        QVERIFY(home_rows::lengthBucket(0) != home_rows::lengthBucket(1));
     }
 
     // What the titles and their metadata alone decide is built when the items

@@ -10,8 +10,9 @@ intermediate version bump.
   app does when two titles have a director that is present but has no letters
   or digits to compare (both count as the same director). No migration.
 - Home's taste rows are built again for a progress record only when a film's
-  length first becomes known or crosses the 100-minute Short Tonight limit, not
-  when the player's estimate of the length drifts by seconds. No migration.
+  length first becomes known or moves across a length the rows read (20 and 75
+  minutes, and the 100-minute Short Tonight limit), not when the player's
+  estimate of the length drifts by seconds. No migration.
 - Settings' Clear Watch History text reads as the released app's does ("Clears
   Continue Watching, Recently Watched, and all saved playback positions.");
   it no longer says watched titles return to Recently Added, which keeps them

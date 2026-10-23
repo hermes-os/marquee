@@ -8,6 +8,12 @@
 
 namespace home_rows
 {
+/// The lengths `heroScore` reads (:2108-2113): +30 from the first, -180 under
+/// the second. `lengthBucket` (HomeTasteRows.hpp) is built from these, so a
+/// threshold the score gains is one place to add.
+inline constexpr qint64 kHeroLongSeconds = 4'500;
+inline constexpr qint64 kHeroShortSeconds = 1'200;
+
 /// `BrowseLeanBackDelightPolicy.seasonalRows` (BrowseSnapshotStore.swift:
 /// 466-498): October Horror in October, and Summer Blockbusters from June to
 /// August, each with at least two movies, over `movies`. The month and the day

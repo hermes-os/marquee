@@ -94,10 +94,10 @@ double home_rows::heroScore(const MediaItem &item, qint64 newestMs)
     }
     // A length of zero is the catalog's "unknown", the released `nil`.
     if (item.durationSeconds > 0) {
-        if (item.durationSeconds >= 4'500) {
+        if (item.durationSeconds >= kHeroLongSeconds) {
             score += 30;
         }
-        if (item.durationSeconds < 1'200) {
+        if (item.durationSeconds < kHeroShortSeconds) {
             score -= 180;
         }
     }

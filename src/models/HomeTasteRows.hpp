@@ -9,6 +9,7 @@
 #include "catalog/MediaItem.hpp"
 #include "models/HomeLibraryRows.hpp"
 #include "models/HomeRowIds.hpp"
+#include "models/SeasonalRows.hpp"
 #include "models/TasteModel.hpp"
 
 /// The Home rows that depend on what the profile has watched and on the
@@ -34,6 +35,22 @@ inline constexpr int kShortTonightLimitSeconds = 100 * 60;    // :2900
 inline constexpr int kCompletedSeedLimit = 3;            // :2901
 inline constexpr int kBecauseYouWatchedRowLimit = 12;    // :2902
 inline constexpr int kBecauseYouWatchedMinimumCount = 4; // :2903
+
+/// Which side of every length the cached rows read a title is on: 0 for an
+/// unknown length (the catalog's zero), then one more for each of the Short
+/// Tonight limit (a length over it is not short), `kHeroShortSeconds` and
+/// `kHeroLongSeconds` that the length has reached. A length that stays in its
+/// bucket cannot change a cached row, so Home rebuilds them when it leaves.
+/// Add a threshold the rows start reading here.
+[[nodiscard]] constexpr int lengthBucket(qint64 seconds)
+{
+    if (seconds <= 0) {
+        return 0;
+    }
+    return 1 + (seconds > kShortTonightLimitSeconds ? 1 : 0)
+        + (seconds >= kHeroShortSeconds ? 1 : 0)
+        + (seconds >= kHeroLongSeconds ? 1 : 0);
+}
 
 /// :2945-2966 `becauseYouWatchedRows`: up to three rows, one per newest
 /// finished movie, each of the twelve best unwatched matches of that movie by
