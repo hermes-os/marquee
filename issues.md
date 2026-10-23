@@ -436,3 +436,8 @@ viewing). v3 stores one `completed` flag per title and profile, so a title
 finished once and later played part-way is no longer watched: it can come back
 in Play Something and Because You Watched and stops shaping that profile's taste.
 Found: Home taste rows task, reading `LibraryState.currentTasteProfile` against `CatalogStore`.
+
+## Without metadata a file's length is known only for titles the profile has started
+Where: `src/models/HomeTasteRows.cpp:36` (`runtimeSeconds`), `src/catalog/CatalogStore.cpp:377` (`COALESCE(w.duration_ms, 0)`), `src/models/SeasonalRows.cpp` (`heroScore`).
+What happens: with no metadata a movie's `durationSeconds` comes only from the profile's own `watch_progress` row, so Short Tonight and the hero's length terms see only titles that profile has started. The released app probes the length of every file.
+Found: review of the Home taste-rows lane (fa1f0c5..7143233).
