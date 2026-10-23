@@ -699,6 +699,69 @@ private slots:
         QCOMPARE(home->cardAt(1, 0).value(QStringLiteral("mediaId")).toString(), top);
     }
 
+    // Left and Right on the hero turn the carousel and emit no focus signal,
+    // so turning it is a move of the remote on its own.
+    void aViewerTurningTheCarouselIsNotRestartedByTheReloadLanding()
+    {
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(seedMovies(movies.path(), 4));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        SwitchFixture fixture;
+        QVERIFY(prepareSwitch(controller, window, fixture));
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+        QTRY_VERIFY(!controller.scanning());
+        QVERIFY(home->hero()->count() > 1);
+        fixture.watched = home->cardAt(0, 1).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!fixture.watched.isEmpty());
+        {
+            CatalogStore store(AppPaths::catalogFile());
+            store.recordWatchProgress(fixture.second, fixture.watched, 600'000, 3'600'000, false);
+        }
+
+        QSemaphore refreshEntered;
+        QSemaphore releaseRefresh;
+        const QMetaObject::Connection gate = QObject::connect(
+            &controller, &ApplicationController::catalogRefreshStarted, &controller,
+            [&] {
+                refreshEntered.release();
+                releaseRefresh.acquire();
+            },
+            Qt::DirectConnection);
+        const auto releaseGate = qScopeGuard([&] {
+            QObject::disconnect(gate);
+            releaseRefresh.release(2);
+        });
+        controller.requestCatalogRefresh();
+        QVERIFY2(refreshEntered.tryAcquire(1, 5000), "the refresh did not reach its gate");
+
+        chooseSecondProfile(window, controller, fixture.second);
+        QVERIFY(home->heroFocused());
+        QCOMPARE(home->hero()->currentIndex(), 0);
+        QTest::keyClick(window, Qt::Key_Right);
+        QVERIFY(home->heroFocused());
+        QCOMPARE(home->hero()->currentIndex(), 1);
+
+        releaseRefresh.release();
+        QTRY_COMPARE(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString(), fixture.watched);
+        QTRY_VERIFY(!controller.scanning());
+        // The remote never left the hero, and the slide it turned to stays.
+        QVERIFY(home->heroFocused());
+        QCOMPARE(home->hero()->currentIndex(), 1);
+    }
+
     // A reload that fails brings no projection, so the restart it was waiting
     // for must not stay armed for a later one.
     void aFailedReloadDisarmsTheHomeRestart()

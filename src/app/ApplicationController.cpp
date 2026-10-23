@@ -86,6 +86,11 @@ ApplicationController::ApplicationController(QObject *parent)
     // tells that the viewer moved (HomeDetailView.swift:57-60). The hero's own
     // appearing or going with a projection arrives under `ShellDrivesHome`.
     QObject::connect(&m_homeRows, &HomeRowsModel::heroFocusedChanged, this, remoteMoved);
+    // Left and Right on the hero turn the carousel and move no focus signal.
+    // The timer is stopped while the remote rests on the hero, so a turn then
+    // is the viewer's; the reload landing must not snap it back to slide 0.
+    // Home's own resets and rebuilds arrive under `ShellDrivesHome`.
+    QObject::connect(m_homeRows.hero(), &HeroSpotlightModel::positionChanged, this, remoteMoved);
     // ProfilePickerView.swift:1101, :1107, and :1195: every edit, addition,
     // and deletion is followed by a reconcile so the shell's active profile
     // never shows stale fields or a profile that no longer exists.

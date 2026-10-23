@@ -76,6 +76,10 @@ intermediate version bump.
 - Switching profile while a library scan is running no longer pulls a viewer
   who has gone Down from the hero to the first row back to the hero when the
   scan finishes. Before, only a move between rows counted as the viewer moving.
+- Switching profile while a library scan is running no longer snaps the hero
+  carousel back to its first slide, and Return no longer plays that slide, when
+  the viewer turned it with Left or Right before the scan finished. Before,
+  turning the carousel did not count as the viewer moving.
 - Choosing a profile now puts the remote on Home's hero, as in the released app,
   when the library has a spotlight: Home opens on the hero's first slide and the
   first Return plays it, whatever slide or place the last viewer left. Left on
