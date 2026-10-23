@@ -320,7 +320,9 @@ private slots:
         QCOMPARE(cards.at(2).mediaId, oldMovie.id);
     }
 
-    void recentlyAddedHidesWhatTheProfileHasWatched()
+    // BrowseSnapshotStore.swift:2871-2874: the released row sorts every movie
+    // and show by file date and filters nothing.
+    void recentlyAddedKeepsWatchedTitles()
     {
         MediaItem seen = movie(QStringLiteral("Arrival"), 2016, daysAgo(1));
         watched(seen, daysAgo(1));
@@ -341,9 +343,8 @@ private slots:
             names.push_back(card.title);
         }
         names.sort();
-        // The watched movie and the show watched through are hidden; one
-        // episode left keeps its show.
-        QCOMPARE(names, (QStringList{QStringLiteral("Dune"), QStringLiteral("Part")}));
+        QCOMPARE(names, (QStringList{QStringLiteral("Arrival"), QStringLiteral("Done"),
+                                     QStringLiteral("Dune"), QStringLiteral("Part")}));
     }
 
     void decadeRowsNeedTwoMoviesAndRunNewestDecadeFirst()
@@ -355,7 +356,12 @@ private slots:
             movie(QStringLiteral("Arrival"), 2016),
         };
 
-        const QVector<home_rows::Row> rows = home_rows::decadeRows(items);
+        QVector<home_rows::Row> rows;
+        for (const home_rows::Row &row : home_rows::compose(items, kNow)) {
+            if (row.id.startsWith(QStringLiteral("decade-"))) {
+                rows.push_back(row);
+            }
+        }
 
         QCOMPARE(rowIds(rows), (QStringList{QStringLiteral("decade-2010s"),
                                             QStringLiteral("decade-1990s")}));
@@ -399,6 +405,33 @@ private slots:
                  (QStringList{QStringLiteral("play-something"), QStringLiteral("recently-added"),
                               QStringLiteral("all-movies")}));
         QVERIFY(home_rows::compose({}, kNow).isEmpty());
+    }
+
+    // BrowseSnapshotStore.swift:2876-2881 puts Holiday Movies after Recently
+    // Added and before the decades, once two titles qualify, in the order
+    // sortedHolidayMovies gives (:2063-2071).
+    void holidayMoviesFollowRecentlyAddedAndAreOrderedByTheSharedScore()
+    {
+        const QVector<home_rows::Row> rows = home_rows::compose(
+            {movie(QStringLiteral("Scrooged"), 1988), movie(QStringLiteral("Arrival"), 2016),
+             movie(QStringLiteral("The Santa Clause"), 1994)},
+            kNow);
+
+        QCOMPARE(rowIds(rows),
+                 (QStringList{QStringLiteral("play-something"), QStringLiteral("recently-added"),
+                              QStringLiteral("holiday-movies"), QStringLiteral("all-movies")}));
+        const home_rows::Row *holiday = rowNamed(rows, QStringLiteral("holiday-movies"));
+        QCOMPARE(holiday->title, QStringLiteral("Holiday Movies"));
+        QCOMPARE(holiday->cards.size(), 2);
+        // 100 for the keyword title, then 86 for the named film.
+        QCOMPARE(holiday->cards.at(0).mediaId, QStringLiteral("root/The Santa Clause"));
+        QCOMPARE(holiday->cards.at(1).mediaId, QStringLiteral("root/Scrooged"));
+
+        QVERIFY(rowNamed(home_rows::compose({movie(QStringLiteral("Scrooged"), 1988),
+                                             movie(QStringLiteral("Arrival"), 2016)},
+                                            kNow),
+                         QStringLiteral("holiday-movies"))
+                == nullptr);
     }
 
     void aRowDrawsAtMostEightCardsAndStillCountsItsWholeLength()
@@ -1085,10 +1118,9 @@ private slots:
         QVERIFY(rowNamed(forB, QStringLiteral("continue-watching")) == nullptr);
         QCOMPARE(ids(rowNamed(forB, QStringLiteral("recently-watched"))->cards),
                  QStringList{coco});
-        // B has watched Coco, so it is not offered as new to B, and A has not.
-        QCOMPARE(ids(rowNamed(forB, QStringLiteral("recently-added"))->cards),
-                 QStringList{arrival});
-        // Arrival is only part-way through for A, so it is still new to A.
+        // Recently Added hides nothing (BrowseSnapshotStore.swift:2871-2874),
+        // so it holds both titles for every profile.
+        QCOMPARE(rowNamed(forB, QStringLiteral("recently-added"))->totalCount, 2);
         QCOMPARE(rowNamed(forA, QStringLiteral("recently-added"))->totalCount, 2);
         QCOMPARE(rowIds(forC), (QStringList{QStringLiteral("play-something"),
                                             QStringLiteral("recently-added"),

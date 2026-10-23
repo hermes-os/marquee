@@ -300,9 +300,14 @@ int maturityOf(const MediaItem &item)
 {
     using Maturity = ProfileStore::Maturity;
 
+    // MediaItem.swift:253-258: the stored certification (`metadata?.certification
+    // ?? contentRating`, both of which the catalog fills from the one stored
+    // certification) and `displayGenres`.
+    const QString certification = item.metadata ? item.metadata->certification : QString();
+
     // MaturityLevel.swift:34-47.
     QSet<QString> genres;
-    for (const QString &genre : genresOf(item)) {
+    for (const QString &genre : displayGenresOf(item)) {
         const QString normalized = genre.trimmed().toLower();
         if (!normalized.isEmpty()) {
             genres.insert(normalized);
@@ -318,6 +323,36 @@ int maturityOf(const MediaItem &item)
     const bool hasAnimation = hasAny({"animation", "animated"});
     const bool hasMature = hasAny({"horror", "crime", "thriller", "war"});
     const bool kidsSignal = hasKidsGenre || (hasFamily && hasAnimation);
+
+    // MaturityLevel.swift:49-73: a non-empty certification decides. A
+    // certification this list does not know falls to the genres, and to Adult
+    // when they name nothing family-friendly.
+    if (!certification.isEmpty()) {
+        QString rating = certification.trimmed().toUpper();
+        rating.replace(QLatin1String("RATED "), QString());
+        if (rating == QLatin1String("TV-Y") || rating == QLatin1String("TV-Y7")
+            || rating == QLatin1String("TV-Y7-FV") || rating == QLatin1String("TV-G")
+            || rating == QLatin1String("G")) {
+            return static_cast<int>(Maturity::Kids);
+        }
+        if (rating == QLatin1String("PG") || rating == QLatin1String("TV-PG")) {
+            if (kidsSignal) {
+                return static_cast<int>(Maturity::Kids);
+            }
+            return static_cast<int>(hasFamily || hasAnimation ? Maturity::Family : Maturity::Teen);
+        }
+        if (rating == QLatin1String("PG-13") || rating == QLatin1String("TV-14")) {
+            return static_cast<int>(Maturity::Teen);
+        }
+        if (rating == QLatin1String("R") || rating == QLatin1String("NC-17")
+            || rating == QLatin1String("TV-MA") || rating == QLatin1String("NR")) {
+            return static_cast<int>(Maturity::Adult);
+        }
+        if (kidsSignal) {
+            return static_cast<int>(Maturity::Kids);
+        }
+        return static_cast<int>(hasFamily ? Maturity::Family : Maturity::Adult);
+    }
 
     // MaturityLevel.swift:75-82, the branch without a certification.
     if (genres.isEmpty()) {

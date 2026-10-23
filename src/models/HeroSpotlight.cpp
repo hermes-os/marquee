@@ -2,9 +2,11 @@
 
 #include "models/BrowseSemantics.hpp"
 #include "models/HomeRowsModel.hpp"
+#include "models/SeasonalRows.hpp"
 #include "models/ShowsModel.hpp"
+#include "models/TasteModel.hpp"
+#include "profiles/ContentPolicy.hpp"
 
-#include <QCollator>
 #include <QFileInfo>
 #include <QHash>
 #include <QSet>
@@ -12,25 +14,17 @@
 #include <QUrl>
 
 #include <algorithm>
-#include <limits>
+#include <optional>
 #include <utility>
 
 namespace
 {
+// :750-753 and :757-758 look at the first four of a title's ranked neighbours.
+constexpr int kSimilarNeighbourCount = 4;
+
 [[nodiscard]] QUrl localUrl(const QString &path)
 {
     return path.isEmpty() ? QUrl() : QUrl::fromLocalFile(path);
-}
-
-// MediaItem.swift:143-151, the form the poster cards use too.
-[[nodiscard]] QString runtimeOf(const MediaItem &item)
-{
-    if (item.durationSeconds <= 0) {
-        return {};
-    }
-    const qint64 totalMinutes = item.durationSeconds / 60;
-    return totalMinutes >= 60 ? QStringLiteral("%1h %2m").arg(totalMinutes / 60).arg(totalMinutes % 60)
-                              : QStringLiteral("%1m").arg(totalMinutes);
 }
 
 // One title of the carousel's pool: a movie, or a show standing for its
@@ -49,52 +43,68 @@ struct Candidate
     QString title;
     int year{0};
     QDateTime date;
+    // `heroScore` (:2103-2121), and with the taste boost (:788) the score the
+    // quality ranking sorts by.
     double score{0.0};
-    int holiday{0};
-    // BrowseSemanticPolicy.franchiseKey, empty when the title has none.
-    QString franchise;
-    // The browse-order family: the franchise, else the normalized title.
-    QString family;
-    int sortYear{std::numeric_limits<int>::max()};
+    double rankScore{0.0};
+    // What the title and its metadata alone decide: the franchise, the browse
+    // key and the holiday score, from the library cache.
+    home_rows::LibraryRows::TitleFacts facts;
 
     [[nodiscard]] bool isShow() const { return !showName.isEmpty(); }
-    [[nodiscard]] QString posterPath() const
-    {
-        if (isShow()) {
-            return art->gridShowPosterPath().isEmpty() ? art->posterAbsolutePath
-                                                       : art->gridShowPosterPath();
-        }
-        return art->posterAbsolutePath;
-    }
-    [[nodiscard]] QString backdropPath() const
-    {
-        // MediaItem.swift:202-207: a movie's own backdrop; an episode's is the
-        // show's. v3 holds no season backdrop.
-        return isShow() ? art->showBackdropAbsolutePath : art->backdropAbsolutePath;
-    }
+    // HeroCarousel.swift:307, :330: the representative's display artwork, a
+    // local sidecar first and the cached TMDB image only in its absence.
+    [[nodiscard]] QString posterPath() const { return art->displayPosterPath(); }
+    [[nodiscard]] QString backdropPath() const { return art->displayBackdropPath(); }
 };
 
-// BrowseSnapshotStore.swift:2026-2046: browse order is the title's family, its
-// year with an unknown one last, then its title. The key breaks what the
-// oracle leaves unordered.
+// BrowseSnapshotStore.swift:2044-2046, the order every released browse sort
+// breaks its ties by.
 [[nodiscard]] bool browsesBefore(const Candidate &left, const Candidate &right)
 {
-    static const QCollator collator = [] {
-        QCollator built;
-        built.setCaseSensitivity(Qt::CaseInsensitive);
-        return built;
-    }();
-    if (const int byFamily = collator.compare(left.family, right.family); byFamily != 0) {
-        return byFamily < 0;
-    }
-    if (left.sortYear != right.sortYear) {
-        return left.sortYear < right.sortYear;
-    }
-    if (const int byTitle = collator.compare(left.title, right.title); byTitle != 0) {
-        return byTitle < 0;
-    }
-    return left.key < right.key;
+    return browse::compareMovieBrowseSortKeys(left.facts.sortKey, right.facts.sortKey);
 }
+
+// :841-880 `HeroContentProfile`: what makes a movie and a show near-duplicates
+// of each other (a franchise, a top-billed actor, or a director and a genre).
+struct ContentProfile
+{
+    QString franchise;
+    QString director;
+    QSet<QString> topCast;
+    QSet<QString> genres;
+
+    explicit ContentProfile(const Candidate &candidate)
+        : franchise(candidate.facts.franchise)
+    {
+        const MediaItem &item = *candidate.art;
+        if (item.metadata) {
+            director = browse::normalizedText(item.metadata->director);
+            for (qsizetype index = 0; index < std::min<qsizetype>(2, item.metadata->cast.size()); ++index) {
+                if (const QString name = browse::normalizedText(item.metadata->cast.at(index).name);
+                    !name.isEmpty()) {
+                    topCast.insert(name);
+                }
+            }
+        }
+        for (const QString &genre : content_policy::displayGenresOf(item)) {
+            if (const QString normalized = browse::normalizedText(genre); !normalized.isEmpty()) {
+                genres.insert(normalized);
+            }
+        }
+    }
+
+    [[nodiscard]] bool isNearDuplicate(const ContentProfile &other) const
+    {
+        if (!franchise.isEmpty() && franchise == other.franchise) {
+            return true;
+        }
+        if (topCast.intersects(other.topCast)) {
+            return true;
+        }
+        return !director.isEmpty() && director == other.director && genres.intersects(other.genres);
+    }
+};
 
 [[nodiscard]] QDateTime unknownDate()
 {
@@ -102,48 +112,19 @@ struct Candidate
 }
 }
 
-double hero_spotlight::heroScore(bool hasBackdrop,
-                                 bool hasPoster,
-                                 qint64 durationSeconds,
-                                 const QDateTime &effectiveDate,
-                                 const QDateTime &newestDate)
-{
-    // BrowseSnapshotStore.swift:2103-2121. `voteAverage * 100` (:2104) is not
-    // here: the catalog holds no rating.
-    double score = 0.0;
-    if (hasBackdrop) {
-        score += 180.0;
-    }
-    if (hasPoster) {
-        score += 50.0;
-    }
-    // :2111-2114. The catalog knows a runtime only once the player has
-    // recorded one, so an unknown runtime scores neither way.
-    if (durationSeconds > 0) {
-        if (durationSeconds >= 4'500) {
-            score += 30.0;
-        }
-        if (durationSeconds < 1'200) {
-            score -= 180.0;
-        }
-    }
-    // :2115-2119: up to 70 for being as new as the newest title, none after
-    // thirty days older.
-    if (newestDate.isValid() && effectiveDate.isValid()) {
-        const double ageSeconds =
-            std::max(0.0, static_cast<double>(effectiveDate.msecsTo(newestDate)) / 1000.0);
-        const double thirtyDays = 60.0 * 60.0 * 24.0 * 30.0;
-        score += std::max(0.0, 70.0 - (ageSeconds / thirtyDays) * 70.0);
-    }
-    return score;
-}
-
 QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem> &items,
-                                                         const QDateTime &now)
+                                                         const QDateTime &now,
+                                                         home_rows::LibraryRows *library,
+                                                         const browse::TasteModel *taste)
 {
     if (items.isEmpty()) {
         return {};
     }
+    home_rows::LibraryRows uncachedLibrary;
+    home_rows::LibraryRows &libraryRows = library != nullptr ? *library : uncachedLibrary;
+    // The holiday scores of the movies are built first so the title facts and
+    // the similarity index reuse them.
+    (void)libraryRows.built(items);
 
     // The pool: every movie, and one entry per show (:2655).
     QVector<QVector<MediaItem>> showEpisodes;
@@ -163,14 +144,10 @@ QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem
 
     QVector<Candidate> pool;
     pool.reserve(items.size());
-    const auto describe = [](Candidate &candidate) {
-        // :1820-1862 and :2026-2033: the family is the franchise, or the
-        // normalized title when the title has none.
-        const QString franchise = browse::franchiseKey(candidate.title);
-        candidate.franchise = franchise;
-        candidate.family = franchise.isEmpty() ? browse::normalizedText(candidate.title) : franchise;
-        candidate.sortYear = candidate.year > 0 ? candidate.year : std::numeric_limits<int>::max();
-        candidate.holiday = browse::holidayScore(candidate.title);
+    const auto describe = [&libraryRows](Candidate &candidate) {
+        // :1820-1862 and :2026-2033 through the library cache: the family is
+        // the franchise, or the normalized title when the title has none.
+        candidate.facts = libraryRows.titleFacts(*candidate.art);
     };
     for (const MediaItem &item : items) {
         if (item.isEpisode()) {
@@ -222,14 +199,13 @@ QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem
     }
 
     // :783: scores are taken against the newest date in the pool.
-    QDateTime newestDate = unknownDate();
+    qint64 newestMs = 0;
     for (const Candidate &candidate : std::as_const(pool)) {
-        newestDate = std::max(newestDate, candidate.date);
+        newestMs = std::max(newestMs, candidate.date.toMSecsSinceEpoch());
     }
     for (Candidate &candidate : pool) {
-        candidate.score = heroScore(!candidate.backdropPath().isEmpty(),
-                                    !candidate.posterPath().isEmpty(),
-                                    candidate.art->durationSeconds, candidate.date, newestDate);
+        candidate.score = home_rows::heroScoreDated(*candidate.art, candidate.date.toMSecsSinceEpoch(), newestMs);
+        candidate.rankScore = candidate.score + (taste != nullptr ? taste->heroBoost(*candidate.art) : 0.0);
     }
 
     QVector<const Candidate *> qualityRanked;
@@ -237,11 +213,11 @@ QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem
     for (const Candidate &candidate : std::as_const(pool)) {
         qualityRanked.push_back(&candidate);
     }
-    // :784-795: score, then browse order.
+    // :784-795: score with the taste boost, then browse order.
     std::stable_sort(qualityRanked.begin(), qualityRanked.end(),
                      [](const Candidate *left, const Candidate *right) {
-                         if (left->score != right->score) {
-                             return left->score > right->score;
+                         if (left->rankScore != right->rankScore) {
+                             return left->rankScore > right->rankScore;
                          }
                          return browsesBefore(*left, *right);
                      });
@@ -254,18 +230,45 @@ QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem
         usedKeys.insert(candidate.key);
         used.push_back(&candidate);
     };
-    // :738-759 asks the similarity index for the top four neighbours of every
-    // title already chosen, and :867-871 treats a shared franchise as a near
-    // duplicate. The index is built from genres, cast, directors, overviews and
-    // ratings the catalog does not hold; the franchise (:1824-1862) is the one
-    // term it still has, and it outweighs the rest (:2419-2421), so a title of
-    // a franchise already spotlit is too similar.
-    const auto tooSimilar = [&](const Candidate &candidate) {
-        if (candidate.franchise.isEmpty()) {
-            return false;
+    // :738-759. A movie is too similar to a chosen one when either is among
+    // the other's four nearest neighbours in the similarity index (the
+    // library's, shared with Because You Watched); a movie and a show are
+    // compared by their content profiles (:863-880). The index ranks movies
+    // only, so two shows are judged by their franchise alone, which is the
+    // term it weighs most (issues.md).
+    QHash<QString, QVector<QString>> nearest;
+    const browse::SimilarityIndex *index = nullptr;
+    const auto nearestOf = [&](const QString &id) -> const QVector<QString> & {
+        auto found = nearest.find(id);
+        if (found == nearest.end()) {
+            if (index == nullptr) {
+                QVector<MediaItem> movies;
+                for (const MediaItem &item : items) {
+                    if (item.isMovie()) {
+                        movies.push_back(item);
+                    }
+                }
+                index = &libraryRows.similarityIndex(movies);
+            }
+            found = nearest.insert(id, index->rankedMovieIds(id, kSimilarNeighbourCount));
         }
+        return found.value();
+    };
+    const auto tooSimilar = [&](const Candidate &candidate) {
+        std::optional<ContentProfile> profile;
         return std::any_of(used.cbegin(), used.cend(), [&](const Candidate *chosen) {
-            return chosen->franchise == candidate.franchise;
+            if (chosen->isShow() != candidate.isShow()) {
+                if (!profile) {
+                    profile.emplace(candidate);
+                }
+                return ContentProfile(*chosen).isNearDuplicate(*profile);
+            }
+            if (candidate.isShow()) {
+                return !candidate.facts.franchise.isEmpty()
+                    && chosen->facts.franchise == candidate.facts.franchise;
+            }
+            return nearestOf(chosen->playId).contains(candidate.playId)
+                || nearestOf(candidate.playId).contains(chosen->playId);
         });
     };
     // :761-764.
@@ -294,7 +297,7 @@ QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem
         spotlight.year = candidate.year;
         // HeroCarousel.swift:380-384 names the runtime and format of the item
         // the card stands for, a show's representative.
-        spotlight.runtime = runtimeOf(*candidate.art);
+        spotlight.runtime = candidate.art->displayRuntime();
         spotlight.formatBadge = QFileInfo(candidate.art->relativePath).suffix().toUpper();
         spotlight.posterPath = candidate.posterPath();
         spotlight.backdropPath = candidate.backdropPath();
@@ -331,7 +334,7 @@ QVector<hero_spotlight::Spotlight> hero_spotlight::build(const QVector<MediaItem
     // offered all year, so it is here.
     QVector<const Candidate *> holiday;
     for (const Candidate *candidate : std::as_const(qualityRanked)) {
-        if (candidate->holiday > 0 && !usedKeys.contains(candidate->key)) {
+        if (candidate->facts.holiday > 0 && !usedKeys.contains(candidate->key)) {
             holiday.push_back(candidate);
         }
     }

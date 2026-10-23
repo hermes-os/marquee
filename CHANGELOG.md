@@ -6,6 +6,84 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- The Home hero ranks and picks as the released builder does now that the
+  catalog holds TMDB's facts: the rating counts in a title's score (vote average
+  times 100), a title you have not finished gains the boost of how much it
+  matches what you finished, the Holiday Pick reads the title, overview and
+  genres through the same score the Movies and Home rows use (so a Christmas
+  film named otherwise is found), and a title too much like one already shown
+  (the same franchise, a shared lead actor, or the same director and genre; a
+  movie among another's four nearest neighbours) waits behind others. The
+  carousel draws a title's cached online poster or backdrop when it has no
+  local one. The hero, the Movies rows and Home's rows share one browse order,
+  one score and one runtime label, and a progress record scores and folds no
+  title again. No migration.
+- Because You Watched ranks the movies beyond the index's twelve as the released
+  app does when two titles have a director that is present but has no letters
+  or digits to compare (both count as the same director). No migration.
+- Home's taste rows are built again for a progress record only when a film's
+  length first becomes known or moves across a length the rows read (20 and 75
+  minutes, and the 100-minute Short Tonight limit), not when the player's
+  estimate of the length drifts by seconds. No migration.
+- Settings' Clear Watch History text reads as the released app's does ("Clears
+  Continue Watching, Recently Watched, and all saved playback positions.");
+  it no longer says watched titles return to Recently Added, which keeps them
+  already.
+- Home no longer scores every movie's holiday words, groups the decades or ranks
+  the library against itself for each progress record while a film plays: they
+  are built when the library or its metadata changes. With 2000 movies a
+  progress record took 52 ms and now takes 5 ms (Release build). No migration.
+- Home's Recently Added keeps the movies and shows a profile has watched, as the
+  released app does: it lists every movie and show by file date. Before, it hid
+  watched movies and shows watched through. No migration.
+- Home shows the released app's taste and seasonal rows. Hidden Gems (ratings
+  and vote counts) and Summer Blockbusters (ratings, votes or popularity) need
+  online metadata and do not appear without it. Because You Watched (through
+  franchise names), Short Tonight (for titles whose length is known) and
+  October Horror (through title words) can appear without it. After Play
+  Something: "Because You Watched ..." (up to three rows, one
+  for each of the newest movies you finished, the twelve unwatched movies most
+  like it by franchise, director, cast, genres, overview and year, shown with
+  four or more), Hidden Gems (rated 7.5 or more by 50 or more people) and Short
+  Tonight (100 minutes or less), each ranked by your taste and shown with two or
+  more movies; then October Horror in October and Summer Blockbusters from June
+  to August, in an order that holds for the day. Each profile's rows come from
+  its own history, and a Kids profile's rows hold only what Kids may see.
+  Home no longer ranks the library again for every progress record while a film
+  plays. No migration.
+- Play Something favours what the profile is likely to enjoy, as the released
+  app does: titles like the ones the profile finished (genres, director, cast,
+  keywords), better rated and more popular titles, and titles with a backdrop
+  or a poster, in the Home row and for the capsule. Titles with no online
+  metadata weigh by their artwork alone, as before. No migration.
+- Home shows a Holiday Movies row after Recently Added, as the released app
+  does, once two movies qualify: a holiday word in the title, in TMDB's genres
+  or in its overview, or a named holiday film. No migration.
+- After an update, every title whose online metadata an older matcher wrote is
+  checked again once in the background, including the ones fetched in the last
+  day (before, those skipped the check). A title waits a day only after a check
+  that failed. The catalog is migrated to schema 8; titles, metadata and watch
+  progress are kept.
+- A dot-separated movie name keeps the dots of its initials:
+  "E.T.the.Extra-Terrestrial.(1982)" shows as "E.T. the Extra-Terrestrial" and
+  "L.A.Confidential.(1997)" as "L.A. Confidential", not "E T the
+  Extra-Terrestrial" and "L A Confidential". Shown titles change on the next
+  scan; no migration.
+- Online metadata keeps a title the folder name only begins with ("Star Trek"
+  for "Star Trek The Original Series") when the second search, without the
+  year, fails on the network or is rate limited, instead of dropping it and
+  trying again on the next run. No migration.
+- Kids, Family and Teen profiles judge a title by its TMDB certification when
+  it has one, as the released app does: a G or TV-Y title with no genre shows
+  for Kids, and an R or TV-MA title no longer shows there because of its
+  folder. Titles with no certification keep the genre rule. No migration.
+- Movies and TV Shows group titles as the released app does. A title's genre
+  rows come from TMDB's genres when it named any (the folder and the title
+  guess otherwise), so Movies gains a row per genre between Holiday Movies and
+  All Movies and TV Shows takes its rows from TMDB too. Holiday Movies also
+  counts a holiday word in a title's TMDB genres or overview. Rows keep the
+  released order: franchise, then year, then title. Search results and More
+  Like This break ties in that order too. No migration.
 - Movie titles no longer carry the year of a `Title (YYYY)` file or folder
   name: "1917 (2019)" is now "1917" from 2019 and "2001 A Space Odyssey (1968)"
   is "2001 A Space Odyssey" from 1968, and the year is what online metadata
@@ -135,8 +213,8 @@ intermediate version bump.
   jpg, jpeg, png and webp (v3's `<name>-backdrop` and `<name>-fanart` come
   after them); a title without one shows the poster and the fallback tile. A spotlight for a show plays the episode you are
   up to rather than always the first, which differs from the released app.
-  Ratings, taste, genres, and online artwork are not in the catalog, so those
-  terms of the released selection are left out (see `issues.md`). The next
+  The selection reads ratings, taste, genres and online artwork once the
+  catalog holds them (see the next entry). The next
   scan of an existing library picks up a movie's backdrop; no migration.
   A click on Watch Now reaches the button when the window is drawn by the GPU.
   The carousel also stops advancing while the window is minimized or hidden.

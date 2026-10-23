@@ -1,5 +1,6 @@
 #include "search/SearchSession.hpp"
 
+#include "models/BrowseSemantics.hpp"
 #include "models/LibraryModel.hpp"
 
 #include <QChar>
@@ -217,12 +218,8 @@ namespace
     if (item.year > 0) {
         parts.push_back(QString::number(item.year));
     }
-    if (item.durationSeconds > 0) {
-        const qint64 totalMinutes = item.durationSeconds / 60;
-        const qint64 hours = totalMinutes / 60;
-        const qint64 minutes = totalMinutes % 60;
-        parts.push_back(hours > 0 ? QStringLiteral("%1h %2m").arg(hours).arg(minutes)
-                                  : QStringLiteral("%1m").arg(minutes));
+    if (const QString runtime = item.displayRuntime(); !runtime.isEmpty()) {
+        parts.push_back(runtime);
     }
     return parts.join(QStringLiteral(" \u00B7 "));
 }
@@ -237,27 +234,6 @@ namespace
         return instance;
     }();
     return collator;
-}
-
-// `BrowseSemanticPolicy.compareMovieBrowseSortKeys`, `BrowseSnapshotStore.swift:2034-2042`.
-[[nodiscard]] bool browseOrderBefore(const MediaItem &lhs, const MediaItem &rhs)
-{
-    const auto familyOf = [](const MediaItem &item) {
-        const QString normalized = SearchSession::normalizedText(item.title);
-        const QString franchise =
-            franchiseKeyOf(normalized.split(QLatin1Char(' '), Qt::SkipEmptyParts));
-        return franchise.isEmpty() ? normalized : franchise;
-    };
-    const QString lhsFamily = familyOf(lhs);
-    const QString rhsFamily = familyOf(rhs);
-    if (lhsFamily != rhsFamily) {
-        return localizedCollator().compare(lhsFamily, rhsFamily) < 0;
-    }
-    if (lhs.year != rhs.year) {
-        const auto yearOrMax = [](int year) { return year > 0 ? year : INT_MAX; };
-        return yearOrMax(lhs.year) < yearOrMax(rhs.year);
-    }
-    return localizedCollator().compare(lhs.title, rhs.title) < 0;
 }
 }
 
@@ -453,7 +429,7 @@ QVector<SearchSession::Hit> SearchSession::searchPass(const QString &query,
         if (lhs.matchType != rhs.matchType) {
             return lhs.matchType < rhs.matchType;
         }
-        return browseOrderBefore(lhs.item, rhs.item);
+        return browse::compareMoviesForBrowsing(lhs.item, rhs.item);
     });
     return hits;
 }

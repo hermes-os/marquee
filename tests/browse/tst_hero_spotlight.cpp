@@ -6,6 +6,7 @@
 
 #include "models/HeroSpotlight.hpp"
 #include "models/HomeRowsModel.hpp"
+#include "models/TasteModel.hpp"
 #include "profiles/ContentPolicy.hpp"
 #include "profiles/ProfileStore.hpp"
 
@@ -167,18 +168,92 @@ private slots:
                  QStringLiteral("/home/alex/Videos/Pictured Older/poster.jpg"));
     }
 
-    void theScoreTermsAreTheReleasedOnesLessTheRating()
+    // The hero ranks by the one `heroScore` the seasonal rows use, the rating
+    // term included (:2104).
+    void theHeroRanksByTheRatingToo()
     {
-        const QDateTime newest = daysAgo(0);
-        // 180 backdrop + 50 poster + 30 for a long film + 70 for being newest.
-        QCOMPARE(hero_spotlight::heroScore(true, true, 7'200, newest, newest), 330.0);
-        // A runtime under twenty minutes costs 180.
-        QCOMPARE(hero_spotlight::heroScore(false, false, 600, newest, newest), -110.0);
-        // An unknown runtime scores neither way.
-        QCOMPARE(hero_spotlight::heroScore(false, false, 0, newest, newest), 70.0);
-        // Newness falls linearly over thirty days and stops there.
-        QCOMPARE(hero_spotlight::heroScore(false, false, 0, newest.addDays(-15), newest), 35.0);
-        QCOMPARE(hero_spotlight::heroScore(false, false, 0, newest.addDays(-45), newest), 0.0);
+        QVector<MediaItem> items = library(5);
+        for (MediaItem &item : items) {
+            item.modifiedAt = daysAgo(100);
+        }
+        MediaItem rated = movie(QStringLiteral("Quiet Masterpiece"), 2004, daysAgo(100));
+        auto metadata = std::make_shared<TitleMetadata>();
+        metadata->tmdbId = 7;
+        metadata->voteAverage = 8.5;
+        rated.metadata = metadata;
+        items.push_back(rated);
+
+        const QVector<hero_spotlight::Spotlight> spotlights = hero_spotlight::build(items, kNow);
+        QCOMPARE(spotlights.constFirst().category, QStringLiteral("Featured"));
+        QCOMPARE(spotlights.constFirst().title, QStringLiteral("Quiet Masterpiece"));
+    }
+
+    // :788: a title the profile has not finished is boosted by how much its
+    // genres, director and cast match what the profile finished.
+    void aTasteBoostMovesAnUnwatchedMatchAhead()
+    {
+        QVector<MediaItem> items;
+        const auto withGenre = [](MediaItem item, const QString &genre) {
+            auto metadata = std::make_shared<TitleMetadata>();
+            metadata->tmdbId = 1;
+            metadata->genres = {genre};
+            item.metadata = metadata;
+            return item;
+        };
+        MediaItem seen = withGenre(movie(QStringLiteral("Seen Western"), 1990, daysAgo(200)), QStringLiteral("Western"));
+        seen.watched = true;
+        items.push_back(seen);
+        items.push_back(withGenre(movie(QStringLiteral("Alpha Comedy"), 2000, daysAgo(100)), QStringLiteral("Comedy")));
+        items.push_back(withGenre(movie(QStringLiteral("Zulu Western"), 2001, daysAgo(100)), QStringLiteral("Western")));
+
+        const QVector<hero_spotlight::Spotlight> plain = hero_spotlight::build(items, kNow);
+        QCOMPARE(plain.constFirst().title, QStringLiteral("Alpha Comedy"));
+
+        const std::optional<browse::TasteModel> taste = browse::TasteModel::build(items);
+        QVERIFY(taste.has_value());
+        const QVector<hero_spotlight::Spotlight> boosted = hero_spotlight::build(items, kNow, nullptr, &*taste);
+        QCOMPARE(boosted.constFirst().title, QStringLiteral("Zulu Western"));
+    }
+
+    // :838-871: a title sharing a top-billed actor with one already chosen is
+    // too similar while others remain.
+    void aSharedLeadActorKeepsTwoTitlesApart()
+    {
+        QVector<MediaItem> items;
+        const auto starring = [](MediaItem item, const QString &actor) {
+            auto metadata = std::make_shared<TitleMetadata>();
+            metadata->tmdbId = 1;
+            metadata->cast = {CastMember{.name = actor, .character = {}, .profilePath = {}, .personId = 1}};
+            item.metadata = metadata;
+            return item;
+        };
+        items.push_back(starring(movie(QStringLiteral("First Lead"), 2001, daysAgo(10), true), QStringLiteral("Pat Example")));
+        items.push_back(starring(movie(QStringLiteral("Second Lead"), 2002, daysAgo(11), true), QStringLiteral("Pat Example")));
+        items.push_back(movie(QStringLiteral("Other One"), 2003, daysAgo(60)));
+        items.push_back(movie(QStringLiteral("Other Two"), 2004, daysAgo(70)));
+
+        const QVector<hero_spotlight::Spotlight> spotlights = hero_spotlight::build(items, kNow);
+        QCOMPARE(spotlights.at(0).title, QStringLiteral("First Lead"));
+        QVERIFY(spotlights.at(1).title != QStringLiteral("Second Lead"));
+    }
+
+    // The released Holiday Pick reads the same holiday score as the Movies and
+    // Home rows (:801-808 over the same `holidayScores`): the overview and the
+    // genres count, not only the title.
+    void theHolidayPickReadsTheOverviewAndGenres()
+    {
+        QVector<MediaItem> items = library(5);
+        MediaItem quiet = movie(QStringLiteral("Snow Globe"), 1995, daysAgo(300));
+        auto metadata = std::make_shared<TitleMetadata>();
+        metadata->tmdbId = 9;
+        metadata->overview = QStringLiteral("A family gathers for Christmas.");
+        quiet.metadata = metadata;
+        items.push_back(quiet);
+
+        const QVector<hero_spotlight::Spotlight> spotlights = hero_spotlight::build(items, kNow);
+        const int at = static_cast<int>(categories(spotlights).indexOf(QStringLiteral("Holiday Pick")));
+        QVERIFY(at >= 0);
+        QCOMPARE(spotlights.at(at).title, QStringLiteral("Snow Globe"));
     }
 
     // :801-808.

@@ -14,6 +14,8 @@
 #include <functional>
 
 #include "catalog/MediaItem.hpp"
+#include "models/HomeLibraryRows.hpp"
+#include "models/TasteModel.hpp"
 
 /// The titles Home's hero carousel spotlights, as plain functions over
 /// projected items. Like `home_rows`, every function reads the watch state the
@@ -22,9 +24,7 @@
 /// profile is never spotlit a title its policy hides.
 ///
 /// The categories and their order follow `HeroSpotlightBuilder.build`
-/// (BrowseSnapshotStore.swift:719-830). Terms the v3 catalog has no data for
-/// (ratings, popularity, taste affinity, genres, overviews, directors, cast)
-/// are left out, not faked; issues.md lists them.
+/// (BrowseSnapshotStore.swift:719-830).
 namespace hero_spotlight
 {
 /// :808-811: the builder tops the carousel up with Smart Picks until it holds
@@ -58,23 +58,20 @@ struct Spotlight
     [[nodiscard]] bool operator==(const Spotlight &other) const = default;
 };
 
-/// BrowseSemanticPolicy.heroScore (BrowseSnapshotStore.swift:2103-2121) over
-/// what the catalog holds. The vote-average term (`* 100`) is left out.
-/// `hasBackdrop` is +180, `hasPoster` +50, a runtime of 75 minutes or more
-/// +30 and under 20 minutes -180, and a title as new as the newest in the
-/// library +70, falling to zero over thirty days.
-[[nodiscard]] double heroScore(bool hasBackdrop,
-                               bool hasPoster,
-                               qint64 durationSeconds,
-                               const QDateTime &effectiveDate,
-                               const QDateTime &newestDate);
-
 /// The spotlights for `items` in carousel order: Continue Watching, Featured,
 /// Holiday Pick, Recently Added, From the Vault, then Smart Picks up to
 /// `kTargetCount`. An empty library has none; a category with nobody to show
 /// is skipped. No title appears twice, and a movie or a show is one title (a
-/// show is its episodes, spotlit once).
-[[nodiscard]] QVector<Spotlight> build(const QVector<MediaItem> &items, const QDateTime &now);
+/// show is its episodes, spotlit once). The score is `home_rows::heroScore`,
+/// the one the seasonal rows rank by, plus `taste`'s boost when the profile has
+/// finished anything (:788); the Holiday Pick reads `browse::holidayScore`, the
+/// one the Movies and Home rows read. `library` keeps what the titles and their
+/// metadata alone decide between builds; without it they are made for this
+/// call alone.
+[[nodiscard]] QVector<Spotlight> build(const QVector<MediaItem> &items,
+                                       const QDateTime &now,
+                                       home_rows::LibraryRows *library = nullptr,
+                                       const browse::TasteModel *taste = nullptr);
 }
 
 /// The carousel as QML sees it: the spotlights, which one is in front, and the

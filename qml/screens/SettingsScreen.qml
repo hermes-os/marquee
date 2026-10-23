@@ -964,7 +964,7 @@ FocusScope {
 
                             Text {
                                 width: parent.width
-                                text: qsTr("Clears Continue Watching, Recently Watched, and every saved playback position and watched mark for this profile. Watched titles show in Recently Added again.")
+                                text: qsTr("Clears Continue Watching, Recently Watched, and all saved playback positions.")
                                 color: Theme.textSecondary
                                 font.pixelSize: 12
                                 wrapMode: Text.WordWrap

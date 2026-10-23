@@ -129,23 +129,43 @@ struct MediaItem
     }
 
     // MediaItem.swift:195-218: the poster this title draws. A local sidecar
-    // always wins (the show folder's, then the season folder's, for an
-    // episode); the cached TMDB image only fills its absence.
+    // always wins (the show folder's, then the season folder's, then the
+    // file's own, for an episode); the cached TMDB image only fills its
+    // absence.
     [[nodiscard]] QString displayPosterPath() const
     {
         if (isEpisode()) {
-            return gridShowPosterPath();
+            const QString local = !showPosterAbsolutePath.isEmpty() ? showPosterAbsolutePath
+                : !seasonPosterAbsolutePath.isEmpty()              ? seasonPosterAbsolutePath
+                                                                   : posterAbsolutePath;
+            return local.isEmpty() ? tmdbPosterAbsolutePath : local;
         }
         return posterAbsolutePath.isEmpty() ? tmdbPosterAbsolutePath : posterAbsolutePath;
     }
 
-    // MediaItem.swift:202-208: the backdrop, the show folder's sidecar first.
-    // The scanner reads no movie backdrop sidecar yet (issues.md), so a movie's
-    // backdrop is TMDB's.
+    // MediaItem.swift:202-208: the backdrop, the show folder's sidecar first
+    // for an episode, then the title's own sidecar (`<name>-backdrop.jpg`,
+    // `fanart.jpg`); the cached TMDB image only fills their absence. v3 holds
+    // no season backdrop.
     [[nodiscard]] QString displayBackdropPath() const
     {
-        return isEpisode() && !showBackdropAbsolutePath.isEmpty() ? showBackdropAbsolutePath
-                                                                  : tmdbBackdropAbsolutePath;
+        if (isEpisode() && !showBackdropAbsolutePath.isEmpty()) {
+            return showBackdropAbsolutePath;
+        }
+        return backdropAbsolutePath.isEmpty() ? tmdbBackdropAbsolutePath : backdropAbsolutePath;
+    }
+
+    // MediaItem.swift:143-151: the duration cut to whole minutes before the
+    // hour or the minute form is chosen ("1h 52m", "47m"); empty while the
+    // length is unknown.
+    [[nodiscard]] QString displayRuntime() const
+    {
+        if (durationSeconds <= 0) {
+            return {};
+        }
+        const qint64 totalMinutes = durationSeconds / 60;
+        return totalMinutes >= 60 ? QStringLiteral("%1h %2m").arg(totalMinutes / 60).arg(totalMinutes % 60)
+                                  : QStringLiteral("%1m").arg(totalMinutes);
     }
 
     // MediaItem.swift:228-229.

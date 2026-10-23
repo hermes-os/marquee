@@ -195,6 +195,13 @@ private slots:
             {"Kill Bill Vol. 1 (2003).mkv", "Kill Bill Vol. 1", 2003},
             // With no space at all the dots are separators.
             {"The.Matrix.(1999).mkv", "The Matrix", 1999},
+            // Initials keep their dots in a dot-separated name too; only the
+            // dots after a word of two letters or more separate words.
+            {"E.T.the.Extra-Terrestrial.(1982).mkv", "E.T. the Extra-Terrestrial", 1982},
+            {"L.A.Confidential.(1997).mkv", "L.A. Confidential", 1997},
+            {"S.W.A.T.(2003).mkv", "S.W.A.T.", 2003},
+            {"A.Beautiful.Mind.(2001).mkv", "A Beautiful Mind", 2001},
+            {"Star.Trek.V.The.Final.Frontier.(1989).mkv", "Star Trek V The Final Frontier", 1989},
             {"The_Wild_Robot (2024).mkv", "The Wild Robot", 2024},
         };
         for (const auto &c : cases) {

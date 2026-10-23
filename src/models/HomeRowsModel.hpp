@@ -15,6 +15,8 @@
 
 #include "catalog/MediaItem.hpp"
 #include "models/HeroSpotlight.hpp"
+#include "models/HomeLibraryRows.hpp"
+#include "models/HomeTasteRows.hpp"
 #include "navigation/FocusNavigator.hpp"
 
 /// The rules behind Home's titled rows, as plain functions over projected
@@ -92,25 +94,29 @@ struct Row
 /// One card per movie and per show, newest file date first
 /// (BrowseSnapshotStore.swift:2871-2874, :2639). A show is dated by its newest
 /// episode file, where the oracle uses its first episode, so a new episode
-/// brings a long-running show back to the front. Titles fully watched are
-/// left out; a show is left out once every episode is watched.
+/// brings a long-running show back to the front. Nothing is hidden for being
+/// watched, as in the oracle.
 [[nodiscard]] QVector<Card> recentlyAdded(const QVector<MediaItem> &items);
-
-/// BrowseSnapshotStore.swift:3126-3144: one row per decade of at least two
-/// movies, newest decade first, each in title order. The row id carries the
-/// decade ("decade-1990s") and its title reads "The 1990s".
-[[nodiscard]] QVector<Row> decadeRows(const QVector<MediaItem> &items);
 
 /// BrowseSnapshotStore.swift:369-385: up to `play_something::kRowLimit`
 /// unwatched movies in the shuffle of `play_something::kHomeSalt`. Movie cards
 /// only; Play Something never offers an episode.
 [[nodiscard]] QVector<Card> playSomethingCards(const QVector<MediaItem> &items);
 
-/// Home's rows in the released order (BrowseSnapshotStore.swift:2832-2892)
-/// for the rows this milestone builds: Continue Watching, Recently Watched,
-/// Play Something, Recently Added, a row per decade, All Movies. An empty row
-/// is not returned.
-[[nodiscard]] QVector<Row> compose(const QVector<MediaItem> &items, const QDateTime &now);
+/// Home's rows in the released order (BrowseSnapshotStore.swift:2832-2892):
+/// Continue Watching, Recently Watched, Play Something, the taste rows
+/// (Because You Watched, Hidden Gems, Short Tonight), the seasonal rows
+/// (October Horror, Summer Blockbusters), Recently Added, Holiday Movies, a
+/// row per decade (BrowseSnapshotStore.swift:3126-3144: one per decade of at
+/// least two movies, newest first, each in title order), All Movies. An empty
+/// row is not returned. The taste, seasonal and Play Something rows come from
+/// `HomeTasteRows.hpp`, and the holiday and decade rows from
+/// `HomeLibraryRows.hpp`; `cache` and `library`, when given, keep them between
+/// calls until their owner invalidates them.
+[[nodiscard]] QVector<Row> compose(const QVector<MediaItem> &items,
+                                   const QDateTime &now,
+                                   DerivedRowsCache *cache = nullptr,
+                                   LibraryRows *library = nullptr);
 }
 
 /// One row's cards, with the roles the shared poster card reads.
@@ -234,6 +240,9 @@ public:
 
     /// Replaces the clock the idle window reads, for tests.
     void setClockForTest(std::function<QDateTime()> clock);
+    /// How many times the taste, seasonal and Play Something rows were built
+    /// from the library, for tests of what a progress record costs.
+    [[nodiscard]] int derivedRowBuildsForTest() const;
     /// Replaces the source of the shuffle salt a press draws, for tests.
     void setPlaySomethingSaltForTest(std::function<QString()> salt);
 
@@ -285,6 +294,13 @@ private:
     QHash<QString, HomeCardModel *> m_cardModels;
     std::function<QDateTime()> m_clock;
     std::function<QString()> m_saltSource;
+    // The rows that rank the library against the profile's history, which a
+    // progress record cannot change (see `DerivedRowsCache`).
+    home_rows::DerivedRowsCache m_derived;
+    // What the titles and their metadata alone decide (holiday scores and
+    // rows, decade rows, the similarity index): built when the items are
+    // replaced, never on a progress record.
+    home_rows::LibraryRows m_library;
     bool m_playSomethingFocused{false};
     // Whether the remote's section is the hero rather than the rows
     // (HomeFocusIDs.hero, HomeDetailView.swift:55-63). Home starts here

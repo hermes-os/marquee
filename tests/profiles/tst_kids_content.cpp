@@ -6,6 +6,7 @@
 #include <QTemporaryDir>
 
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <system_error>
 
@@ -246,6 +247,123 @@ private slots:
         // UserProfile.swift:73-75: a Kids profile admits through Family.
         QVERIFY(content_policy::allows(level(Maturity::Kids),
                                        movie("Family/Little Women.mkv", "Little Women")));
+    }
+
+    // MaturityLevel.swift:49-73 decides on the stored certification when there
+    // is one, with the genres only breaking the PG and unknown cases.
+    void aStoredCertificationDecidesTheMaturityAsTheReleasedAppDoes()
+    {
+        using Maturity = ProfileStore::Maturity;
+        const auto level = [](Maturity value) { return static_cast<int>(value); };
+        const auto rated = [](const QString &relativePath, const QString &certification,
+                              const QStringList &genres = {}) {
+            MediaItem item;
+            item.relativePath = relativePath;
+            item.title = QFileInfo(relativePath).completeBaseName();
+            item.mediaKind = QStringLiteral("movie");
+            auto metadata = std::make_shared<TitleMetadata>();
+            metadata->tmdbId = 1;
+            metadata->certification = certification;
+            metadata->genres = genres;
+            item.metadata = metadata;
+            return item;
+        };
+
+        // Kids sees what the certification calls Kids even with no genre,
+        // which the genre rule alone hides as Adult.
+        QCOMPARE(content_policy::maturityOf(rated("Unsorted Film.mkv", "G")), level(Maturity::Kids));
+        QCOMPARE(content_policy::maturityOf(rated("Unsorted Show.mkv", "TV-Y7-FV")),
+                 level(Maturity::Kids));
+        QCOMPARE(content_policy::maturityOf(rated("Unsorted Film.mkv", " rated g ")),
+                 level(Maturity::Kids));
+        QVERIFY(content_policy::allows(level(Maturity::Kids), rated("Unsorted Film.mkv", "TV-G")));
+
+        // Kids does not see what the certification calls Adult, whatever the
+        // folder says.
+        QCOMPARE(content_policy::maturityOf(rated("Kids/Wonder (2017).mkv", "R")),
+                 level(Maturity::Adult));
+        QCOMPARE(content_policy::maturityOf(rated("Family/Fable.mkv", "TV-MA", {"Animation", "Family"})),
+                 level(Maturity::Adult));
+        QCOMPARE(content_policy::maturityOf(rated("Kids/Wonder (2017).mkv", "NR")),
+                 level(Maturity::Adult));
+        QVERIFY(!content_policy::allows(level(Maturity::Kids), rated("Kids/Wonder (2017).mkv", "NC-17")));
+        QVERIFY(!content_policy::allows(level(Maturity::Teen), rated("Kids/Wonder (2017).mkv", "R")));
+        QVERIFY(content_policy::allows(level(Maturity::Teen), rated("Heat.mkv", "PG-13")));
+        QVERIFY(!content_policy::allows(level(Maturity::Family), rated("Heat.mkv", "TV-14")));
+
+        // PG: Kids with a kids signal, Family with Family or Animation, else
+        // Teen. TMDB's genres replace the folder's, so a Horror folder does
+        // not lower a PG title that TMDB calls Animation.
+        QCOMPARE(content_policy::maturityOf(rated("Frozen (2013).mkv", "PG", {"Animation", "Family"})),
+                 level(Maturity::Kids));
+        QCOMPARE(content_policy::maturityOf(rated("Frozen (2013).mkv", "PG", {"Animation"})),
+                 level(Maturity::Family));
+        QCOMPARE(content_policy::maturityOf(rated("Heat.mkv", "PG", {"Crime"})),
+                 level(Maturity::Teen));
+        QCOMPARE(content_policy::maturityOf(rated("Heat.mkv", "TV-PG")), level(Maturity::Teen));
+        QVERIFY(!content_policy::allows(level(Maturity::Kids), rated("Heat.mkv", "PG", {"Crime"})));
+
+        // A certification the table does not know falls to the genres, and a
+        // title with none of the family signals is Adult.
+        QCOMPARE(content_policy::maturityOf(rated("Foreign.mkv", "FSK 12")), level(Maturity::Adult));
+        QCOMPARE(content_policy::maturityOf(rated("Foreign.mkv", "FSK 0", {"Kids"})),
+                 level(Maturity::Kids));
+        QCOMPARE(content_policy::maturityOf(rated("Foreign.mkv", "FSK 6", {"Family"})),
+                 level(Maturity::Family));
+        QCOMPARE(content_policy::maturityOf(rated("Foreign.mkv", "FSK 6", {"Comedy"})),
+                 level(Maturity::Adult));
+    }
+
+    void aTitleWithMetadataButNoCertificationFallsBackToItsGenres()
+    {
+        using Maturity = ProfileStore::Maturity;
+        MediaItem item;
+        item.relativePath = QStringLiteral("Unsorted Film.mkv");
+        item.title = QStringLiteral("Unsorted Film");
+        item.mediaKind = QStringLiteral("movie");
+        auto metadata = std::make_shared<TitleMetadata>();
+        metadata->tmdbId = 1;
+        metadata->genres = {QStringLiteral("Kids")};
+        item.metadata = metadata;
+        // displayGenres: TMDB's list, with no certification to consult.
+        QCOMPARE(content_policy::maturityOf(item), static_cast<int>(Maturity::Kids));
+
+        metadata = std::make_shared<TitleMetadata>(*item.metadata);
+        metadata->genres = {QStringLiteral("Horror")};
+        item.metadata = metadata;
+        QCOMPARE(content_policy::maturityOf(item), static_cast<int>(Maturity::Adult));
+
+        // No metadata at all keeps the offline rule.
+        item.metadata = nullptr;
+        QCOMPARE(content_policy::maturityOf(item), static_cast<int>(Maturity::Adult));
+    }
+
+    void aKidsProjectionHoldsTheTitlesTheCertificationAdmits()
+    {
+        using Maturity = ProfileStore::Maturity;
+        const auto certified = [](const QString &title, const QString &certification) {
+            MediaItem item;
+            item.id = title;
+            item.relativePath = title + QStringLiteral(".mkv");
+            item.title = title;
+            item.mediaKind = QStringLiteral("movie");
+            auto metadata = std::make_shared<TitleMetadata>();
+            metadata->tmdbId = 1;
+            metadata->certification = certification;
+            item.metadata = metadata;
+            return item;
+        };
+        const QVector<MediaItem> visible = content_policy::filtered(
+            static_cast<int>(Maturity::Kids),
+            {certified(QStringLiteral("Gentle"), QStringLiteral("G")),
+             certified(QStringLiteral("Gritty"), QStringLiteral("R")),
+             certified(QStringLiteral("Show"), QStringLiteral("TV-Y")),
+             certified(QStringLiteral("Teenish"), QStringLiteral("PG-13"))});
+        QStringList ids;
+        for (const MediaItem &item : visible) {
+            ids.push_back(item.id);
+        }
+        QCOMPARE(ids, (QStringList{QStringLiteral("Gentle"), QStringLiteral("Show")}));
     }
 
     void folderGenreIsCapitalizedLikeTheReleasedApp()

@@ -108,6 +108,34 @@ marquee_add_test(tst_play_something
     browse/tst_play_something.cpp
 )
 
+# Browse order, genre rows and the holiday score are plain functions and models
+# over projected items: no window.
+marquee_add_test(tst_browse_order
+    browse/tst_browse_order.cpp
+)
+
+# The taste model behind Home's taste rows and Play Something's weight is a
+# plain function over projected items: no window.
+marquee_add_test(tst_taste_model
+    browse/tst_taste_model.cpp
+)
+
+# Home's taste and seasonal rows, composed and as the model serves them.
+marquee_add_test(tst_home_taste_rows
+    browse/tst_home_taste_rows.cpp
+)
+
+# October Horror and Summer Blockbusters, with the date they read pinned.
+marquee_add_test(tst_seasonal_rows
+    browse/tst_seasonal_rows.cpp
+)
+
+# The similarity ranking behind Because You Watched: plain functions over
+# projected items.
+marquee_add_test(tst_similarity_index
+    browse/tst_similarity_index.cpp
+)
+
 marquee_add_test(tst_movies_route
     browse/tst_movies_route.cpp
 )

@@ -10,6 +10,8 @@
 #include <QTemporaryDir>
 #include <QUrl>
 
+#include <algorithm>
+
 #include "app/AppPaths.hpp"
 #include "app/ApplicationController.hpp"
 #include "navigation/NavigationController.hpp"
@@ -51,6 +53,17 @@ void press(Shell &shell, Qt::Key key)
 [[nodiscard]] QQuickItem *find(const Shell &shell, const char *objectName)
 {
     return shell.window->findChild<QQuickItem *>(QString::fromLatin1(objectName));
+}
+
+[[nodiscard]] bool hasText(const QQuickItem *item, const QString &text)
+{
+    if (item->property("text").toString() == text) {
+        return true;
+    }
+    const auto children = item->childItems();
+    return std::any_of(children.begin(), children.end(), [&text](const QQuickItem *child) {
+        return hasText(child, text);
+    });
 }
 
 [[nodiscard]] bool focusedIs(const Shell &shell, const char *objectName)
@@ -324,6 +337,19 @@ private slots:
         QTRY_COMPARE(repeater->property("count").toInt(), 2);
         // The new root's scan finishes before the directory goes away.
         QTRY_VERIFY(!shell.controller->scanning());
+    }
+
+    // SettingsDetailView.swift:701: Recently Added does not hide watched
+    // titles, so the text may not name it.
+    void watchHistoryTextIsTheReleasedWording()
+    {
+        Shell shell;
+        QVERIFY(openSettings(shell));
+        const QQuickItem *row = find(shell, "watchHistoryRow");
+        QVERIFY(row != nullptr);
+        QVERIFY(hasText(row, QStringLiteral("Watch History")));
+        QVERIFY(hasText(row,
+                        QStringLiteral("Clears Continue Watching, Recently Watched, and all saved playback positions.")));
     }
 
     void confirmsBeforeClearingHistoryAndSaysCleared()

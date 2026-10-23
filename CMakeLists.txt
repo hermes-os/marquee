@@ -139,6 +139,11 @@ qt_add_qml_module(marquee_core
         src/models/BrowseSemantics.cpp
         src/models/HeroSpotlight.hpp
         src/models/HeroSpotlight.cpp
+        src/models/HomeLibraryRows.hpp
+        src/models/HomeLibraryRows.cpp
+        src/models/HomeRowIds.hpp
+        src/models/HomeTasteRows.hpp
+        src/models/HomeTasteRows.cpp
         src/models/HomeRowsModel.hpp
         src/models/HomeRowsModel.cpp
         src/models/LibraryModel.hpp
@@ -147,8 +152,16 @@ qt_add_qml_module(marquee_core
         src/models/MovieRowsModel.cpp
         src/models/PlaySomething.hpp
         src/models/PlaySomething.cpp
+        src/models/SeasonalRows.hpp
+        src/models/SeasonalRows.cpp
         src/models/ShowsModel.hpp
         src/models/ShowsModel.cpp
+        src/models/SimilarityIndex.hpp
+        src/models/SimilarityIndex.cpp
+        src/models/StableRandom.hpp
+        src/models/StableRandom.cpp
+        src/models/TasteModel.hpp
+        src/models/TasteModel.cpp
         src/models/TitleMetadataView.hpp
         src/models/TitleMetadataView.cpp
 

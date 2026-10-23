@@ -58,8 +58,9 @@ public:
     void keepMatch(const QString &ownerKey);
     /// Records that TMDB found no match (`unmatched`) or that the details of a
     /// match could not be read (`failed`). A title already matched is kept; one
-    /// an older matcher matched only has its attempt time recorded, so the
-    /// failed-retry wait applies before the rematch is tried again.
+    /// an older matcher matched only has the attempt's time recorded (apart
+    /// from when its data was fetched), so the failed-retry wait applies before
+    /// the rematch is tried again.
     void saveAttempt(const MetadataTarget &target, const QString &state, const QDateTime &now,
                      std::optional<int> tmdbId = std::nullopt);
     /// `poster` or `backdrop`; `thumbnailName` is the cached file's name, empty

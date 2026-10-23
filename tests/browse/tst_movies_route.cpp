@@ -55,11 +55,11 @@ namespace
 // the row's own placement has somewhere to move.
 [[nodiscard]] QStringList sampleTitles()
 {
-    return {QStringLiteral("Arrival.2016.mkv"),  QStringLiteral("Coco.2017.mkv"),
-            QStringLiteral("Dune.2021.mkv"),     QStringLiteral("Elemental.2023.mkv"),
+    return {QStringLiteral("Arrival.2016.mkv"),  QStringLiteral("Cobalt.2017.mkv"),
+            QStringLiteral("Dune.2021.mkv"),     QStringLiteral("Eclipse.2023.mkv"),
             QStringLiteral("Flow.2024.mkv"),     QStringLiteral("Gravity.2013.mkv"),
             QStringLiteral("Heat.1995.mkv"),     QStringLiteral("Interstellar.2014.mkv"),
-            QStringLiteral("Jaws.1975.mkv"),     QStringLiteral("Klaus.2019.mkv"),
+            QStringLiteral("Jaws.1975.mkv"),     QStringLiteral("Kestrel.2019.mkv"),
             QStringLiteral("Moon.2009.mkv"),     QStringLiteral("Nope.2022.mkv"),
             QStringLiteral("Prey.2022.mkv"),     QStringLiteral("Rushmore.1998.mkv"),
             QStringLiteral("Sicario.2015.mkv"),  QStringLiteral("Tenet.2020.mkv")};
@@ -116,6 +116,26 @@ namespace
     return qobject_cast<const LibraryModel *>(
         rows.data(rows.index(row, 0), MovieRowsModel::ItemsRole)
             .value<QAbstractItemModel *>());
+}
+
+// The row with `id`, or null when the composition holds none.
+[[nodiscard]] const LibraryModel *rowWithId(const MovieRowsModel &rows, const QString &id)
+{
+    for (int row = 0; row < rows.rowCount(); ++row) {
+        if (rows.data(rows.index(row, 0), MovieRowsModel::RowIdRole).toString() == id) {
+            return itemsOfRow(rows, row);
+        }
+    }
+    return nullptr;
+}
+
+[[nodiscard]] QStringList rowIdsOf(const MovieRowsModel &rows)
+{
+    QStringList ids;
+    for (int row = 0; row < rows.rowCount(); ++row) {
+        ids.push_back(rows.data(rows.index(row, 0), MovieRowsModel::RowIdRole).toString());
+    }
+    return ids;
 }
 }
 
@@ -284,10 +304,9 @@ private slots:
     // The route's own composition, proved without a scene so a failure here is
     // never confused with a layout problem.
 
-    // A library with no holiday title composes the single "All Movies" row:
-    // BrowseSnapshotStore.swift:3030-3044 groups the rest by genre, which the
-    // v3 catalog does not model.
-    void moviesComposeOneAllMoviesRowUntilTheCatalogCarriesGenres()
+    // A library whose titles name no genre composes the single "All Movies"
+    // row: BrowseSnapshotStore.swift:3030-3044 drops the "Other" group.
+    void titlesWithNoGenreComposeOneAllMoviesRow()
     {
         MovieRowsModel rows;
         rows.replaceItems({projectedMovie(QStringLiteral("Arrival"), 2016),
@@ -303,81 +322,81 @@ private slots:
     }
 
     // BrowseSnapshotStore.swift:2087-2098 recognizes a holiday film from its
-    // title alone -- Home Alone and Elf carry no keyword and no genre there
-    // either -- and :3022-3028 composes that row before All Movies once at
-    // least two titles qualify. The v3 catalog holds titles and years and
-    // nothing else, which is all this row has ever needed.
-    void holidayTitlesComposeTheirOwnRowAheadOfAllMoviesWithoutAnyMetadata()
+    // title alone, and :3022-3028 composes that row before the genre rows and
+    // All Movies once at least two titles qualify. Elf and Home Alone also
+    // infer the Comedy and Holiday genres offline, so they get those rows too
+    // (:3030-3044), between Holiday Movies and All Movies.
+    void holidayTitlesComposeTheirOwnRowAheadOfTheGenreRowsAndAllMovies()
     {
         MovieRowsModel rows;
         rows.replaceItems({projectedMovie(QStringLiteral("Arrival"), 2016),
                            projectedMovie(QStringLiteral("Home Alone"), 1990),
                            projectedMovie(QStringLiteral("Elf"), 2003)});
 
-        QCOMPARE(rows.rowCount(), 2);
-        // :3027 and :3046 fix both the identity and the order of the rows.
-        QCOMPARE(rows.data(rows.index(0, 0), MovieRowsModel::RowIdRole).toString(),
-                 QStringLiteral("holiday-movies"));
+        // :3027 and :3046 fix the order of the rows; the genre rows sort
+        // case-insensitively.
+        QCOMPARE(rowIdsOf(rows),
+                 (QStringList{QStringLiteral("holiday-movies"), QStringLiteral("genre-Comedy"),
+                              QStringLiteral("genre-Holiday"), QStringLiteral("all-movies")}));
         QCOMPARE(rows.data(rows.index(0, 0), MovieRowsModel::RowTitleRole).toString(),
                  QStringLiteral("Holiday Movies"));
-        QCOMPARE(rows.data(rows.index(1, 0), MovieRowsModel::RowIdRole).toString(),
-                 QStringLiteral("all-movies"));
-        QCOMPARE(rows.data(rows.index(1, 0), MovieRowsModel::RowTitleRole).toString(),
+        QCOMPARE(rows.data(rows.index(3, 0), MovieRowsModel::RowTitleRole).toString(),
                  QStringLiteral("All Movies"));
 
         QCOMPARE(rows.data(rows.index(0, 0), MovieRowsModel::ItemCountRole).toInt(), 2);
-        QCOMPARE(rows.data(rows.index(1, 0), MovieRowsModel::ItemCountRole).toInt(), 3);
+        QCOMPARE(rows.data(rows.index(3, 0), MovieRowsModel::ItemCountRole).toInt(), 3);
         // The count the surface's own heading answers is still every movie the
         // library holds, not the sum of the rows.
         QCOMPARE(rows.titleCount(), 3);
 
-        const auto *holiday = itemsOfRow(rows, 0);
-        const auto *all = itemsOfRow(rows, 1);
+        const auto *holiday = rowWithId(rows, QStringLiteral("holiday-movies"));
+        const auto *all = rowWithId(rows, QStringLiteral("all-movies"));
         QVERIFY(holiday != nullptr);
         QVERIFY(all != nullptr);
-        // Both named films score 86 at :2097, so the row keeps browse order
-        // between them: "elf" sorts before "home alone".
+        // Both infer the Holiday genre offline (CatalogContentPolicy.swift
+        // :400-476), which :2077 puts in the haystack, so both score 100 and the
+        // row keeps browse order between them: "elf" sorts before "home alone".
         QCOMPARE(titlesIn(holiday),
                  (QStringList{QStringLiteral("Elf"), QStringLiteral("Home Alone")}));
         // :3020 and :3046 build All Movies from every movie, so a holiday
-        // title is shown in both rows rather than moved out of this one, and
-        // the non-qualifying title appears only here.
+        // title is shown in both rows rather than moved out of this one.
         QCOMPARE(titlesIn(all),
                  (QStringList{QStringLiteral("Arrival"), QStringLiteral("Elf"),
                               QStringLiteral("Home Alone")}));
 
-        // The remote addresses both rows, and each answers with its own card.
+        // The remote addresses each row, and each answers with its own card.
         QCOMPARE(rows.mediaIdAt(0, 0), QStringLiteral("root-1/Elf"));
-        QCOMPARE(rows.mediaIdAt(1, 0), QStringLiteral("root-1/Arrival"));
+        QCOMPARE(rows.mediaIdAt(3, 0), QStringLiteral("root-1/Arrival"));
         QVERIFY(rows.mediaIdAt(0, 2).isEmpty());
     }
 
-    // :2079-2085 scores a keyword title above a named one, and
-    // :2066-2068 puts the stronger signal first in the row.
+    // :2079-2085 scores a keyword title above a named one (Scrooged has no
+    // holiday genre, so only :2087-2098 recognizes it), and :2066-2068 puts the
+    // stronger signal first in the row.
     void aKeywordHolidayTitleIsPlacedAheadOfANamedHolidayFilm()
     {
         MovieRowsModel rows;
-        rows.replaceItems({projectedMovie(QStringLiteral("Home Alone"), 1990),
+        rows.replaceItems({projectedMovie(QStringLiteral("Scrooged"), 1988),
                            projectedMovie(QStringLiteral("The Santa Clause"), 1994)});
 
-        QCOMPARE(rows.rowCount(), 2);
-        const auto *holiday = itemsOfRow(rows, 0);
+        const auto *holiday = rowWithId(rows, QStringLiteral("holiday-movies"));
         QVERIFY(holiday != nullptr);
         QCOMPARE(titlesIn(holiday),
                  (QStringList{QStringLiteral("The Santa Clause"),
-                              QStringLiteral("Home Alone")}));
+                              QStringLiteral("Scrooged")}));
     }
 
     // :3026 composes the row only once at least two titles qualify, so one
-    // holiday title on its own is shown in All Movies and nowhere else.
+    // holiday title on its own gets no Holiday Movies row.
     void oneQualifyingTitleComposesNoHolidayRow()
     {
         MovieRowsModel rows;
         rows.replaceItems({projectedMovie(QStringLiteral("Arrival"), 2016),
                            projectedMovie(QStringLiteral("Elf"), 2003)});
 
-        QCOMPARE(rows.rowCount(), 1);
-        QCOMPARE(rows.data(rows.index(0, 0), MovieRowsModel::RowIdRole).toString(),
+        QVERIFY(rowWithId(rows, QStringLiteral("holiday-movies")) == nullptr);
+        QCOMPARE(rows.data(rows.index(rows.rowCount() - 1, 0), MovieRowsModel::RowIdRole)
+                     .toString(),
                  QStringLiteral("all-movies"));
     }
 
@@ -387,8 +406,7 @@ private slots:
     // one of those names inside a longer word, and this pins the released
     // behavior rather than quietly improving on it: "Self Reliance" holds
     // "elf" and qualifies, while a title that holds none of the names does
-    // not. Narrowing this to whole tokens is a change to the released
-    // classifier, not a fix to this slice.
+    // not.
     void holidayNamesAreMatchedByContainmentExactlyAsTheReleasedClassifierDoes()
     {
         MovieRowsModel rows;
@@ -397,8 +415,7 @@ private slots:
                            projectedMovie(QStringLiteral("Self Reliance"), 2023),
                            projectedMovie(QStringLiteral("The Elephant Man"), 1980)});
 
-        QCOMPARE(rows.rowCount(), 2);
-        const auto *holiday = itemsOfRow(rows, 0);
+        const auto *holiday = rowWithId(rows, QStringLiteral("holiday-movies"));
         QVERIFY(holiday != nullptr);
         QCOMPARE(titlesIn(holiday),
                  (QStringList{QStringLiteral("Elf"), QStringLiteral("Home Alone"),
@@ -406,7 +423,7 @@ private slots:
 
         // "The Elephant Man" spells none of the names and stays out of the
         // row while remaining in All Movies.
-        const auto *all = itemsOfRow(rows, 1);
+        const auto *all = rowWithId(rows, QStringLiteral("all-movies"));
         QVERIFY(all != nullptr);
         QVERIFY(titlesIn(all).contains(QStringLiteral("The Elephant Man")));
         QVERIFY(!titlesIn(holiday).contains(QStringLiteral("The Elephant Man")));
@@ -422,7 +439,7 @@ private slots:
         rows.replaceItems({projectedMovie(QStringLiteral("Batman Begins"), 2005),
                            projectedMovie(QStringLiteral("Arrival"), 2016),
                            projectedMovie(QStringLiteral("The Dark Knight"), 2008),
-                           projectedMovie(QStringLiteral("Coco"), 2017)});
+                           projectedMovie(QStringLiteral("Cobalt"), 2017)});
 
         const auto *items = itemsOfRow(rows, 0);
         QVERIFY(items != nullptr);
@@ -430,11 +447,11 @@ private slots:
                  (QStringList{QStringLiteral("Arrival"),
                               // Both Batman titles share the "batman" family
                               // from BrowseSnapshotStore.swift:1842-1843, so
-                              // the 2005 film precedes the 2008 one and Coco
+                              // the 2005 film precedes the 2008 one and Cobalt
                               // does not fall between them.
                               QStringLiteral("Batman Begins"),
                               QStringLiteral("The Dark Knight"),
-                              QStringLiteral("Coco")}));
+                              QStringLiteral("Cobalt")}));
     }
 
     // BrowseSnapshotStore.swift:2038-2040 sorts a title with no year after its
@@ -472,7 +489,7 @@ private slots:
     {
         MovieRowsModel rows;
         rows.replaceItems({projectedMovie(QStringLiteral("Arrival"), 2016),
-                           projectedMovie(QStringLiteral("Coco"), 2017),
+                           projectedMovie(QStringLiteral("Cobalt"), 2017),
                            projectedMovie(QStringLiteral("Dune"), 2021)});
         rows.focus()->setPosition(0, 2);
         QCOMPARE(rows.focus()->column(), 2);
@@ -970,7 +987,7 @@ private slots:
         QVERIFY(!expectedId.isEmpty());
         const std::optional<MediaItem> expected = controller.library()->itemForId(expectedId);
         QVERIFY(expected.has_value());
-        QCOMPARE(expected->title, QStringLiteral("Coco"));
+        QCOMPARE(expected->title, QStringLiteral("Cobalt"));
 
         QTest::keyClick(window, Qt::Key_Return);
 

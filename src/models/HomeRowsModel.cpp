@@ -1,4 +1,5 @@
 #include "models/HomeRowsModel.hpp"
+#include "models/BrowseSemantics.hpp"
 
 #include "models/PlaySomething.hpp"
 #include "models/ShowsModel.hpp"
@@ -31,11 +32,8 @@ namespace
     if (item.year > 0) {
         parts.push_back(QString::number(item.year));
     }
-    if (item.durationSeconds > 0) {
-        const qint64 totalMinutes = item.durationSeconds / 60;
-        parts.push_back(totalMinutes >= 60
-                            ? QStringLiteral("%1h %2m").arg(totalMinutes / 60).arg(totalMinutes % 60)
-                            : QStringLiteral("%1m").arg(totalMinutes));
+    if (const QString runtime = item.displayRuntime(); !runtime.isEmpty()) {
+        parts.push_back(runtime);
     }
     return parts.join(QLatin1Char(' '));
 }
@@ -267,18 +265,15 @@ QVector<home_rows::Card> home_rows::recentlyWatched(const QVector<MediaItem> &it
 
 QVector<home_rows::Card> home_rows::recentlyAdded(const QVector<MediaItem> &items)
 {
+    // :2871-2874 sorts every movie and every show by file date and hides
+    // nothing, watched or not.
     QVector<Dated> dated;
     for (const MediaItem &item : items) {
-        if (item.isMovie() && !item.watched) {
+        if (item.isMovie()) {
             dated.push_back(Dated{.when = item.modifiedAt, .card = movieCard(item)});
         }
     }
     for (const Show &show : groupShows(items)) {
-        // A show watched through is hidden; one episode left keeps it.
-        if (std::all_of(show.episodes.cbegin(), show.episodes.cend(),
-                        [](const MediaItem &episode) { return episode.watched; })) {
-            continue;
-        }
         QDateTime newest;
         for (const MediaItem &episode : show.episodes) {
             if (newer(episode.modifiedAt, newest)) {
@@ -303,44 +298,35 @@ QVector<home_rows::Card> home_rows::playSomethingCards(const QVector<MediaItem> 
     return cards;
 }
 
-QVector<home_rows::Row> home_rows::decadeRows(const QVector<MediaItem> &items)
+QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items,
+                                           const QDateTime &now,
+                                           DerivedRowsCache *cache,
+                                           LibraryRows *library)
 {
-    QHash<int, QVector<MediaItem>> byDecade;
+    DerivedRowsCache uncachedDerived;
+    LibraryRows uncachedLibrary;
+    LibraryRows &libraryRows = library != nullptr ? *library : uncachedLibrary;
+    // Built first: the similarity index the taste rows ask for reuses its
+    // holiday scores.
+    const LibraryRows::Built &fromLibrary = libraryRows.built(items);
+    const DerivedRows &derived = (cache != nullptr ? *cache : uncachedDerived).rows(items, now, &libraryRows);
+    QHash<QString, const MediaItem *> movieById;
     for (const MediaItem &item : items) {
-        if (item.isMovie() && item.year > 0) {
-            byDecade[(item.year / 10) * 10].push_back(item);
+        if (item.isMovie()) {
+            movieById.insert(item.id, &item);
         }
     }
-    QList<int> decades;
-    for (auto it = byDecade.cbegin(); it != byDecade.cend(); ++it) {
-        if (it.value().size() >= 2) {
-            decades.push_back(it.key());
-        }
-    }
-    std::sort(decades.begin(), decades.end(), std::greater<>());
-
-    QCollator collator;
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
-    QVector<Row> rows;
-    for (const int decade : std::as_const(decades)) {
-        QVector<MediaItem> movies = byDecade.value(decade);
-        std::stable_sort(movies.begin(), movies.end(),
-                         [&collator](const MediaItem &left, const MediaItem &right) {
-                             return collator.compare(left.title, right.title) < 0;
-                         });
+    // A row of ids becomes cards from the items as they are now.
+    const auto idRow = [&movieById](const IdRow &row) {
         QVector<Card> cards;
-        cards.reserve(movies.size());
-        for (const MediaItem &movie : std::as_const(movies)) {
-            cards.push_back(movieCard(movie));
+        for (const QString &id : row.mediaIds) {
+            if (const MediaItem *movie = movieById.value(id, nullptr)) {
+                cards.push_back(movieCard(*movie));
+            }
         }
-        rows.push_back(makeRow(QStringLiteral("decade-%1s").arg(decade),
-                               QStringLiteral("The %1s").arg(decade), std::move(cards)));
-    }
-    return rows;
-}
+        return makeRow(row.id, row.title, std::move(cards));
+    };
 
-QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items, const QDateTime &now)
-{
     QVector<Row> rows;
     const auto append = [&rows](Row row) {
         if (row.totalCount > 0) {
@@ -353,21 +339,24 @@ QVector<home_rows::Row> home_rows::compose(const QVector<MediaItem> &items, cons
     append(makeRow(QStringLiteral("recently-watched"), QStringLiteral("Recently Watched"),
                    recentlyWatched(items)));
 
-    // BrowseSnapshotStore.swift:2856-2860 puts Play Something here; :2862-2870
-    // puts the taste rows (Because You Watched, Hidden Gems, Short Tonight) and
-    // the seasonal rows after it, before Recently Added. Those arrive with
-    // their own inputs; append them at this point to keep the released order.
-    append(makeRow(QString::fromLatin1(play_something::kRowId), QStringLiteral("Play Something"),
-                   playSomethingCards(items)));
+    // BrowseSnapshotStore.swift:2855-2869: Play Something, the taste rows, the
+    // seasonal rows, then Recently Added.
+    append(idRow(derived.playSomething));
+    for (const IdRow &row : derived.taste) {
+        append(idRow(row));
+    }
+    for (const IdRow &row : derived.seasonal) {
+        append(idRow(row));
+    }
 
     append(makeRow(QStringLiteral("recently-added"), QStringLiteral("Recently Added"),
                    recentlyAdded(items)));
 
     // :2876-2881 puts Holiday Movies after Recently Added and before the
-    // decades. MovieRowsModel already composes that row for the Movies route.
-
-    for (Row &row : decadeRows(items)) {
-        append(std::move(row));
+    // decades, from the one holiday score the Movies route reads.
+    append(idRow(fromLibrary.holiday));
+    for (const IdRow &row : fromLibrary.decades) {
+        append(idRow(row));
     }
 
     QVector<Card> allMovies;
@@ -731,6 +720,11 @@ void HomeRowsModel::setPlaySomethingSaltForTest(std::function<QString()> salt)
     m_saltSource = std::move(salt);
 }
 
+int HomeRowsModel::derivedRowBuildsForTest() const
+{
+    return m_derived.buildCount();
+}
+
 void HomeRowsModel::setClockForTest(std::function<QDateTime()> clock)
 {
     m_clock = std::move(clock);
@@ -745,6 +739,8 @@ QDateTime HomeRowsModel::now() const
 void HomeRowsModel::replaceItems(QVector<MediaItem> items)
 {
     m_items = std::move(items);
+    m_derived.invalidate();
+    m_library.invalidate();
     if (m_items.isEmpty()) {
         // The capsule goes with the title bar when the library empties.
         setPlaySomethingFocused(false);
@@ -763,10 +759,21 @@ void HomeRowsModel::applyWatchProgress(const QString &mediaId,
     if (match == m_items.end()) {
         return;
     }
-    match->resumePositionMs = completed ? 0 : positionMs;
-    if (durationMs > 0) {
-        match->durationSeconds = durationMs / 1000;
+    // A position recorded every ten seconds of a film changes where the title
+    // resumes and when it was played, and nothing the taste, seasonal and
+    // Play Something rows rank on. Only a title newly watched (or unwatched)
+    // or one whose length became known or moved to another length bucket
+    // (the lengths those rows read) sends them to be built again; libmpv's
+    // estimate of a length drifts by seconds while a film plays, and that
+    // must not.
+    const qint64 durationSeconds = durationMs > 0 ? durationMs / 1000 : match->durationSeconds;
+    const bool lengthMatters = home_rows::lengthBucket(match->durationSeconds)
+        != home_rows::lengthBucket(durationSeconds);
+    if (match->watched != completed || lengthMatters) {
+        m_derived.invalidate();
     }
+    match->resumePositionMs = completed ? 0 : positionMs;
+    match->durationSeconds = durationSeconds;
     match->watched = completed;
     match->lastPlayedAt = now();
     recompose();
@@ -801,12 +808,20 @@ void HomeRowsModel::rebuildHero()
 {
     m_heroStale = false;
     ++m_heroBuilds;
-    m_hero.replaceSpotlights(hero_spotlight::build(m_items, now()));
+    // The taste is the cached one of the rows (it changes only with the watch
+    // state), and the title facts come from the library cache, so a progress
+    // record folds and scores no title again.
+    // The library rows come first: the similarity index reuses their holiday
+    // scores.
+    (void)m_library.built(m_items);
+    const home_rows::DerivedRows &derived = m_derived.rows(m_items, now(), &m_library);
+    m_hero.replaceSpotlights(
+        hero_spotlight::build(m_items, now(), &m_library, derived.tasteModel ? &*derived.tasteModel : nullptr));
 }
 
 void HomeRowsModel::recompose()
 {
-    QVector<home_rows::Row> composed = home_rows::compose(m_items, now());
+    QVector<home_rows::Row> composed = home_rows::compose(m_items, now(), &m_derived, &m_library);
     if (m_playerActive) {
         m_heroStale = true;
     } else {

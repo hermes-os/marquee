@@ -1,53 +1,25 @@
 #include "models/MovieRowsModel.hpp"
 
 #include "models/BrowseSemantics.hpp"
+#include "profiles/ContentPolicy.hpp"
 
 #include <QAbstractItemModel>
-#include <QChar>
-#include <QLatin1Char>
+#include <QCollator>
+#include <QHash>
 #include <QLatin1String>
+#include <QSet>
 #include <QStringList>
 
 #include <algorithm>
-#include <limits>
 #include <utility>
 
 namespace
 {
-// BrowseSnapshotStore.swift:2016-2042: browse order is the title's family, then
-// its year, then its title, with an undated title sorted after its dated
-// siblings.
-struct BrowseSortKey
-{
-    QString family;
-    int year{0};
-    QString title;
-};
-
-[[nodiscard]] BrowseSortKey browseSortKeyFor(const MediaItem &item)
-{
-    const QString family = browse::franchiseKey(item.title);
-    return BrowseSortKey{.family = family.isEmpty() ? browse::normalizedText(item.title) : family,
-                         .year = item.year > 0 ? item.year : std::numeric_limits<int>::max(),
-                         .title = item.title};
-}
-
-[[nodiscard]] bool isBefore(const BrowseSortKey &left, const BrowseSortKey &right)
-{
-    if (const int family = QString::compare(left.family, right.family, Qt::CaseInsensitive);
-        family != 0) {
-        return family < 0;
-    }
-    if (left.year != right.year) {
-        return left.year < right.year;
-    }
-    return QString::compare(left.title, right.title, Qt::CaseInsensitive) < 0;
-}
-
 struct KeyedItem
 {
-    BrowseSortKey key;
+    browse::MovieBrowseSortKey key;
     int holidayScore{0};
+    QStringList genres;
     MediaItem item;
 };
 
@@ -58,66 +30,120 @@ struct ComposedRow
     QVector<MediaItem> items;
 };
 
-/// The rows the released Movies surface composes from `movies`. See the header
-/// for which of them the v3 catalog can still not compose.
+[[nodiscard]] const QCollator &localizedCollator()
+{
+    static const QCollator collator = [] {
+        QCollator built;
+        built.setCaseSensitivity(Qt::CaseInsensitive);
+        return built;
+    }();
+    return collator;
+}
+
+/// BrowseSnapshotStore.swift:3008-3048 `buildMovieRows`.
 [[nodiscard]] QVector<ComposedRow> composeRows(QVector<MediaItem> movies)
 {
+    // :3009
     if (movies.isEmpty()) {
         return {};
     }
 
-    // Each key is composed once per title rather than inside the comparison,
-    // because folding and tokenising a title is far too expensive to repeat
-    // for every comparison a sort makes. The holiday signal folds the same
-    // title, so it is scored in the same pass.
+    // Each key, score and genre list is composed once per title rather than
+    // inside the comparison, because folding and tokenising a title is far
+    // too expensive to repeat for every comparison a sort makes
+    // (:2022-2025).
     QVector<KeyedItem> keyed;
     keyed.reserve(movies.size());
+    QHash<QString, int> holidayScores;
     for (MediaItem &item : movies) {
-        keyed.push_back(KeyedItem{.key = browseSortKeyFor(item),
-                                  .holidayScore = browse::holidayScore(item.title),
+        const int score = browse::holidayScore(item);
+        holidayScores.insert(item.id, score);
+        keyed.push_back(KeyedItem{.key = browse::movieBrowseSortKey(item),
+                                  .holidayScore = score,
+                                  .genres = content_policy::displayGenresOf(item),
                                   .item = std::move(item)});
     }
+    // :3020 `sortedMoviesForBrowsing`; equal keys keep catalog order.
     std::stable_sort(keyed.begin(), keyed.end(),
                      [](const KeyedItem &left, const KeyedItem &right) {
-                         return isBefore(left.key, right.key);
+                         return browse::compareMovieBrowseSortKeys(left.key, right.key);
                      });
 
-    // BrowseSnapshotStore.swift:2063-2071 orders the holiday row by the
-    // strongest signal first and by browse order within one score, which the
-    // browse-ordered pass above already holds. The titles are copied rather
-    // than moved because :3020 and :3046 build All Movies from every movie,
-    // so a holiday title is shown in both rows.
-    QVector<KeyedItem> holidayKeyed;
-    for (const KeyedItem &keyedItem : std::as_const(keyed)) {
-        if (keyedItem.holidayScore > 0) {
-            holidayKeyed.push_back(keyedItem);
+    // :3010-3018 groups by genre, with "Other" holding a title that names none.
+    // The key is the genre as spelled, so "Sci-Fi" and "Science Fiction" are two
+    // rows. Walking the already sorted titles fills each row in browse order,
+    // which is what :3040 gets by filtering `sortedAll`.
+    QHash<QString, QVector<qsizetype>> byGenre;
+    QStringList genreOrder;
+    for (qsizetype index = 0; index < keyed.size(); ++index) {
+        const QStringList &genres = keyed.at(index).genres;
+        const QStringList named = genres.isEmpty() ? QStringList{QStringLiteral("Other")} : genres;
+        for (const QString &genre : named) {
+            if (!byGenre.contains(genre)) {
+                genreOrder.push_back(genre);
+            }
+            byGenre[genre].push_back(index);
         }
-    }
-    std::stable_sort(holidayKeyed.begin(), holidayKeyed.end(),
-                     [](const KeyedItem &left, const KeyedItem &right) {
-                         return left.holidayScore > right.holidayScore;
-                     });
-
-    QVector<MediaItem> sorted;
-    sorted.reserve(keyed.size());
-    for (KeyedItem &keyedItem : keyed) {
-        sorted.push_back(std::move(keyedItem.item));
     }
 
     QVector<ComposedRow> rows;
-    // :3026-3028 composes Holiday Movies before the rest, and only once at
-    // least two titles qualify.
-    if (holidayKeyed.size() >= 2) {
-        QVector<MediaItem> holidayItems;
-        holidayItems.reserve(holidayKeyed.size());
-        for (KeyedItem &keyedItem : holidayKeyed) {
-            holidayItems.push_back(std::move(keyedItem.item));
+
+    // :3022-3028 composes Holiday Movies before the rest, and only once at
+    // least two titles qualify. The titles are copied, not moved, because
+    // :3046 builds All Movies from every movie, so a holiday title is shown
+    // in both rows.
+    QVector<MediaItem> holidayCandidates;
+    for (const KeyedItem &entry : std::as_const(keyed)) {
+        if (entry.holidayScore > 0) {
+            holidayCandidates.push_back(entry.item);
         }
+    }
+    QVector<MediaItem> holidayMovies =
+        browse::sortedHolidayMovies(std::move(holidayCandidates), holidayScores);
+    if (holidayMovies.size() >= 2) {
         rows.push_back(ComposedRow{.id = QStringLiteral("holiday-movies"),
                                    .title = QStringLiteral("Holiday Movies"),
-                                   .items = std::move(holidayItems)});
+                                   .items = std::move(holidayMovies)});
     }
 
+    // :3030-3044: a row per genre in case-insensitive order, skipping "Other"
+    // and a genre that holds every movie.
+    std::stable_sort(genreOrder.begin(), genreOrder.end(),
+                     [](const QString &left, const QString &right) {
+                         return localizedCollator().compare(left, right) < 0;
+                     });
+    QSet<QString> allIds;
+    for (const KeyedItem &entry : std::as_const(keyed)) {
+        allIds.insert(entry.item.id);
+    }
+    for (const QString &genre : std::as_const(genreOrder)) {
+        const QVector<qsizetype> &members = byGenre.value(genre);
+        if (genre == QLatin1String("Other") || members.isEmpty()) {
+            continue;
+        }
+        QSet<QString> memberIds;
+        for (const qsizetype index : members) {
+            memberIds.insert(keyed.at(index).item.id);
+        }
+        if (memberIds == allIds) {
+            continue;
+        }
+        QVector<MediaItem> items;
+        items.reserve(members.size());
+        for (const qsizetype index : members) {
+            items.push_back(keyed.at(index).item);
+        }
+        rows.push_back(ComposedRow{.id = QStringLiteral("genre-") + genre,
+                                   .title = genre,
+                                   .items = std::move(items)});
+    }
+
+    // :3046.
+    QVector<MediaItem> sorted;
+    sorted.reserve(keyed.size());
+    for (KeyedItem &entry : keyed) {
+        sorted.push_back(std::move(entry.item));
+    }
     rows.push_back(ComposedRow{.id = QStringLiteral("all-movies"),
                                .title = QStringLiteral("All Movies"),
                                .items = std::move(sorted)});

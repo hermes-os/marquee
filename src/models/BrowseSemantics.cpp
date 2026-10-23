@@ -1,12 +1,30 @@
 #include "models/BrowseSemantics.hpp"
 
+#include "profiles/ContentPolicy.hpp"
+
 #include <QChar>
+#include <QCollator>
 #include <QLatin1Char>
 #include <QLatin1String>
 #include <QStringList>
 
+#include <algorithm>
+#include <atomic>
+#include <limits>
+#include <utility>
+
 namespace browse
 {
+namespace
+{
+std::atomic<int> g_holidayScoreCalls{0};
+}
+
+int holidayScoreCallsForTest()
+{
+    return g_holidayScoreCalls.load(std::memory_order_relaxed);
+}
+
 // BrowseSnapshotStore.swift:1784-1802 folds diacritics and width, lowercases,
 // and reduces every run of non-alphanumerics to one space.
 QString normalizedText(const QString &value)
@@ -95,15 +113,118 @@ QString franchiseKey(const QString &title)
     return {};
 }
 
-// BrowseSnapshotStore.swift:2073-2101 scores a title's holiday signal: a direct
-// keyword anywhere in the text, then a named holiday film. The released score
-// also reads the genres and the overview, which the v3 catalog does not model,
-// so what remains here is that same rule over the title alone -- which is what
-// recognizes Home Alone and Elf there, not a genre. Both passes match on
-// containment rather than on whole tokens, exactly as :2083 and :2096 do.
-int holidayScore(const QString &title)
+namespace
 {
-    const QString normalized = browse::normalizedText(title);
+// localizedCaseInsensitiveCompare, which every released browse sort uses:
+// locale collation, so a superscript digit sorts as a digit rather than by
+// code point.
+[[nodiscard]] const QCollator &localizedCollator()
+{
+    static const QCollator collator = [] {
+        QCollator built;
+        built.setCaseSensitivity(Qt::CaseInsensitive);
+        return built;
+    }();
+    return collator;
+}
+}
+
+// BrowseSnapshotStore.swift:2026-2032. The key is composed once per title
+// because folding and tokenising a title is far too expensive to repeat inside
+// every comparison a sort makes (:2022-2025).
+MovieBrowseSortKey movieBrowseSortKey(const MediaItem &item)
+{
+    return movieBrowseSortKey(item, franchiseKey(item.title));
+}
+
+MovieBrowseSortKey movieBrowseSortKey(const MediaItem &item, const QString &franchise)
+{
+    return MovieBrowseSortKey{.family = franchise.isEmpty() ? normalizedText(item.title) : franchise,
+                              .year = item.year,
+                              .title = item.title};
+}
+
+// BrowseSnapshotStore.swift:2034-2042.
+bool compareMovieBrowseSortKeys(const MovieBrowseSortKey &lhs, const MovieBrowseSortKey &rhs)
+{
+    if (lhs.family != rhs.family) {
+        return localizedCollator().compare(lhs.family, rhs.family) < 0;
+    }
+    if (lhs.year != rhs.year) {
+        const auto yearOrMax = [](int year) {
+            return year > 0 ? year : std::numeric_limits<int>::max();
+        };
+        return yearOrMax(lhs.year) < yearOrMax(rhs.year);
+    }
+    return localizedCollator().compare(lhs.title, rhs.title) < 0;
+}
+
+// BrowseSnapshotStore.swift:2044-2046.
+bool compareMoviesForBrowsing(const MediaItem &lhs, const MediaItem &rhs)
+{
+    return compareMovieBrowseSortKeys(movieBrowseSortKey(lhs), movieBrowseSortKey(rhs));
+}
+
+// BrowseSnapshotStore.swift:2048-2053. Swift's sort is stable in practice, so
+// equal keys keep the catalog's order here too.
+QVector<MediaItem> sortedMoviesForBrowsing(QVector<MediaItem> items)
+{
+    struct Keyed
+    {
+        MovieBrowseSortKey key;
+        MediaItem item;
+    };
+    QVector<Keyed> keyed;
+    keyed.reserve(items.size());
+    for (MediaItem &item : items) {
+        keyed.push_back(Keyed{.key = movieBrowseSortKey(item), .item = std::move(item)});
+    }
+    std::stable_sort(keyed.begin(), keyed.end(), [](const Keyed &lhs, const Keyed &rhs) {
+        return compareMovieBrowseSortKeys(lhs.key, rhs.key);
+    });
+    QVector<MediaItem> sorted;
+    sorted.reserve(keyed.size());
+    for (Keyed &entry : keyed) {
+        sorted.push_back(std::move(entry.item));
+    }
+    return sorted;
+}
+
+// BrowseSnapshotStore.swift:660-665: `metadata?.releaseDate ?? displayYear ?? ""`
+// compared as text, then browse order.
+bool compareFranchiseOrder(const MediaItem &lhs, const MediaItem &rhs)
+{
+    const auto dateOf = [](const MediaItem &item) {
+        if (item.metadata && !item.metadata->releaseDate.isEmpty()) {
+            return item.metadata->releaseDate;
+        }
+        return item.year > 0 ? QString::number(item.year) : QString();
+    };
+    const QString lhsDate = dateOf(lhs);
+    const QString rhsDate = dateOf(rhs);
+    if (lhsDate != rhsDate) {
+        return lhsDate < rhsDate;
+    }
+    return compareMoviesForBrowsing(lhs, rhs);
+}
+
+// BrowseSnapshotStore.swift:2073-2101. The released haystack is the title, the
+// overview and the genres joined by spaces, and both passes match on
+// containment rather than whole tokens (:2083, :2096). It reads no keywords.
+int holidayScore(const MediaItem &item)
+{
+    g_holidayScoreCalls.fetch_add(1, std::memory_order_relaxed);
+    const QString title = normalizedText(item.title);
+    QStringList parts{title};
+    if (item.metadata) {
+        parts.push_back(normalizedText(item.metadata->overview));
+    } else {
+        parts.push_back(QString());
+    }
+    for (const QString &genre : content_policy::displayGenresOf(item)) {
+        parts.push_back(normalizedText(genre));
+    }
+    const QString haystack = parts.join(QLatin1Char(' '));
 
     static const QLatin1String directSignals[]{
         QLatin1String("christmas"), QLatin1String("xmas"),
@@ -113,7 +234,7 @@ int holidayScore(const QString &title)
         QLatin1String("kwanzaa"),   QLatin1String("thanksgiving"),
         QLatin1String("halloween")};
     for (const QLatin1String &signal : directSignals) {
-        if (normalized.contains(signal)) {
+        if (haystack.contains(signal)) {
             return 100;
         }
     }
@@ -127,11 +248,48 @@ int holidayScore(const QString &title)
         QLatin1String("its a wonderful life"),
         QLatin1String("nightmare before christmas")};
     for (const QLatin1String &knownTitle : knownHolidayTitles) {
-        if (normalized.contains(knownTitle)) {
+        if (title.contains(knownTitle)) {
             return 86;
         }
     }
 
     return 0;
 }
+
+// BrowseSnapshotStore.swift:2055-2057.
+bool isHolidayMovie(const MediaItem &item)
+{
+    return holidayScore(item) > 0;
+}
+
+// BrowseSnapshotStore.swift:2063-2071.
+QVector<MediaItem> sortedHolidayMovies(QVector<MediaItem> items, const QHash<QString, int> &scores)
+{
+    struct Keyed
+    {
+        int score;
+        MovieBrowseSortKey key;
+        MediaItem item;
+    };
+    QVector<Keyed> keyed;
+    keyed.reserve(items.size());
+    for (MediaItem &item : items) {
+        const auto known = scores.constFind(item.id);
+        const int score = known != scores.cend() ? *known : holidayScore(item);
+        keyed.push_back(Keyed{.score = score, .key = movieBrowseSortKey(item), .item = std::move(item)});
+    }
+    std::stable_sort(keyed.begin(), keyed.end(), [](const Keyed &lhs, const Keyed &rhs) {
+        if (lhs.score != rhs.score) {
+            return lhs.score > rhs.score;
+        }
+        return compareMovieBrowseSortKeys(lhs.key, rhs.key);
+    });
+    QVector<MediaItem> sorted;
+    sorted.reserve(keyed.size());
+    for (Keyed &entry : keyed) {
+        sorted.push_back(std::move(entry.item));
+    }
+    return sorted;
+}
+
 }

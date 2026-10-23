@@ -24,23 +24,21 @@ What happens: Interface Sounds, Launch Ident, and Sound Pack persist and say
 "Saved", but no code plays a cue.
 Found: source read at 81c8fa8; no audio module is linked in `CMakeLists.txt`.
 
-## TMDB metadata is stored but no screen shows it yet
+## TMDB metadata is stored but Details and search do not show it yet
 Where: `qml/screens/DetailsScreen.qml`, `qml/screens/ShowDetailScreen.qml`,
-`src/models/MovieRowsModel.cpp`, `src/models/HomeRowsModel.cpp`,
-`src/search/SearchSession.cpp`, `src/profiles/ContentPolicy.cpp` (`maturityOf`).
+`src/search/SearchSession.cpp`.
 What happens: after a scan Marquee fetches TMDB details and artwork when a key
 exists (`src/metadata/`, catalog migration 6) and the models expose the fields
-as roles, but nothing reads them. Details has no overview, director, cast,
-rating or certification section; the Movies and TV routes still key their genre
-rows on `genresOf` (folder and title inference, not TMDB's genres); scoped and
-genre search find nothing from TMDB; a Kids profile still classifies from genres
-alone and ignores the stored certification; Home's Because You Watched, Hidden
-Gems and Short Tonight rows are not built. TMDB's similar and recommended movie
-ids are stored as TMDB ids and are not yet resolved to library titles. A movie
-backdrop is only ever TMDB's, because the scanner reads no movie `fanart` or
-`backdrop` sidecar, so with no key a movie has no backdrop.
+as roles. The Movies and TV routes order and group by it, and a Kids profile
+reads the stored certification, but Details has no overview, director, cast,
+rating or certification section; scoped and genre search find nothing from
+TMDB. TMDB's similar and recommended movie ids are stored as TMDB ids and are
+not resolved to library titles; no released browse code reads them
+(`movieEdges` is stored and never consulted). A movie backdrop is only ever TMDB's,
+because the scanner reads no movie `fanart` or `backdrop` sidecar, so with no
+key a movie has no backdrop.
 Found: the TMDB enrichment commits; `git grep -n "metadata->" src` outside
-`src/models/TitleMetadataView.cpp` and `src/profiles/ContentPolicy.cpp` is empty.
+`src/models/`, `src/profiles/ContentPolicy.cpp` and `src/catalog/` is empty.
 
 ## Character avatars are not fetched
 Where: `src/` (no counterpart of `Marquee/Services/Metadata/AvatarService.swift`).
@@ -51,28 +49,18 @@ built-in icons only. Episode frame thumbnails generated from the video
 sidecar and no TMDB still draws its show backdrop.
 Found: the TMDB enrichment task, comparing `Marquee/Services/` with `src/`.
 
-## Home has no taste rows or seasonal rows, and the hero lacks the terms the catalog has no data for
-Where: `src/models/HomeRowsModel.cpp` (`compose` leaves the place after Play
-Something and before Recently Added open), `src/models/HeroSpotlight.cpp`.
-What happens: Home's rows are Continue Watching, Recently Watched, Play
-Something, Recently Added, a row per decade, and All Movies; the released
-Because You Watched, Hidden Gems, Short Tonight, seasonal, and Holiday Movies
-rows are not built. The hero (Continue Watching, Featured, Holiday Pick,
-Recently Added, From the Vault, Smart Picks) is built, but its selection leaves
-out what the catalog does not hold: the rating term of `heroScore` (vote average
-times 100, BrowseSnapshotStore.swift:2104), the taste boost
-(`tasteModel.heroBoost`, :788), and every similarity input but the franchise
-(genres, director, cast, overview, rating; `HeroContentProfile` :841-880 and
-`BrowseSimilarityIndex` :2377-2470), so near-duplicates are judged by franchise
-alone. The Holiday Pick reads the title alone, not genres or overview. Artwork
-is the local sidecars only: no online backdrop, no season backdrop, and a
-runtime is known only after the player has recorded one, so the long-film and
-short-film terms of the score apply only to titles that have been played. The
-released first-paint placeholder (HomeDetailView.swift:513-600) and the
-spring's overshoot (response 0.5, damping 0.82) are not reproduced; the slide
-is a 500 ms ease.
-Found: parity inventory in the retired plan, re-checked against source at
-81c8fa8 and again when the hero was built.
+## The hero is not fully as released
+Where: `src/models/HeroSpotlight.cpp`, `qml/` (the carousel).
+What happens: the hero ranks and de-duplicates as the released builder does
+(rating, taste boost, content profiles, the library's similarity index) except
+for two things. Two shows are judged near-duplicates by their franchise alone,
+because `browse::SimilarityIndex` ranks movies only (`rankedShowNames`,
+BrowseSnapshotStore.swift:750-753, :2373). A show has no season backdrop in
+the catalog, so a show with no show-folder backdrop draws its cached TMDB one
+or none. The released first-paint placeholder (HomeDetailView.swift:513-600)
+and the spring's overshoot (response 0.5, damping 0.82) are not reproduced;
+the slide is a 500 ms ease.
+Found: the join of the hero and rows lanes, comparing `Marquee/` with `src/`.
 
 ## Home remembers the selected card only while its row survives
 Where: `src/models/HomeRowsModel.cpp` (`recompose` keeps the focus on the
@@ -444,3 +432,18 @@ Found: review of 95952b7..4efbbe8, comparing the HUD with the released overlay.
 Where: `tests/details/tst_media_details.cpp:459` (`aRowScrolledOutMidFadeComesBackAtRest`).
 What happens: under `QT_QPA_PLATFORM=offscreen` the wait for the focused episode row's scale to sit between 1.0005 and 1.03 times out, and the case fails (3 of 3 runs on 95952b7 and 3 of 3 on the scrub commit; the other 31 cases pass, the run takes about 63 s).
 Found: the live-frame scrub work, running the test on the base commit in a scratch copy and on its head.
+
+## A finished title replayed part-way leaves the profile's taste
+Where: `src/models/TasteModel.cpp` (`build` reads `MediaItem::watched`),
+`src/catalog/CatalogStore.cpp` (`recordWatchProgress` overwrites `completed`).
+What happens: the released app keeps a per-profile ledger of every title ever
+finished (`WatchProgressStore.completedTitlePaths`, never cleared by a later
+viewing). v3 stores one `completed` flag per title and profile, so a title
+finished once and later played part-way is no longer watched: it can come back
+in Play Something and Because You Watched and stops shaping that profile's taste.
+Found: Home taste rows task, reading `LibraryState.currentTasteProfile` against `CatalogStore`.
+
+## Without metadata a file's length is known only for titles the profile has started
+Where: `src/models/HomeTasteRows.cpp:36` (`runtimeSeconds`), `src/catalog/CatalogStore.cpp:377` (`COALESCE(w.duration_ms, 0)`), `src/models/SeasonalRows.cpp` (`heroScore`).
+What happens: with no metadata a movie's `durationSeconds` comes only from the profile's own `watch_progress` row, so Short Tonight and the hero's length terms see only titles that profile has started. The released app probes the length of every file.
+Found: review of the Home taste-rows lane (fa1f0c5..7143233).

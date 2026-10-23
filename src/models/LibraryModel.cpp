@@ -1,6 +1,5 @@
 #include "models/LibraryModel.hpp"
 
-#include <QCollator>
 #include <QFileInfo>
 #include <QStringList>
 #include <QUrl>
@@ -8,7 +7,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <iterator>
-#include <limits>
 #include <utility>
 
 #include "models/BrowseSemantics.hpp"
@@ -31,21 +29,6 @@ namespace
 [[nodiscard]] QString formatBadgeOf(const MediaItem &item)
 {
     return QFileInfo(item.relativePath).suffix().toUpper();
-}
-
-[[nodiscard]] QString displayRuntimeOf(qint64 durationSeconds)
-{
-    if (durationSeconds <= 0) {
-        return {};
-    }
-
-    const qint64 totalMinutes = durationSeconds / 60;
-    const qint64 hours = totalMinutes / 60;
-    const qint64 minutes = totalMinutes % 60;
-    if (hours > 0) {
-        return QStringLiteral("%1h %2m").arg(hours).arg(minutes);
-    }
-    return QStringLiteral("%1m").arg(minutes);
 }
 
 // TimeInterval+Marquee.swift:6-16: a finite non-negative position as M:SS,
@@ -78,7 +61,7 @@ namespace
     if (item.year > 0) {
         parts.push_back(QString::number(item.year));
     }
-    const QString runtime = displayRuntimeOf(item.durationSeconds);
+    const QString runtime = item.displayRuntime();
     if (!runtime.isEmpty()) {
         parts.push_back(runtime);
     }
@@ -244,7 +227,7 @@ QVariantMap LibraryModel::detailsForId(const QString &mediaId) const
             // records it. Zero means it is unknown, which the surface renders
             // by leaving that slot out exactly as the oracle leaves an absent
             // runtime out.
-            {QStringLiteral("runtime"), displayRuntimeOf(item->durationSeconds)}};
+            {QStringLiteral("runtime"), item->displayRuntime()}};
     for (auto fact = facts.cbegin(); fact != facts.cend(); ++fact) {
         details.insert(fact.key(), fact.value());
     }
@@ -255,7 +238,7 @@ QVariantMap LibraryModel::detailsForId(const QString &mediaId) const
 // franchise-first ranking with the decade term: up to `limit` other movies
 // ordered by shared franchise then shared decade. No metadata exists to score
 // beyond those terms, so ties and the no-signal case hold the browse order
-// (BrowseSnapshotStore.swift:2016-2041: franchise family, then year
+// (BrowseSnapshotStore.swift:2016-2042: franchise family, then year
 // ascending with unknown years last, then title), and a library that yields
 // no scored candidate answers with an empty list, which the surface renders
 // as the oracle renders an empty `similar` (it draws nothing).
@@ -270,7 +253,7 @@ QVariantList LibraryModel::similarMovies(const QString &mediaId, int limit) cons
     {
         const MediaItem *item;
         int score;
-        QString family;
+        browse::MovieBrowseSortKey key;
     };
 
     const QString sourceFamily = browse::franchiseKey(source->title);
@@ -294,50 +277,25 @@ QVariantList LibraryModel::similarMovies(const QString &mediaId, int limit) cons
             score += 20;
         }
         if (score > 0) {
-            // movieBrowseSortKey (BrowseSnapshotStore.swift:2027-2033):
-            // a title with no family of its own sorts by its normalized
-            // title.
-            ranked.push_back({&candidate, score,
-                              candidateFamily.isEmpty()
-                                  ? browse::normalizedText(candidate.title)
-                                  : candidateFamily});
+            ranked.push_back({&candidate, score, browse::movieBrowseSortKey(candidate)});
         }
     }
 
-    QCollator familyCollator;
-    familyCollator.setCaseSensitivity(Qt::CaseInsensitive);
-    std::stable_sort(ranked.begin(), ranked.end(),
-                     [&familyCollator](const Ranked &left, const Ranked &right) {
-                         if (left.score != right.score) {
-                             return left.score > right.score;
-                         }
-                         // BrowseSnapshotStore.swift:2034-2042 compares families
-                         // with localizedCaseInsensitiveCompare even after
-                         // normalization. Collation-equivalent keys fall through
-                         // to year (unknown last), title, then id, preserving
-                         // strict, deterministic tie-breaking.
-                         const int familyOrder =
-                             familyCollator.compare(left.family, right.family);
-                         if (familyOrder != 0) {
-                             return familyOrder < 0;
-                         }
-                         const int leftYear = left.item->year > 0
-                             ? left.item->year
-                             : std::numeric_limits<int>::max();
-                         const int rightYear = right.item->year > 0
-                             ? right.item->year
-                             : std::numeric_limits<int>::max();
-                         if (leftYear != rightYear) {
-                             return leftYear < rightYear;
-                         }
-                         const int titleOrder =
-                             QString::compare(left.item->title, right.item->title,
-                                              Qt::CaseInsensitive);
-                         if (titleOrder != 0) {
-                             return titleOrder < 0;
-                         }
-                         return left.item->id < right.item->id;
-                     });
+    // BrowseSnapshotStore.swift:2258-2261 breaks equal scores with
+    // compareMoviesForBrowsing. The id only settles what the oracle leaves
+    // unordered, so the result is deterministic.
+    std::stable_sort(ranked.begin(), ranked.end(), [](const Ranked &left, const Ranked &right) {
+        if (left.score != right.score) {
+            return left.score > right.score;
+        }
+        if (browse::compareMovieBrowseSortKeys(left.key, right.key)) {
+            return true;
+        }
+        if (browse::compareMovieBrowseSortKeys(right.key, left.key)) {
+            return false;
+        }
+        return left.item->id < right.item->id;
+    });
 
     QVariantList similar;
     for (const Ranked &entry : ranked) {

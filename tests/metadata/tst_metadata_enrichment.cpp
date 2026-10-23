@@ -766,6 +766,43 @@ private slots:
                      .toInt(), 0);
     }
 
+    // After an upgrade every row an older matcher wrote is stale, including
+    // the ones fetched in the last day; none of them has been rematched, so
+    // none waits.
+    void aRowFetchedLessThanADayAgoByAnOlderMatcherIsMatchedAgain()
+    {
+        Library library;
+        QVERIFY(library.build());
+        {
+            MetadataEnrichment first(library.catalogPath(), makeSetup(library, m_transport, m_state));
+            (void)runOnce(first, library.rootList());
+        }
+        const QString path = library.catalogPath();
+        const QString bareId = library.movie(QStringLiteral("Bare Synthetic")).id;
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET matcher_version = 0")));
+        // Fetched an hour ago, well inside the failed-retry wait.
+        m_state->clock = m_state->clock.addSecs(3600);
+        QVERIFY(sql(path, QStringLiteral("UPDATE title_metadata SET tmdb_id = 123, overview = 'Wrong film' "
+                                         "WHERE owner_key = '%1'").arg(bareId)));
+
+        const auto searches = [this] {
+            int count = 0;
+            for (const QUrl &url : m_transport->urls()) {
+                if (url.path() == QLatin1String("/3/search/movie")
+                    && FakeTransport::queryValue(url, QStringLiteral("query")) == QLatin1String("Bare Synthetic")) {
+                    ++count;
+                }
+            }
+            return count;
+        };
+        const int before = searches();
+        MetadataEnrichment second(path, makeSetup(library, m_transport, m_state));
+        (void)runOnce(second, library.rootList());
+        QCOMPARE(searches(), before + 1);
+        QVERIFY(library.movie(QStringLiteral("Bare Synthetic")).metadata->overview
+                != QLatin1String("Wrong film"));
+    }
+
     void aRematchWhoseDetailsFailKeepsTheOldMatchAndWaitsADayBeforeTryingAgain()
     {
         Library library;
@@ -809,9 +846,13 @@ private slots:
         // The old match stays, and the attempt is on record.
         QCOMPARE(scalar(path, QStringLiteral("SELECT overview FROM title_metadata WHERE owner_key = '%1'")
                                   .arg(bareId)).toString(), QStringLiteral("Wrong film"));
-        QCOMPARE(scalar(path, QStringLiteral("SELECT fetched_at FROM title_metadata WHERE owner_key = '%1'")
+        QCOMPARE(scalar(path, QStringLiteral("SELECT rematch_attempted_at FROM title_metadata WHERE owner_key = '%1'")
                                   .arg(bareId)).toString(),
                  QStringLiteral("2026-01-03T12:00:00.000Z"));
+        // When the stored data was fetched does not move with the attempt.
+        QCOMPARE(scalar(path, QStringLiteral("SELECT fetched_at FROM title_metadata WHERE owner_key = '%1'")
+                                  .arg(bareId)).toString(),
+                 QStringLiteral("2026-01-01T12:00:00.000Z"));
 
         // Within the day it is not asked again, after it is.
         m_state->clock = m_state->clock.addSecs(3600);
