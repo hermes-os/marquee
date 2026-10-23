@@ -20,9 +20,12 @@ intermediate version bump.
 - Home's Recently Added keeps the movies and shows a profile has watched, as the
   released app does: it lists every movie and show by file date. Before, it hid
   watched movies and shows watched through. No migration.
-- Home shows the released app's taste and seasonal rows, each only with metadata
-  to judge by, so with no key and no metadata Home shows the rows it showed
-  before. After Play Something: "Because You Watched ..." (up to three rows, one
+- Home shows the released app's taste and seasonal rows. Hidden Gems (ratings
+  and vote counts) and Summer Blockbusters (ratings, votes or popularity) need
+  online metadata and do not appear without it. Because You Watched (through
+  franchise names), Short Tonight (for titles whose length is known) and
+  October Horror (through title words) can appear without it. After Play
+  Something: "Because You Watched ..." (up to three rows, one
   for each of the newest movies you finished, the twelve unwatched movies most
   like it by franchise, director, cast, genres, overview and year, shown with
   four or more), Hidden Gems (rated 7.5 or more by 50 or more people) and Short
