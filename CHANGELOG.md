@@ -80,6 +80,11 @@ intermediate version bump.
   carousel back to its first slide, and Return no longer plays that slide, when
   the viewer turned it with Left or Right before the scan finished. Before,
   turning the carousel did not count as the viewer moving.
+- When the row the remote rested on leaves Home, the hero carousel returns to
+  its first slide with the remote, as in the released app; a remote already on
+  the hero keeps the slide the viewer turned to. Before, the remote went to the
+  hero but the carousel stayed on a slide the viewer had turned to earlier, and
+  Return played it.
 - Choosing a profile now puts the remote on Home's hero, as in the released app,
   when the library has a spotlight: Home opens on the hero's first slide and the
   first Return plays it, whatever slide or place the last viewer left. Left on

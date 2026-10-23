@@ -601,6 +601,12 @@ private slots:
         model.applyWatchProgress(QStringLiteral("root/Arrival"), 600'000, 7'200'000, false);
         QCOMPARE(model.data(model.index(1), HomeRowsModel::RowIdRole).toString(),
                  QStringLiteral("recently-watched"));
+        // The viewer turned the carousel, then went Down into the rows.
+        QVERIFY(model.hero()->count() >= 2);
+        QVERIFY(model.moveRight());
+        QCOMPARE(model.hero()->currentIndex(), 1);
+        QVERIFY(model.moveDown());
+        QVERIFY(!model.heroFocused());
         model.focus()->setPosition(2, 1);
         model.focus()->setPosition(1, 0);
 
@@ -610,6 +616,9 @@ private slots:
         QCOMPARE(model.focus()->row(), 0);
         QCOMPARE(model.focus()->column(), 0);
         QCOMPARE(focusChanged.count(), 1);
+        // The remote went to the hero's first item and the carousel with it
+        // (HeroCarousel.swift:272-274).
+        QCOMPARE(model.hero()->currentIndex(), 0);
         // With a hero the repair sends the remote there (:1128-1130); Down
         // from it is the first row, then the rows the remote remembers.
         QVERIFY(model.heroFocused());
@@ -623,6 +632,32 @@ private slots:
         QCOMPARE(model.data(model.index(model.focus()->row()), HomeRowsModel::RowIdRole).toString(),
                  QStringLiteral("play-something"));
         QCOMPARE(model.focus()->column(), 1);
+    }
+
+    // A remote already on the hero when the rows change keeps the slide the
+    // viewer turned to (HomeDetailView.swift:1101-1111).
+    void theRepairKeepsTheSlideWhenTheRemoteWasOnTheHero()
+    {
+        HomeRowsModel model;
+        model.setClockForTest([] { return kNow; });
+        model.replaceItems({movie(QStringLiteral("Arrival"), 2016), movie(QStringLiteral("Coco"), 2017),
+                            movie(QStringLiteral("Dune"), 2021)});
+        model.applyWatchProgress(QStringLiteral("root/Coco"), 0, 7'200'000, true);
+        model.applyWatchProgress(QStringLiteral("root/Arrival"), 600'000, 7'200'000, false);
+        QCOMPARE(model.data(model.index(1), HomeRowsModel::RowIdRole).toString(),
+                 QStringLiteral("recently-watched"));
+        QVERIFY(model.hero()->count() >= 2);
+        QVERIFY(model.heroFocused());
+        QVERIFY(model.moveRight());
+        QCOMPARE(model.hero()->currentIndex(), 1);
+        // The pointer put the focus navigator on the vanishing row without
+        // taking the remote off the hero.
+        model.focus()->setPosition(1, 0);
+
+        model.applyWatchProgress(QStringLiteral("root/Coco"), 0, 7'200'000, false);
+
+        QVERIFY(model.heroFocused());
+        QCOMPARE(model.hero()->currentIndex(), 1);
     }
 
     // A row that appears above keeps the others' columns too: Continue

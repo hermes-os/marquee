@@ -911,11 +911,17 @@ void HomeRowsModel::recompose()
     });
     if (found == m_rows.cend()) {
         // The row the remote rested on is gone. The oracle's repair
-        // (HomeFocusContentPolicy.repair, :1128-1134) sends focus to the first
-        // card of the first row that has one, and so does this; with a hero,
-        // the oracle sends it there (:1128-1130), which `heroFocused` does
-        // while the remote's section is the hero.
+        // (HomeFocusContentPolicy.repair, :1128-1134) sends the remote to the
+        // hero's first item when there is a hero, else to the first card of
+        // the first row that has one, and so does this. The carousel follows
+        // the remote there (HeroCarousel.swift:272-274) unless the remote was
+        // already on it, which keeps the slide the viewer turned to
+        // (HomeDetailView.swift:1101-1111).
+        const bool wasOnHero = heroFocused();
         placeFirstTarget(std::move(rowLengths));
+        if (!wasOnHero) {
+            m_hero.moveTo(0);
+        }
         return;
     }
     // The same card where the row still holds it; otherwise the column it was
