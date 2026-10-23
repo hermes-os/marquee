@@ -197,6 +197,21 @@ private slots:
         QVERIFY(index.similarMovies(source, 0).isEmpty());
     }
 
+    // :2289-2293: two directors that are present and normalize to the same
+    // (here empty) string match in the older rule, +160; an absent one does not.
+    void theOlderRuleMatchesDirectorsThatNormalizeToNothing()
+    {
+        MediaItem source = movie(QStringLiteral("Aster"), 1990, {QStringLiteral("Drama")});
+        editable(source).director = QStringLiteral("...");
+        MediaItem punctuated = movie(QStringLiteral("Bramble"), 2015, {QStringLiteral("Comedy")});
+        editable(punctuated).director = QStringLiteral("!!!");
+        MediaItem absent = movie(QStringLiteral("Cedar"), 2016, {QStringLiteral("Comedy")});
+
+        const browse::SimilarityIndex index({absent, punctuated, source});
+        QVERIFY(index.rankedMovieIds(source.id).isEmpty());
+        QCOMPARE(titlesOf(index.similarMovies(source, 10)), (QStringList{QStringLiteral("Bramble")}));
+    }
+
     // :2265-2311: the older rule scores a shared holiday theme and decade.
     void theOlderRuleKnowsHolidaysAndDecades()
     {

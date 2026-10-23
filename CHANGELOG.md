@@ -6,6 +6,9 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Because You Watched ranks the movies beyond the index's twelve as the released
+  app does when two titles have a director that is present but has no letters
+  or digits to compare (both count as the same director). No migration.
 - Home's taste rows are built again for a progress record only when a film's
   length first becomes known or crosses the 100-minute Short Tonight limit, not
   when the player's estimate of the length drifts by seconds. No migration.

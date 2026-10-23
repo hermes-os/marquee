@@ -127,6 +127,8 @@ browse::SimilarityIndex::SimilarityIndex(const QVector<MediaItem> &movies,
         if (item.metadata) {
             // :2595, :2613-2617: a director that normalizes to nothing is none.
             profile.director = normalizedText(item.metadata->director);
+            // The catalog stores a missing director as an empty string.
+            profile.hasDirector = !item.metadata->director.isEmpty();
             // :2603-2611: the first billing of a name is its rank.
             for (qsizetype rank = 0; rank < item.metadata->cast.size(); ++rank) {
                 const QString name = normalizedText(item.metadata->cast.at(rank).name);
@@ -309,7 +311,7 @@ int browse::SimilarityIndex::olderScore(const Profile &source,
         }
     }
 
-    if (!source.director.isEmpty() && source.director == candidate.director) {
+    if (source.hasDirector && candidate.hasDirector && source.director == candidate.director) {
         score += 160;
     }
 

@@ -66,6 +66,9 @@ private:
         qint64 effectiveDate{0};
         QString franchise;
         QString director;
+        // The released rule compares directors that are present, whatever they
+        // normalize to (:2289-2293), unlike the index's, which skips an empty one.
+        bool hasDirector{false};
         // Sorted, so the genre sum has one order.
         QStringList genres;
         QHash<QString, int> castRank;
