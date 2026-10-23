@@ -202,11 +202,12 @@ public:
     Q_INVOKABLE void focusHero();
     /// Home's first focus target: the remote off the capsule, on the hero
     /// when there is one and otherwise the first card of the first row, with
-    /// the hero back on its first slide and no column remembered for any row. A profile
-    /// choice rebuilds Home at the top (ContentView.swift:391-407), so what
-    /// the last viewer left focused is not carried over. Both this and the
-    /// repair after a recomposition lose their row go through
-    /// `placeFirstTarget`, the one function that names the first target.
+    /// the hero back on its first slide and no column remembered for any
+    /// row. A profile choice rebuilds Home at the top
+    /// (ContentView.swift:391-407), so what the last viewer left focused is
+    /// not carried over. Both this and the repair after a recomposition
+    /// lose their row go through `placeFirstTarget`, the one function that
+    /// names the first target.
     Q_INVOKABLE void resetFocus();
     /// The ids one press of Play Something may play, best first: a fresh
     /// shuffle of the unwatched movies the profile may see (AppState.swift:
@@ -262,10 +263,10 @@ private:
     void recompose();
     void rebuildHero();
     /// Home's first focus target, named once: the hero, or without one the
-    /// first card of the first row that has one, announced as one change. Whether the capsule holds the
-    /// remote, and whether remembered columns are forgotten, is the caller's,
-    /// so a repair keeps both. A Home whose first target is elsewhere changes
-    /// only this.
+    /// first card of the first row that has one, announced as one change.
+    /// Whether the capsule holds the remote, whether remembered columns are
+    /// forgotten and where the carousel rests are the caller's, so a repair
+    /// keeps them. A Home whose first target is elsewhere changes only this.
     void placeFirstTarget(QVector<int> rowLengths);
     /// The row ids in order, for the navigator's memory of columns by row.
     [[nodiscard]] QStringList currentRowIds() const;
