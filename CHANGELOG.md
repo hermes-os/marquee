@@ -85,6 +85,10 @@ intermediate version bump.
   the hero keeps the slide the viewer turned to. Before, the remote went to the
   hero but the carousel stayed on a slide the viewer had turned to earlier, and
   Return played it.
+- Opening the player or a title's details from Home while a profile switch is
+  still loading no longer lets the load restart Home's remote when you come
+  back. Before, Return on the hero or a card left the restart armed, and the
+  late load then moved the remote to the top.
 - Choosing a profile now puts the remote on Home's hero, as in the released app,
   when the library has a spotlight: Home opens on the hero's first slide and the
   first Return plays it, whatever slide or place the last viewer left. Left on

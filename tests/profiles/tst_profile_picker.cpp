@@ -762,6 +762,88 @@ private slots:
         QCOMPARE(home->hero()->currentIndex(), 1);
     }
 
+    // Return on the hero opens the player, and Details opens the same way,
+    // without a focus signal. The viewer acted on the remote's place, so a
+    // reload landing after they come back must not restart Home under them.
+    void openedAndClosedBeforeTheReloadLands(bool player)
+    {
+        QTemporaryDir runtimeRoot;
+        QTemporaryDir movies;
+        AppPaths::setRuntimeRoot(runtimeRoot.path());
+        const auto restore = qScopeGuard([] { AppPaths::clearRuntimeRoot(); });
+        QVERIFY(seedMovies(movies.path(), 4));
+
+        ApplicationController controller;
+        controller.setTemporaryLibraryRoot(movies.path());
+        QQmlApplicationEngine engine;
+        QQuickWindow *window = loadMainWindow(controller, engine);
+        SwitchFixture fixture;
+        QVERIFY(prepareSwitch(controller, window, fixture));
+        QQuickItem *picker = pickerOf(window);
+        QVERIFY(picker != nullptr);
+        QTRY_VERIFY(picker->hasActiveFocus());
+        QTest::keyClick(window, Qt::Key_Return);
+        verifyHomeHoldsTheRemote(window, controller);
+        HomeRowsModel *home = controller.homeRows();
+        QTRY_VERIFY(home->rowCount() >= 2);
+        QTRY_VERIFY(!controller.scanning());
+        fixture.watched = home->cardAt(0, 1).value(QStringLiteral("mediaId")).toString();
+        const QString top = home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString();
+        QVERIFY(!fixture.watched.isEmpty() && fixture.watched != top);
+        {
+            CatalogStore store(AppPaths::catalogFile());
+            store.recordWatchProgress(fixture.second, fixture.watched, 600'000, 3'600'000, false);
+        }
+
+        QSemaphore refreshEntered;
+        QSemaphore releaseRefresh;
+        const QMetaObject::Connection gate = QObject::connect(
+            &controller, &ApplicationController::catalogRefreshStarted, &controller,
+            [&] {
+                refreshEntered.release();
+                releaseRefresh.acquire();
+            },
+            Qt::DirectConnection);
+        const auto releaseGate = qScopeGuard([&] {
+            QObject::disconnect(gate);
+            releaseRefresh.release(2);
+        });
+        controller.requestCatalogRefresh();
+        QVERIFY2(refreshEntered.tryAcquire(1, 5000), "the refresh did not reach its gate");
+
+        chooseSecondProfile(window, controller, fixture.second);
+        QVERIFY(home->heroFocused());
+        if (player) {
+            QTest::keyClick(window, Qt::Key_Return);
+            QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Player);
+        } else {
+            controller.showMediaDetails(top);
+            QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Details);
+        }
+        QTest::keyClick(window, Qt::Key_Escape);
+        QTRY_COMPARE(controller.navigation()->route(), NavigationController::Route::Home);
+        QVERIFY(home->heroFocused());
+        QCOMPARE(home->focus()->row(), 0);
+
+        releaseRefresh.release();
+        QTRY_COMPARE(home->cardAt(0, 0).value(QStringLiteral("mediaId")).toString(), fixture.watched);
+        QTRY_VERIFY(!controller.scanning());
+        // The reload reshaped the rows under the remote, which keeps its card,
+        // now one row lower; the restart did not pull it back to row 0.
+        QCOMPARE(home->focus()->row(), 1);
+        QCOMPARE(home->cardAt(1, 0).value(QStringLiteral("mediaId")).toString(), top);
+    }
+
+    void aPlayerOpenedBeforeTheReloadLandsIsNotRestartedByIt()
+    {
+        openedAndClosedBeforeTheReloadLands(true);
+    }
+
+    void detailsOpenedBeforeTheReloadLandsAreNotRestartedByIt()
+    {
+        openedAndClosedBeforeTheReloadLands(false);
+    }
+
     // A reload that fails brings no projection, so the restart it was waiting
     // for must not stay armed for a later one.
     void aFailedReloadDisarmsTheHomeRestart()

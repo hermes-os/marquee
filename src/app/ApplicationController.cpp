@@ -147,8 +147,15 @@ ApplicationController::ApplicationController(QObject *parent)
 
     // Leaving the player is the end of a viewing, whether the film finished or
     // the viewer walked out of it.
-    connect(&m_navigation, &NavigationController::routeChanged, this, [this] {
+    connect(&m_navigation, &NavigationController::routeChanged, this, [this, remoteMoved] {
         const bool playing = m_navigation.route() == NavigationController::Route::Player;
+        // Return on the hero or a card opens the player or Details without a
+        // focus signal. That is the viewer acting on the remote's place, so a
+        // reload landing while they watch or read must not move it.
+        if (playing || m_navigation.route() == NavigationController::Route::Details
+            || m_navigation.route() == NavigationController::Route::ShowDetail) {
+            remoteMoved();
+        }
         if (!playing) {
             m_player.endSession();
         }
