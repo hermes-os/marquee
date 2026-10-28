@@ -42,8 +42,14 @@ do not exist yet are not listed.
       appear.
 - [ ] A disposable file added, renamed, and removed is reflected after a scan;
       unrelated titles keep their watch state; no duplicates appear.
-- [ ] An unmounted or unreadable root keeps its titles listed, reports `Library
-      unavailable`, and recovers when the root returns. No catalog row is lost.
+- [ ] An unmounted or unreadable root (unplug the drive, or stop an automount's
+      device) withholds its titles from every surface, keeps Home's notice
+      naming the folder until a scan reads it again, reports `Library
+      unavailable`, and recovers on a rescan once the root returns. No catalog
+      row is lost, and the application keeps answering the remote throughout:
+      its main thread is never in uninterruptible sleep on the mount.
+- [ ] With every root unavailable, or none set, Home shows the empty library
+      with the Settings advice, and the remote still reaches Settings.
 - [ ] Browsing and local artwork work with the network disabled.
 
 ## Browse, search, and details

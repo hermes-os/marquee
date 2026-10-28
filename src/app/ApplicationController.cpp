@@ -302,7 +302,7 @@ void ApplicationController::startCatalogWorker()
             });
     connect(worker, &CatalogWorker::rootsUnavailable, this,
             [this](const QStringList &paths, const QStringList &rootIds) {
-                m_unavailableRootIds = QSet<QString>(rootIds.cbegin(), rootIds.cend());
+                setUnavailableRoots(paths, QSet<QString>(rootIds.cbegin(), rootIds.cend()));
                 reportUnavailableRoots(paths);
             });
     connect(this, &ApplicationController::projectionReloadRequested,
@@ -371,9 +371,22 @@ void ApplicationController::publishProjection()
     // The hidden-file index is derived from the projection and the profile's
     // ceiling, the two things this republishes on.
     m_hiddenFiles.reset();
-    const QVector<MediaItem> visible = m_activeProfile
+    QVector<MediaItem> visible = m_activeProfile
         ? content_policy::filtered(m_activeProfile->maturityLevel, m_projection)
         : m_projection;
+    // A title of a root the last scan could not read is on no surface: its
+    // poster, backdrop and file are paths on a drive that may answer every
+    // call after minutes, and Qt Quick stats artwork on the GUI thread. This
+    // is the one place the projection turns into what the models hold, so
+    // Home, the hero, Movies, TV Shows, Search and Play Something all stop
+    // here, and the rows return when a scan reads the root again.
+    if (!m_unavailableRootIds.isEmpty()) {
+        visible.erase(std::remove_if(visible.begin(), visible.end(),
+                                     [this](const MediaItem &item) {
+                                         return m_unavailableRootIds.contains(item.libraryRootId);
+                                     }),
+                      visible.end());
+    }
     QVector<MediaItem> movies;
     movies.reserve(visible.size());
     std::copy_if(visible.cbegin(), visible.cend(), std::back_inserter(movies),
@@ -385,6 +398,28 @@ void ApplicationController::publishProjection()
     // only what Movies and TV Shows hold for it.
     const ShellDrivesHome shell(m_shellDrivesHome);
     m_homeRows.replaceItems(visible);
+}
+
+void ApplicationController::setUnavailableRoots(const QStringList &paths, QSet<QString> rootIds)
+{
+    const bool titlesChange = rootIds != m_unavailableRootIds;
+    const bool noticeChanges = paths != m_unavailableRootPaths;
+    m_unavailableRootIds = std::move(rootIds);
+    m_unavailableRootPaths = paths;
+    // Before the notice is announced, so a surface that reacts to it never
+    // finds the titles of the roots it names. Until the first projection there
+    // is nothing published to take them out of.
+    if (titlesChange && m_projectionReceived) {
+        publishProjection();
+    }
+    if (noticeChanges) {
+        emit unavailableLibraryRootsChanged();
+    }
+}
+
+QStringList ApplicationController::unavailableLibraryRoots() const
+{
+    return m_unavailableRootPaths;
 }
 
 bool ApplicationController::profileAllows(const MediaItem &item) const
@@ -826,8 +861,9 @@ void ApplicationController::playLocalFile(const QString &path)
         // Nothing can say a file is not hidden when its own identity cannot
         // be read, or when a hidden title cannot be read to compare against,
         // so both refuse it. Only a restricted profile pays for this: every
-        // hidden title is read again on each request, on the GUI thread, and
-        // rows from an unavailable root can stall there.
+        // hidden title is read again on each request, on the GUI thread. The
+        // titles of a root the last scan found unavailable are refused
+        // without being read, since reading them can stall there.
         const QString canonicalPath = file.canonicalFilePath();
         const std::optional<FileIdentity> identity = canonicalPath.isEmpty()
             ? std::nullopt
@@ -855,11 +891,20 @@ bool ApplicationController::isRefusedLooseFile(const QString &canonicalPath,
         m_hiddenFiles.emplace();
         for (const MediaItem &item : std::as_const(m_projection)) {
             if (!profileAllows(item)) {
-                m_hiddenFiles->titles.push_back({.catalogPath = item.absolutePath, .canonicalPath = {}});
+                m_hiddenFiles->titles.push_back({.libraryRootId = item.libraryRootId,
+                                                 .catalogPath = item.absolutePath,
+                                                 .canonicalPath = {}});
             }
         }
     }
     for (HiddenTitle &title : m_hiddenFiles->titles) {
+        // A title of a root the last scan could not read cannot be compared
+        // with, and asking its path can stall the GUI thread for the drive's
+        // whole device timeout. It is the same answer the failed read gives
+        // below, without the wait: nothing can say this file is not that title.
+        if (m_unavailableRootIds.contains(title.libraryRootId)) {
+            return true;
+        }
         // The identity is read on every request and never kept: a disk
         // remounted under the same path gets a new device number, and an
         // identity kept from before would stop matching its hard links.
@@ -963,15 +1008,16 @@ void ApplicationController::playSomething()
     // Home's model holds the projection the profile may see, so the pick can
     // never leave the profile's policy and counts that profile's watch state.
     //
-    // Rows of an offline root or a deleted file are kept on purpose, so the
-    // first pick may not be playable while others are: take the first
-    // candidate whose file is readable and say nothing when there is none.
+    // The row of a deleted file is kept on purpose, so the first pick may not
+    // be playable while others are: take the first candidate whose file is
+    // readable and say nothing when there is none.
     //
     // A stat on an unreachable network mount can block the GUI thread for
     // minutes, so no title of a root the last refresh found unavailable is
-    // stat'd at all; that refresh learned it off this thread. The first few
-    // candidates on reachable roots are tried, which bounds the stats on the
-    // roots left.
+    // stat'd at all; that refresh learned it off this thread. Home does not
+    // hold those titles, so they are not candidates; the test below is the
+    // last guard should one reach here. The first few candidates on reachable
+    // roots are tried, which bounds the stats on the roots left.
     constexpr int kMaxCandidatesTried = 5;
     const PlayableFileCheck readable =
         m_playableFileCheck ? m_playableFileCheck : PlayableFileCheck(isPlayableFile);

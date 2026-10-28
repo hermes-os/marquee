@@ -408,8 +408,14 @@ copy the NAS library merely to make it playable.
 - The platform/storage layer reports source readiness to `CatalogService`; it
   does not make QML or the scanner guess whether a path is a mount.
 - A missing or disconnected source becomes `unavailable`, not an empty root.
-  Existing catalog rows remain visible with an unavailable state and are not
-  deleted by a failed scan.
+  Existing catalog rows, artwork and watch state are kept and are not deleted
+  by a failed scan, and they return with the next scan that reads the root.
+  While the root is unavailable its titles are on no surface (Home, the hero,
+  Movies, TV Shows, Search, Play Something): a path on a missing mount can
+  block the GUI thread for the mount's whole device timeout, so the GUI thread
+  never stats, opens or lists a root path and reads the availability the
+  catalog worker cached. Home keeps a notice naming the missing folder for as
+  long as it is missing, and an empty Home says where to add folders.
 - A NAS that drops during playback produces a controlled library/playback
   error and retry state. It must not silently advance through missing files or
   rewrite the catalog as if the media had been removed.

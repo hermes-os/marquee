@@ -23,6 +23,7 @@
 #include "search/SearchSession.hpp"
 #include "settings/SettingsStore.hpp"
 #include "support/FileIdentity.hpp"
+#include "support/GuiThreadIoProbe.hpp"
 
 namespace
 {
@@ -829,6 +830,64 @@ private slots:
         QVERIFY2(looseFilePlays(controller, wonderPath), qPrintable(controller.errorMessage()));
         QVERIFY2(looseFileRefused(controller, heatLink),
                  "a hidden title that came back after indexing was never covered");
+    }
+
+    // A hidden title on a drive that is unplugged cannot be compared with, and
+    // asking its path can block the GUI thread for the drive's device timeout,
+    // so a restricted profile is refused the loose file without the title being
+    // read (nor its path resolved) and without the wait.
+    void aHiddenTitleOfAnUnavailableRootIsNeverReadForALooseFileCheck()
+    {
+        Shell shell;
+        QTemporaryDir drive;
+        QTemporaryDir shelf;
+        AppPaths::setRuntimeRoot(shell.runtimeRoot.path());
+        QVERIFY(writeMovies(shell.movies.path()) && writeShows(shell.shows.path()));
+        const QString driveMovies = drive.path() + QStringLiteral("/Movies");
+        QVERIFY(writeFile(driveMovies + QStringLiteral("/Horror/Another Nightmare (2021).mkv")));
+        const auto replugged = qScopeGuard([&] {
+            gui_thread_io::unwatch();
+            QDir().rename(shelf.path() + QStringLiteral("/unplugged"), drive.path());
+        });
+
+        shell.controller = std::make_unique<ApplicationController>();
+        shell.controller->setTemporaryLibraryRoot(shell.movies.path());
+        shell.controller->setTemporaryLibraryRoot(driveMovies);
+        shell.controller->setTemporaryTvShowsRoot(shell.shows.path());
+        ApplicationController &controller = *shell.controller;
+        QVERIFY(QTest::qWaitFor(
+            [&] {
+                return controller.library()->rowCount() == kAllowedMovies + kBlockedMovies + 1
+                    && controller.shows()->episodeCount() == 4 && !controller.scanning();
+            },
+            30000));
+        QVERIFY(choose(controller, QStringLiteral("Kids")));
+        const QString wonderPath = QDir(shell.movies.path()).filePath(
+            QStringLiteral("Kids/Wonder (2017).mkv"));
+
+        // The drive goes, and the next scan finds it gone.
+        QVERIFY(QDir().rename(drive.path(), shelf.path() + QStringLiteral("/unplugged")));
+        controller.requestCatalogRefresh();
+        QVERIFY(QTest::qWaitFor(
+            [&] { return !controller.unavailableLibraryRoots().isEmpty() && !controller.scanning(); },
+            30000));
+        QCOMPARE(controller.library()->rowCount(), kAllowedMovies);
+
+        QStringList read;
+        controller.setFileIdentityReaderForTest([&read](const QString &path) {
+            read.push_back(path);
+            return readFileIdentity(path);
+        });
+        gui_thread_io::watch(drive.path());
+        QVERIFY2(looseFileRefused(controller, wonderPath),
+                 "a loose file played while a hidden title could not be compared with");
+        QVERIFY(controller.errorMessage().contains(QStringLiteral("not available")));
+        QVERIFY(looseFileRefused(controller, wonderPath));
+        const QStringList hits = gui_thread_io::mainThreadHits();
+        QVERIFY2(hits.isEmpty(), qPrintable(hits.join(QLatin1Char('\n'))));
+        for (const QString &path : std::as_const(read)) {
+            QVERIFY2(!path.startsWith(drive.path()), qPrintable(path));
+        }
     }
 
     void switchingProfilesRefreshesEverySurface()

@@ -1138,7 +1138,10 @@ private slots:
         QVERIFY2(!controller.hasError(), qPrintable(controller.errorMessage()));
     }
 
-    void storedRowsStayBrowsableAfterTheRootDisappears()
+    // The rows stay in the catalog, so the root coming back lists them again;
+    // while it is gone they are on no surface, because reaching the files of a
+    // missing drive blocks the GUI thread.
+    void storedRowsAreWithheldButKeptWhileTheRootIsMissing()
     {
         QTemporaryDir runtimeRoot;
         AppPaths::setRuntimeRoot(runtimeRoot.path());
@@ -1159,16 +1162,26 @@ private slots:
         ApplicationController controller;
         controller.setTemporaryLibraryRoot(libraryPath);
 
+        // The root being gone is stated rather than left for the user to infer
+        // from a library that stopped changing, and nothing of it is browsable.
+        QTRY_VERIFY(controller.hasError());
+        QCOMPARE(controller.errorTitle(), QStringLiteral("Library unavailable"));
+        QCOMPARE(controller.unavailableLibraryRoots(), QStringList{libraryPath});
+        QTRY_VERIFY(!controller.scanning());
+        QCOMPARE(controller.library()->rowCount(), 0);
+        QCOMPARE(catalogValue(AppPaths::catalogFile(),
+                              QStringLiteral("SELECT title FROM media_items")),
+                 QStringLiteral("Moon"));
+
+        // The next scan that reads the root brings the title back.
+        QVERIFY(writeMediaFile(libraryPath, QStringLiteral("Moon.2009.mkv")));
+        controller.requestCatalogRefresh();
         QTRY_COMPARE(controller.library()->rowCount(), 1);
         QCOMPARE(controller.library()
                      ->data(controller.library()->index(0, 0), LibraryModel::TitleRole)
                      .toString(),
                  QStringLiteral("Moon"));
-
-        // Browsing keeps working, and the root being gone is stated rather than
-        // left for the user to infer from a library that stopped changing.
-        QTRY_VERIFY(controller.hasError());
-        QCOMPARE(controller.errorTitle(), QStringLiteral("Library unavailable"));
+        QVERIFY(controller.unavailableLibraryRoots().isEmpty());
     }
 };
 

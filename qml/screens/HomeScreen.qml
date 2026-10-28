@@ -26,6 +26,13 @@ FocusScope {
     // as the poster surface's own request state is held.
     property bool scanning: appController.scanning
 
+    // The folders the latest scan could not read. Their titles are on no
+    // surface (the shell withholds them, because reaching a missing drive's
+    // files blocks the interface for its device timeout), so Home says which
+    // folders are missing for as long as they are. Plain like `scanning`, so a
+    // test can hold the surface in the state.
+    property var unavailableRoots: appController.unavailableLibraryRoots
+
     // HomeDetailView.swift:191 and :385-386 count the projection itself rather
     // than any composed row.
     readonly property int movieCount: appController.library.titleCount
@@ -47,6 +54,13 @@ FocusScope {
     readonly property bool hasContent: !root.libraryEmpty
     // :147-153: the hero is there while the library has a spotlight.
     readonly property bool hasHero: root.rows.hero.count > 0
+    // Above the hero, and the first thing of the page, while any folder is
+    // missing and something else is left to show. An empty Home puts the same
+    // notice in its empty state instead.
+    readonly property bool hasNotice: root.hasContent && root.unavailableRoots.length > 0
+    readonly property real noticeBlock: root.hasNotice
+        ? libraryNotice.height + Theme.scaled(12, 20, root.leanBack)
+        : 0
 
     // HomeDetailView.swift:329 and :1008 run `appState.playSomething()` for a
     // tap on the capsule and for Enter while the remote rests on it. The shell
@@ -130,6 +144,22 @@ FocusScope {
                 easing.type: Easing.OutCubic
             }
 
+            // Not in the released app (see LibraryNotice.qml): the page opens
+            // with it while a folder is missing, inset like the rows, with the
+            // hero's own 12/20 points beneath it.
+            LibraryNotice {
+                id: libraryNotice
+                objectName: "homeLibraryNotice"
+
+                x: Theme.outerPadding(root.leanBack)
+                y: 0
+                width: scroll.width - 2 * Theme.outerPadding(root.leanBack)
+                height: implicitHeight
+                visible: root.hasNotice
+                roots: root.unavailableRoots
+                leanBack: root.leanBack
+            }
+
             // :202-203 puts the hero first in the page, after the bar's
             // spacer, and :204-210 gives it the page's whole width: only the
             // rows below it are inset by the outer padding. :511 leaves 12/20
@@ -140,7 +170,7 @@ FocusScope {
                 objectName: "homeHero"
 
                 x: 0
-                y: 0
+                y: root.noticeBlock
                 width: scroll.width
                 height: root.hasHero ? implicitHeight : 0
                 visible: root.hasHero
@@ -161,9 +191,9 @@ FocusScope {
             Column {
                 id: pageColumn
 
-                y: root.hasHero
+                y: root.noticeBlock + (root.hasHero
                     ? heroBlock.height + Theme.scaled(12, 20, root.leanBack)
-                    : 0
+                    : 0)
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.leftMargin: Theme.outerPadding(root.leanBack)
@@ -758,13 +788,29 @@ FocusScope {
             horizontalAlignment: Text.AlignHCenter
         }
 
+        // :486's "Content will appear once scanning completes" is not true of
+        // this state: the scan is over, so nothing will appear on its own.
+        // Whatever the reason (no folder set, none holding a film, none
+        // readable) the way out is the folder lists in Settings.
         Text {
             objectName: "libraryEmptyDetail"
             width: parent.width
-            text: qsTr("Content will appear once scanning completes")
+            text: qsTr("Add your Movies and TV Shows folders in Settings.")
             color: Theme.textTertiary
             font.pixelSize: Theme.scaled(12, 17, root.leanBack)
             horizontalAlignment: Text.AlignHCenter
+            wrapMode: Text.Wrap
+        }
+
+        // Folders that were set and cannot be read are named, as they are above
+        // a library that still has titles.
+        LibraryNotice {
+            objectName: "libraryEmptyNotice"
+            width: parent.width
+            visible: root.unavailableRoots.length > 0
+            height: visible ? implicitHeight : 0
+            roots: root.unavailableRoots
+            leanBack: root.leanBack
         }
     }
 

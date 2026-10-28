@@ -70,6 +70,15 @@ class ApplicationController final : public QObject
     /// `isScanning` and what Home draws its scan state and its header capsule
     /// from.
     Q_PROPERTY(bool scanning READ scanning NOTIFY scanningChanged)
+    /// The folders of the library the latest finished scan could not read, as
+    /// configured: a drive that is unplugged or a mount that is down. Empty
+    /// when every configured folder was read. Home draws its lasting notice
+    /// from this. The titles of these folders are on no surface while they are
+    /// listed, and no path of theirs is touched on the GUI thread; their rows,
+    /// artwork and watch state stay in the catalog and return with the next
+    /// scan that reads the folder.
+    Q_PROPERTY(QStringList unavailableLibraryRoots READ unavailableLibraryRoots
+                   NOTIFY unavailableLibraryRootsChanged)
     /// PlayerView.swift:64 resolves the startup overlay's backdrop as the
     /// playing title's display backdrop first, then its display poster. This
     /// is that source: the show backdrop, season poster chain, or title
@@ -127,6 +136,7 @@ public:
     void setStartFullscreen(bool value);
 
     [[nodiscard]] bool scanning() const;
+    [[nodiscard]] QStringList unavailableLibraryRoots() const;
 
     [[nodiscard]] QUrl playerArtworkUrl() const;
 
@@ -225,6 +235,7 @@ signals:
     void startFullscreenChanged();
     void nextEpisodeChanged();
     void scanningChanged();
+    void unavailableLibraryRootsChanged();
     void playerArtworkUrlChanged();
     void errorChanged();
     void activeProfileChanged();
@@ -248,6 +259,10 @@ private:
     [[nodiscard]] bool bootstrapCatalog();
     void startCatalogWorker();
     void reportUnavailableRoots(const QStringList &paths);
+    /// Takes the roots a finished scan could not read and republishes the
+    /// projection without their titles (or with them again, for a root that
+    /// came back), before any surface can ask the file system about them.
+    void setUnavailableRoots(const QStringList &paths, QSet<QString> rootIds);
     /// The projected movie or episode carrying `mediaId`.
     [[nodiscard]] std::optional<MediaItem> projectedItem(const QString &mediaId) const;
     void finishCatalogRefresh();
@@ -271,6 +286,7 @@ private:
     /// they are read from `canonicalPath` on each request.
     struct HiddenTitle
     {
+        QString libraryRootId;
         QString catalogPath;
         QString canonicalPath;
     };
@@ -318,9 +334,13 @@ private:
     std::optional<HiddenFileIndex> m_hiddenFiles;
     FileIdentityReader m_readFileIdentity{readFileIdentity};
     PlayableFileCheck m_playableFileCheck;
-    // Roots the latest finished refresh could not reach, by catalog identity.
-    // Their rows are kept, but their files are never stat'd on the GUI thread.
+    // Roots the latest finished refresh could not reach, by catalog identity,
+    // and as configured for the notice. The worker learns this off the GUI
+    // thread and this is the only copy the GUI reads: their rows stay in
+    // `m_projection`, but nothing publishes their titles and no path of theirs
+    // is stat'd, opened or handed to Qt Quick on the GUI thread.
     QSet<QString> m_unavailableRootIds;
+    QStringList m_unavailableRootPaths;
     // The choice whose fade-out is running, and a serial so a completion
     // scheduled for an earlier choice cannot end a later one
     // (AppState.swift:272 and :294-305).

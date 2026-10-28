@@ -88,10 +88,13 @@ signals:
     void metadataRunFinished(MetadataEnrichment::Summary summary);
 
     /// The configured roots that could not be reached by this refresh. Their
-    /// rows are still projected, so this reports why the library may look stale
-    /// rather than why it is empty. `rootIds` names the same roots by catalog
+    /// rows are still projected, with their artwork and watch state, but a
+    /// receiver must not show or touch their titles while the root is in this
+    /// set: reaching a path of a missing drive can block for as long as the
+    /// drive's device timeout. `rootIds` names the same roots by catalog
     /// identity. It is emitted after every refresh that finishes, empty
-    /// included, so a root that came back leaves the set the receiver keeps.
+    /// included, so a root that came back leaves the set the receiver keeps, and
+    /// always before that refresh's `projectionReady`.
     void rootsUnavailable(QStringList paths, QStringList rootIds);
 
 private:

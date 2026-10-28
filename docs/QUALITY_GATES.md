@@ -59,6 +59,7 @@ Run one target with `ctest --test-dir build/v3-debug -R '<regex>'
 | Play Something (the pick, then the controls) | `^tst_play_something$`, `^tst_home_rows$`, `^tst_home_screen$`, `^tst_sidebar_navigation` |
 | Movies and TV routes (order, genre rows, holiday) | `^tst_browse_order$`, `^tst_movies_route` (also runs `_hidpi`), `^tst_tv_route$` |
 | Details | `^tst_media_details$` |
+| Library roots that go missing (withheld titles, Home's notice and empty state, no GUI-thread file call on a missing root's paths) | `^tst_unavailable_root$`, `^tst_kids_content$`, `^tst_library_scanner$`, `^tst_home_screen$` |
 | Player, HUD, watch progress | `^tst_playback$`, `^tst_playback_fullscreen$`, `^tst_player_window$`, `^tst_player_hud$`, `^tst_next_episode$`, `^tst_next_episode_flow$`, `^tst_player_tracks$`, `^tst_subtitle_discovery$`, `^tst_track_selection$`, `^tst_watch_progress$`, `^tst_watch_progress_process$` |
 | Profiles and Kids content filtering | `^tst_profile_store$`, `^tst_profile_picker$`, `^tst_kids_content$` |
 | Search | `^tst_search_session$`, `^tst_search_screen$` |
@@ -97,6 +98,13 @@ Change-specific additions:
 - Browse fixtures that need a window narrower than the compositor grants skip as
   an unsupported fixture rather than passing. Count skips; do not call a run
   with skips acceptance.
+- `tests/support/GuiThreadIoProbe.hpp` counts the file system calls the GUI
+  thread makes under a path, by defining the C library's `stat`, `open`,
+  `opendir` and the like in the test executable, so Qt's own calls (Qt Quick
+  image loading stats artwork on the GUI thread) are seen as well as ours. It
+  needs a dynamically linked Qt, and `tst_unavailable_root` first proves the
+  probe sees a stat of a watched path, so a quiet probe is not read as a pass.
+  It counts calls; it cannot measure how long a real hung mount blocks.
 - Logical focus and navigation policy can be asserted deterministically.
   Perceived motion, physical-remote reachability, Wayland and OpenGL/EGL
   behavior, hardware decode, PipeWire routing, fullscreen transitions, and

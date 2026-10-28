@@ -1156,9 +1156,10 @@ private slots:
     }
 
     // A stat on an unreachable network mount can hang the interface for
-    // minutes, so a title of a root the last refresh found unavailable is
-    // never stat'd, and a root that returns is tried again.
-    void aTitleOfAnUnavailableRootIsSkippedWithoutAStat()
+    // minutes, so a title of a root the last refresh found unavailable is not
+    // one of Home's candidates and is never stat'd, and a root that returns is
+    // tried again.
+    void aTitleOfAnUnavailableRootIsNotACandidateAndIsNeverStatted()
     {
         Shell shell;
         QTemporaryDir otherMovies;
@@ -1181,6 +1182,13 @@ private slots:
         const MediaItem firstPick = *shell.controller->library()->itemForId(order.at(0));
         const bool firstIsOther = firstPick.absolutePath.startsWith(otherMovies.path());
         const QString awayRoot = firstIsOther ? otherMovies.path() : shell.movies.path();
+        QStringList awayIds;
+        for (const QString &id : order) {
+            if (shell.controller->library()->itemForId(id)->absolutePath.startsWith(awayRoot)) {
+                awayIds.push_back(id);
+            }
+        }
+        QCOMPARE(awayIds.size(), 3);
         const QString awayRenamed = awayRoot + QStringLiteral(".away");
         QVERIFY(QDir().rename(awayRoot, awayRenamed));
         const auto restore = qScopeGuard([&] { QDir().rename(awayRenamed, awayRoot); });
@@ -1188,7 +1196,12 @@ private slots:
         QTRY_VERIFY(shell.controller->hasError());
         QTRY_VERIFY(!shell.controller->scanning());
         shell.controller->dismissError();
-        QCOMPARE(rows->playSomethingCandidates(), order);
+        // Home holds what can be read, so the root's titles are not offered.
+        const QStringList reachable = rows->playSomethingCandidates();
+        QCOMPARE(reachable.size(), 3);
+        for (const QString &id : awayIds) {
+            QVERIFY(!reachable.contains(id));
+        }
 
         QStringList statted;
         shell.controller->setPlayableFileCheckForTest([&statted](const QString &path) {
@@ -1207,11 +1220,13 @@ private slots:
         QVERIFY(!played.absolutePath.startsWith(awayRoot));
         QVERIFY(!shell.controller->hasError());
 
-        // The root coming back clears the set: its first pick plays again.
+        // The root coming back clears the set: its titles are offered again
+        // and its first pick plays again.
         shell.controller->navigation()->goHome();
         QVERIFY(QDir().rename(awayRenamed, awayRoot));
         shell.controller->requestCatalogRefresh();
         QTRY_VERIFY(!shell.controller->scanning());
+        QTRY_COMPARE(rows->playSomethingCandidates().size(), 6);
         QTRY_VERIFY(([&] {
             shell.controller->playSomething();
             return shell.controller->player()->mediaId() == order.at(0);

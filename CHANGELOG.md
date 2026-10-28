@@ -6,6 +6,20 @@ intermediate version bump.
 
 ## [Unreleased]
 
+- Home no longer freezes when a library folder is on a drive that is unplugged
+  or a mount that is down. Reaching a path on such a drive can block for the
+  mount's whole device timeout, and Home asked for its artwork and files one
+  after another on the interface thread. The titles of a folder the latest scan
+  could not read are now on no surface (Home, the hero, Movies, TV Shows,
+  Search and Play Something) while it is unavailable; their catalog rows,
+  artwork and watch state are kept, and they come back with the next scan that
+  reads the folder. Home shows a notice for as long as a folder is missing that
+  names it and says to plug the drive in and rescan, or to change the library
+  folders, in Settings. A library with nothing to show says "Add your Movies and
+  TV Shows folders in Settings." in place of "Content will appear once scanning
+  completes", which was not true once the scan had ended; the released app has
+  neither notice. A Kids profile is refused a loose file at once when a hidden
+  title is on a missing drive, instead of after the wait. No migration.
 - The Home hero ranks and picks as the released builder does now that the
   catalog holds TMDB's facts: the rating counts in a title's score (vote average
   times 100), a title you have not finished gains the boost of how much it

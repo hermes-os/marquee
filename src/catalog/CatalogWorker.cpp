@@ -51,10 +51,12 @@ void CatalogWorker::refresh(const LibraryRootPaths &rootPaths, const QString &pr
             m_store->applyScan(root, result);
         }
 
-        // The projection goes first so the library is on screen before anything
-        // explains why part of it may be stale.
-        emit projectionReady(m_store->projection(roots, profileId), profileId);
+        // The shell hides the titles of a root it knows is unavailable, so it
+        // learns which roots those are before the projection that holds their
+        // rows: a projection first would show their artwork, and the GUI thread
+        // would stat it, until the answer arrived.
         emit rootsUnavailable(unavailable, unavailableIds);
+        emit projectionReady(m_store->projection(roots, profileId), profileId);
         // After the library is on screen: TMDB never holds up browsing.
         startMetadataRun(rootPaths);
     } catch (const std::exception &error) {

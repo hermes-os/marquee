@@ -64,6 +64,7 @@ qt_add_qml_module(marquee_core
         qml/components/FocusFrame.qml
         qml/components/GradientWordmark.qml
         qml/components/HeroCarousel.qml
+        qml/components/LibraryNotice.qml
         qml/components/MarqueeSymbol.qml
         qml/components/MediaItemRow.qml
         qml/components/PlayerCardButton.qml

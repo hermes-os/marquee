@@ -103,6 +103,13 @@ marquee_add_test(tst_home_screen
     browse/tst_home_screen.cpp
 )
 
+# A library root on a drive that is unplugged under an automount blocks every
+# file system call that reaches it. The shipped shell runs with such a root, and
+# a probe in the test executable counts what the GUI thread asks of its paths.
+marquee_add_test(tst_unavailable_root
+    browse/tst_unavailable_root.cpp
+)
+
 # Play Something's pick is a plain function over projected items: no window.
 marquee_add_test(tst_play_something
     browse/tst_play_something.cpp

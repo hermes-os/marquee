@@ -4055,8 +4055,10 @@ private slots:
         QTRY_VERIFY(empty != nullptr);
         QTRY_VERIFY(empty->isVisible());
 
-        // :483 and :486's copy, at :484's 17 points medium in the secondary
-        // ink over :487's 12 points in the tertiary ink.
+        // :483's copy at :484's 17 points medium in the secondary ink, over
+        // :487's 12 points in the tertiary ink. :486's "Content will appear
+        // once scanning completes" is not true of a settled empty library, so
+        // the line says where folders are added instead.
         auto *title = window->findChild<QQuickItem *>(QStringLiteral("libraryEmptyTitle"));
         auto *detail = window->findChild<QQuickItem *>(QStringLiteral("libraryEmptyDetail"));
         auto *glyph = window->findChild<QQuickItem *>(QStringLiteral("libraryEmptyGlyph"));
@@ -4065,7 +4067,7 @@ private slots:
         QVERIFY(glyph != nullptr);
         QCOMPARE(title->property("text").toString(), QStringLiteral("No content found"));
         QCOMPARE(detail->property("text").toString(),
-                 QStringLiteral("Content will appear once scanning completes"));
+                 QStringLiteral("Add your Movies and TV Shows folders in Settings."));
         QCOMPARE(title->property("font").value<QFont>().pixelSize(), 17);
         QCOMPARE(detail->property("font").value<QFont>().pixelSize(), 12);
         QCOMPARE(title->property("color").value<QColor>(), QColor("#9b8fb0"));
@@ -6132,7 +6134,10 @@ private slots:
         QCOMPARE(currentIndexOf(view), 0);
     }
 
-    void anUnreachableRootIsReportedWhileItsTitlesStayListed()
+    // The report is lasting (Home's notice names the folder) and the titles of
+    // the root are withheld, because reaching a missing drive's files blocks
+    // the GUI thread; the rows themselves stay in the catalog.
+    void anUnreachableRootIsReportedAndItsTitlesAreWithheld()
     {
         QTemporaryDir runtimeRoot;
         AppPaths::setRuntimeRoot(runtimeRoot.path());
@@ -6159,7 +6164,17 @@ private slots:
         QCOMPARE(controller.errorTitle(), QStringLiteral("Library unavailable"));
         QVERIFY(controller.errorMessage().contains(libraryPath));
         QVERIFY(controller.errorMessage().contains(QStringLiteral("preserved")));
-        QCOMPARE(controller.library()->rowCount(), 2);
+        QCOMPARE(controller.unavailableLibraryRoots(), QStringList{libraryPath});
+        QCOMPARE(controller.library()->rowCount(), 0);
+        QVERIFY(controller.homeRows()->rowCount() == 0);
+
+        // The rows are not lost: the same root readable again lists them.
+        QVERIFY(QDir().mkpath(libraryPath));
+        QVERIFY(writeMediaFile(libraryPath, QStringLiteral("Arrival.2016.mkv")));
+        QVERIFY(writeMediaFile(libraryPath, QStringLiteral("Moon.2009.mkv")));
+        controller.requestCatalogRefresh();
+        QTRY_COMPARE(controller.library()->rowCount(), 2);
+        QVERIFY(controller.unavailableLibraryRoots().isEmpty());
     }
 
     // A glow that is not shown (EpisodeRow's, until its row is focused) used
