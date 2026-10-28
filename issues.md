@@ -346,6 +346,7 @@ Found: Home rows review.
 Where: `tests/profiles/tst_profile_picker.cpp:133`, `:185`, `:257` (`theRemoteWalksTheTopRowAndTheManageControl`, `selectingAProfileFadesThePickerThenShowsTheShell`, `managementModeExposesTheActionsAndBackLeavesIt`).
 What happens: under `xvfb-run -s "-screen 0 1920x1080x24"` the focused profile id is empty and the focus kind is "add" where the test expects "manage"; 3 of 3 runs, the same on the build from before the shadow change. It passes offscreen under ctest.
 Found: gate run for the first-frame freeze fix.
+Also: under ctest offscreen on a busy host (load 5 to 25), `selectingAProfileFadesThePickerThenShowsTheShell` can crash with SIGSEGV at `tst_profile_picker.cpp:289` (`focusProfileId(picker)` on a picker already destroyed because the exit fade ended before the test's key presses; five runs, and the same on a scratch build of c024e28). Suggested fix: hold the fade open with `reduceMotion` off and a long duration, or guard the picker pointer with a `QPointer` and wait for the exit to start.
 
 ## everyHudControlWorksWithAPointer fails when tst_player_hud runs directly offscreen
 Where: `tests/playback/tst_player_hud.cpp:1057` (the window is still fullscreen).
@@ -460,5 +461,10 @@ Found: review of the Home taste-rows lane (fa1f0c5..7143233).
 
 ## tst_catalog_bootstrap concurrentBootstrapsMigrateTheCatalogOnce fails with "database is locked" under host load
 Where: `tests/catalog/tst_catalog_bootstrap.cpp` (`concurrentBootstrapsMigrateTheCatalogOnce`), `CatalogDatabase::migrate` in `src/catalog/CatalogDatabase.cpp` (`BEGIN IMMEDIATE`).
-What happens: four threads open and migrate one catalog at once. With the host at a load average of 15 on 4 cores one run failed with "SQL failed: database is locked ... BEGIN IMMEDIATE" and the target took 199 s; the same case passed alone in 3.7 s, and the target passed on the next run at load 4 (173 s). It does not touch library roots.
-Found: the gate run for aa1b5e1..1b8a91e on a shared host.
+What happens: four threads open and migrate one catalog at once, and the case fails with "SQL failed: database is locked ... BEGIN IMMEDIATE" when the host is busy (a load average of 5 to 25 on 4 cores; 4 of 4 isolated runs at load 12, the same on a scratch build of c024e28 before the change). It passed alone in 3.7 s on a quiet host and the target passed once at load 4. It does not touch library roots. Suggested fix: give the connections a busy timeout, or retry `BEGIN IMMEDIATE` in `migrate`, so a second opener waits for the first.
+Found: the gate runs for the missing-root work on a shared host.
+
+## Several QML tests wait a fixed 5 s for a projection and fail on a busy host
+Where: `tests/browse/tst_movies_route.cpp` (`theMoviesRouteShowsTheLibraryRatherThanTheRewriteStatusScreen`, `reduceMotionPlacesTheRowWithoutRunningItsSpring`), `tests/details/tst_media_details.cpp` (`backOnTheDetailsSurfaceReturnsToTheLibrary`), `tests/browse/tst_home_screen.cpp` (`aTappedCardOpensThatCardRatherThanTheFocusedOne`, `contentY > 0`).
+What happens: with the host at a load average of 17 to 25 on 4 cores, QTest reports "the requested timeout (5000 ms) was too short, 12200 ms would have been sufficient" and the Home case sees no scroll yet. Each passes alone and in a later run at load under 6. Suggested fix: use `QTRY_*_WITH_TIMEOUT` with 30 s for waits that follow a catalog projection, as `tst_kids_content` now does.
+Found: the full gate run for the missing-root work, load average above 17.
