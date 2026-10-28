@@ -457,3 +457,8 @@ Found: Home taste rows task, reading `LibraryState.currentTasteProfile` against 
 Where: `src/models/HomeTasteRows.cpp:36` (`runtimeSeconds`), `src/catalog/CatalogStore.cpp:377` (`COALESCE(w.duration_ms, 0)`), `src/models/SeasonalRows.cpp` (`heroScore`).
 What happens: with no metadata a movie's `durationSeconds` comes only from the profile's own `watch_progress` row, so Short Tonight and the hero's length terms see only titles that profile has started. The released app probes the length of every file.
 Found: review of the Home taste-rows lane (fa1f0c5..7143233).
+
+## tst_catalog_bootstrap concurrentBootstrapsMigrateTheCatalogOnce fails with "database is locked" under host load
+Where: `tests/catalog/tst_catalog_bootstrap.cpp` (`concurrentBootstrapsMigrateTheCatalogOnce`), `CatalogDatabase::migrate` in `src/catalog/CatalogDatabase.cpp` (`BEGIN IMMEDIATE`).
+What happens: four threads open and migrate one catalog at once. With the host at a load average of 15 on 4 cores one run failed with "SQL failed: database is locked ... BEGIN IMMEDIATE" and the target took 199 s; the same case passed alone in 3.7 s, and the target passed on the next run at load 4 (173 s). It does not touch library roots.
+Found: the gate run for aa1b5e1..1b8a91e on a shared host.
