@@ -531,8 +531,9 @@ private slots:
         QVERIFY2(text.contains(f.driveShows()), qPrintable(text));
         QVERIFY2(text.contains(QStringLiteral("Settings")), qPrintable(text));
         QVERIFY2(text.contains(QStringLiteral("drive"), Qt::CaseInsensitive), qPrintable(text));
+        // The projection a profile choice reloads lands after the scan ends.
+        QTRY_VERIFY(itemNamed(f.window, "homeRowsViewport")->isVisible());
         QVERIFY(!itemNamed(f.window, "libraryEmptyState")->isVisible());
-        QVERIFY(itemNamed(f.window, "homeRowsViewport")->isVisible());
 
         // The toast is dismissed, a viewer walks the page, and the notice is
         // still on Home.
@@ -627,7 +628,8 @@ private slots:
         QVERIFY(open(f, {}));
         HomeRowsModel *rows = f.controller->homeRows();
         QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
-        QCOMPARE(f.controller->library()->titleCount(), 2);
+        // The projection a profile choice reloads lands after the scan ends.
+        QTRY_COMPARE(f.controller->library()->titleCount(), 2);
         QVERIFY(!homeTitles(rows).contains(QStringLiteral("Heat")));
 
         QVERIFY(f.plugIn());
@@ -667,7 +669,7 @@ private slots:
         Fixture f;
         QVERIFY(open(f, {.unplugged = false}));
         QTRY_VERIFY(!f.controller->scanning());
-        QCOMPARE(f.controller->library()->titleCount(), 4);
+        QTRY_COMPARE(f.controller->library()->titleCount(), 4);
         const QString dune = f.seeded.idOf(QStringLiteral("Dune"));
         f.controller->showMediaDetails(dune);
         QTRY_COMPARE(f.controller->navigation()->route(), NavigationController::Route::Details);
