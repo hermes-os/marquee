@@ -304,7 +304,7 @@ Found: the retired plan's Open Questions section.
 
 ## Kids loose-file check stalls the GUI thread when a library root is offline
 Where: `ApplicationController::isRefusedLooseFile` and `playLocalFile` in `src/app/ApplicationController.cpp`.
-What happens: on a restricted profile every loose-file request resolves and stats every hidden catalog title on the GUI thread (`canonicalFilePath` and `stat`). When a root is an offline network mount or a missing USB disk those calls can block, so each request freezes the UI until they time out, not only the first one. The request is refused afterwards, but only after the stall. Adult profiles and sessions with no profile do not run the check.
+What happens: on a restricted profile every loose-file request resolves and stats every hidden catalog title on the GUI thread (`canonicalFilePath` and `stat`). When a root is an offline network mount or a missing USB disk those calls can block, so each request freezes the UI until they time out, not only the first one. The request is refused afterwards, but only after the stall. Adult profiles and sessions with no profile do not run the check. Since aa1b5e1 the titles of a root the latest scan found unavailable are refused without being read; a root that dies after that scan is still read (see the Play Something entry below for the same limit).
 Found: review of 5a5d848; the code comment already notes the GUI-thread cost. No file-open path calls it yet (`--play` runs before a profile is chosen), so it is not reachable from the UI today.
 
 ## Kids loose-file check can read the wrong file after a library root moves
@@ -368,10 +368,20 @@ before and after 14c9132.
 Found: `tst_home_screen` at the Home rows commit; teardown count from
 `tst_media_details` under xvfb with `QT_QPA_PLATFORM=xcb`.
 
-## Play Something can still stall on a root that goes away between refreshes
-Where: `ApplicationController::playSomething` in `src/app/ApplicationController.cpp`, `m_unavailableRootIds`.
-What happens: the stat is skipped only for roots the latest finished refresh found unreachable. A network mount that dies after that refresh is still stat'd on the GUI thread, up to five titles per press, and `QFileInfo::isFile` on a dead hard NFS mount may never return (a minute or more on soft NFS or CIFS). Refreshes run on startup and on settings changes, not on a timer.
-Found: review of 0ef4e95..ff928d9; the fix for the first round stops at what the catalog worker already knows.
+## The GUI thread still touches files of a root that goes away between refreshes
+Where: `ApplicationController::playSomething`, `playMediaId` and `playNextEpisode` in `src/app/ApplicationController.cpp` (`m_unavailableRootIds`), `MpvVideoItem::addSidecarSubtitles` in `src/playback/MpvVideoItem.cpp`, and every `Image` of library artwork in `qml/`.
+What happens: titles of a root the latest finished refresh found unreachable are withheld from every surface and never touched (aa1b5e1). A network mount or drive that dies after that refresh is still read on the GUI thread. Play Something stats up to five titles per press, and `QFileInfo::isFile` on a dead hard NFS mount may never return (a minute or more on soft NFS or CIFS). Playing a title stats its file, and starting playback lists its folder for sidecar subtitles. Qt Quick stats every artwork file it loads on the GUI thread even with `asynchronous: true`: six calls per image (a `statx` for each of the five `QFileSelector` candidates `+Fusion`, `+en_US`, `+unix`, `+linux`, `+omarchy`, and one `access`), so each card or hero slide that scrolls in blocks for the device timeout six times. Refreshes run on startup and on settings changes, not on a timer, so nothing marks the root unavailable until one runs.
+Found: review of 0ef4e95..ff928d9; the fix for the first round stops at what the catalog worker already knows. Facts about images and playback: `tst_unavailable_root` with an LD_PRELOAD shim that sleeps on a plugged drive's paths, at aa1b5e1.
+
+## A hanging root delays the first projection of every root
+Where: `CatalogWorker::refresh` in `src/catalog/CatalogWorker.cpp`, `LibraryScanner::scan` in `src/catalog/LibraryScanner.cpp`.
+What happens: roots are scanned one after another and the projection is published after the last, so a root whose mount takes its device timeout per call (an automount with `x-systemd.device-timeout=10`) holds back the titles of every readable root by that long: about 8 s on a laptop with one missing drive and one local folder, longer with two missing drives. The interface stays responsive and Home shows its scanning state meanwhile, but no title appears until the hanging root's scan ends.
+Found: an LD_PRELOAD shim that sleeps 3 s per call on a missing drive's paths, at aa1b5e1: the worker's four calls on two missing roots held the first projection about 12 s.
+
+## Home's missing-folder notice stays until a scan runs
+Where: `ApplicationController` (`unavailableLibraryRoots`), `src/settings/SettingsSession.cpp` (`rescanLibrary`).
+What happens: nothing watches for a drive coming back. After the drive is plugged in, Home keeps its notice and the drive's titles stay withheld until a scan runs: the viewer presses Rescan in Settings, changes a library folder, or restarts. The notice says to rescan in Settings.
+Found: design of the notice at aa1b5e1.
 
 ## tst_player_hud hangs on window teardown and once aborted before any output
 Where: `tests/playback/tst_player_hud.cpp`, `~QQuickWindow` on teardown.
