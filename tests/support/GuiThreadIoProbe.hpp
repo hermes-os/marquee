@@ -239,6 +239,70 @@ ssize_t readlink(const char *__restrict path, char *__restrict buffer, size_t si
     return real(path, buffer, size);
 }
 
+// The calls a fortified build of Qt (`_FORTIFY_SOURCE`, as distributions build
+// it) makes instead of `open`, `readlink` and `realpath` when the buffer size is
+// known at compile time. `QFileInfo::canonicalFilePath` walks a path with them.
+int __open_2(const char *path, int flags)
+{
+    gui_thread_io::note("open", path);
+    MARQUEE_PROBE_CALL(int (*)(const char *, int), "__open_2");
+    return real(path, flags);
+}
+
+int __open64_2(const char *path, int flags)
+{
+    gui_thread_io::note("open64", path);
+    MARQUEE_PROBE_CALL(int (*)(const char *, int), "__open64_2");
+    return real(path, flags);
+}
+
+int __openat_2(int dirfd, const char *path, int flags)
+{
+    gui_thread_io::note("openat", path);
+    MARQUEE_PROBE_CALL(int (*)(int, const char *, int), "__openat_2");
+    return real(dirfd, path, flags);
+}
+
+int __openat64_2(int dirfd, const char *path, int flags)
+{
+    gui_thread_io::note("openat64", path);
+    MARQUEE_PROBE_CALL(int (*)(int, const char *, int), "__openat64_2");
+    return real(dirfd, path, flags);
+}
+
+ssize_t __readlink_chk(const char *__restrict path, char *__restrict buffer, size_t size,
+                       size_t bufferSize) __THROW
+{
+    gui_thread_io::note("readlink", path);
+    MARQUEE_PROBE_CALL(ssize_t (*)(const char *, char *, size_t, size_t), "__readlink_chk");
+    return real(path, buffer, size, bufferSize);
+}
+
+ssize_t readlinkat(int dirfd, const char *__restrict path, char *__restrict buffer,
+                   size_t size) __THROW
+{
+    gui_thread_io::note("readlinkat", path);
+    MARQUEE_PROBE_CALL(ssize_t (*)(int, const char *, char *, size_t), "readlinkat");
+    return real(dirfd, path, buffer, size);
+}
+
+ssize_t __readlinkat_chk(int dirfd, const char *__restrict path, char *__restrict buffer,
+                         size_t size, size_t bufferSize) __THROW
+{
+    gui_thread_io::note("readlinkat", path);
+    MARQUEE_PROBE_CALL(ssize_t (*)(int, const char *, char *, size_t, size_t),
+                       "__readlinkat_chk");
+    return real(dirfd, path, buffer, size, bufferSize);
+}
+
+char *__realpath_chk(const char *__restrict path, char *__restrict resolved,
+                     size_t resolvedSize) __THROW
+{
+    gui_thread_io::note("realpath", path);
+    MARQUEE_PROBE_CALL(char *(*)(const char *, char *, size_t), "__realpath_chk");
+    return real(path, resolved, resolvedSize);
+}
+
 FILE *fopen(const char *__restrict path, const char *__restrict mode)
 {
     gui_thread_io::note("fopen", path);

@@ -867,9 +867,13 @@ private slots:
 
         // The drive goes, and the next scan finds it gone.
         QVERIFY(QDir().rename(drive.path(), shelf.path() + QStringLiteral("/unplugged")));
+        controller.dismissError();
         controller.requestCatalogRefresh();
         QVERIFY(QTest::qWaitFor(
-            [&] { return !controller.unavailableLibraryRoots().isEmpty() && !controller.scanning(); },
+            [&] {
+                return controller.errorTitle() == QStringLiteral("Library unavailable")
+                    && !controller.scanning();
+            },
             30000));
         QCOMPARE(controller.library()->rowCount(), kAllowedMovies);
 

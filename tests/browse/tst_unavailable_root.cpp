@@ -27,6 +27,8 @@
 #include "settings/SettingsStore.hpp"
 #include "support/GuiThreadIoProbe.hpp"
 
+#include <cstdio>
+
 #ifndef __linux__
 #error "The GUI-thread file probe replaces C library entry points and is Linux only."
 #endif
@@ -72,6 +74,10 @@ namespace
         && writeImage(root + QLatin1Char('/') + show + QStringLiteral("/poster.png"), colour)
         && writeImage(root + QLatin1Char('/') + show + QStringLiteral("/fanart.png"), colour);
 }
+
+// A scan of a drive that hangs takes as long as the drive's device timeout for
+// each folder it reads; the shipped timeout was ten seconds.
+constexpr int kScanTimeoutMs = 60'000;
 
 [[nodiscard]] QString mainProfileId()
 {
@@ -208,17 +214,23 @@ class UnavailableRootTest final : public QObject
         [[nodiscard]] QString driveShows() const { return drive.path() + QStringLiteral("/TV Shows"); }
         [[nodiscard]] QString shelved() const { return shelf.path() + QStringLiteral("/unplugged"); }
 
+        // The C library's rename: Qt's own looks at the destination first,
+        // which is a call on the drive's path that is the fixture's, not the
+        // shell's.
         [[nodiscard]] bool unplug()
         {
-            unplugged = QDir().rename(drive.path(), shelved());
+            unplugged = ::rename(QFile::encodeName(drive.path()).constData(),
+                                 QFile::encodeName(shelved()).constData())
+                == 0;
             return unplugged;
         }
 
         [[nodiscard]] bool plugIn()
         {
-            // The renames below look at the drive's path themselves.
             gui_thread_io::unwatch();
-            if (QDir().rename(shelved(), drive.path())) {
+            if (::rename(QFile::encodeName(shelved()).constData(),
+                         QFile::encodeName(drive.path()).constData())
+                == 0) {
                 unplugged = false;
             }
             return !unplugged;
@@ -377,7 +389,7 @@ private slots:
     {
         Fixture f;
         QVERIFY(open(f, {}));
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         // The scan did look at the drive, away from the GUI thread.
         QVERIFY(gui_thread_io::otherThreadHits() > 0);
         QTest::qWait(300);
@@ -441,7 +453,7 @@ private slots:
         Fixture f;
         QVERIFY(open(f, {}));
         HomeRowsModel *rows = f.controller->homeRows();
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         QTRY_VERIFY(!homeTitles(rows).isEmpty());
 
         // Home: the rows and the hero hold what can be read, and only that.
@@ -480,7 +492,7 @@ private slots:
     {
         Fixture f;
         QVERIFY(open(f, {}));
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         QTest::qWait(150);
 
         QCOMPARE(catalogValue(QStringLiteral("SELECT COUNT(*) FROM media_items WHERE "
@@ -506,7 +518,7 @@ private slots:
     {
         Fixture f;
         QVERIFY(open(f, {}));
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         QCOMPARE(unavailableRoots(f).size(), 2);
         QVERIFY(unavailableRoots(f).contains(f.driveMovies()));
         QVERIFY(unavailableRoots(f).contains(f.driveShows()));
@@ -541,7 +553,7 @@ private slots:
     {
         Fixture f;
         QVERIFY(open(f, {.local = false}));
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
 
         QQuickItem *empty = itemNamed(f.window, "libraryEmptyState");
         QVERIFY(empty != nullptr);
@@ -614,13 +626,13 @@ private slots:
         Fixture f;
         QVERIFY(open(f, {}));
         HomeRowsModel *rows = f.controller->homeRows();
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         QCOMPARE(f.controller->library()->titleCount(), 2);
         QVERIFY(!homeTitles(rows).contains(QStringLiteral("Heat")));
 
         QVERIFY(f.plugIn());
         f.controller->requestCatalogRefresh();
-        QTRY_VERIFY(scanSettled(f, false));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, false), kScanTimeoutMs);
 
         QTRY_COMPARE(f.controller->library()->titleCount(), 4);
         QCOMPARE(f.controller->shows()->showCount(), 2);
@@ -641,7 +653,7 @@ private slots:
         QVERIFY(f.unplug());
         gui_thread_io::watch(f.drive.path());
         f.controller->requestCatalogRefresh();
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         QTRY_COMPARE(f.controller->library()->titleCount(), 2);
         QTest::qWait(150);
         QVERIFY2(gui_thread_io::mainThreadHits().isEmpty(),
@@ -665,7 +677,7 @@ private slots:
         QVERIFY(f.unplug());
         gui_thread_io::watch(f.drive.path());
         f.controller->requestCatalogRefresh();
-        QTRY_VERIFY(scanSettled(f, true));
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         QTRY_COMPARE(f.controller->library()->titleCount(), 2);
         QQuickItem *missing = nullptr;
         QTRY_VERIFY((missing = itemNamed(f.window, "detailsMissingState")) != nullptr);
