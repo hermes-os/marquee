@@ -1593,6 +1593,82 @@ private slots:
         QCOMPARE(qRound(scroll->property("contentY").toReal()), qRound(settled));
     }
 
+    // The missing-folder notice opens the page above the hero, so it coming
+    // and going moves every row by its height. The row the remote rests on is
+    // put back at its anchor both times, not left where the shift took it
+    // until the next key.
+    void aFocusedLowerRowStaysOnItsAnchorWhenTheNoticeComesAndGoes()
+    {
+        Shell shell;
+        for (int decade = 0; decade < 8; ++decade) {
+            for (int film = 0; film < 2; ++film) {
+                QVERIFY(writeFile(shell.movies.path()
+                                  + QStringLiteral("/Film %1 %2 (%3).mkv")
+                                        .arg(decade)
+                                        .arg(film)
+                                        .arg(1950 + decade * 10 + film)));
+            }
+        }
+        QVERIFY(open(shell, [](const Seed &) {}, true, false));
+        HomeRowsModel *rows = shell.controller->homeRows();
+        QTRY_VERIFY(rows->rowCount() >= 9);
+        shell.controller->settings()->setReduceMotion(true);
+        QVERIFY(handToContent(shell));
+        QQuickItem *scroll = itemNamed(shell.window, "homeScroll");
+        QQuickItem *home = itemNamed(shell.window, "homeRowsViewport")->parentItem();
+        QQuickItem *notice = itemNamed(shell.window, "homeLibraryNotice");
+        QVERIFY(scroll != nullptr && home != nullptr && notice != nullptr);
+        QVERIFY(!notice->isVisible());
+
+        // A row well inside the page, so its anchor is not clamped by either
+        // end of it.
+        constexpr int focusedRow = 3;
+        for (int step = 0; step <= focusedRow; ++step) {
+            press(shell, Qt::Key_Down);
+        }
+        QCOMPARE(rows->focus()->row(), focusedRow);
+        const auto rowTop = [&] {
+            QQuickItem *row = rowNamed(shell.window, rowIdAt(rows, focusedRow));
+            return row == nullptr ? qreal(-1e6) : row->mapToItem(scroll, QPointF(0, 0)).y();
+        };
+        // RemoteScrollCoordinator.swift:1240-1241 and :1254-1255, as
+        // HomeScreen.placeFocusedRow reads them.
+        const qreal desiredTop = qMax(210.0, std::round(scroll->height() * 0.36));
+        const qreal tolerance = qMax(48.0, scroll->height() * 0.11);
+        const auto onAnchor = [&] { return qAbs(rowTop() - desiredTop) <= tolerance; };
+        QTRY_VERIFY2(onAnchor(), qPrintable(QStringLiteral("row at %1, anchor %2")
+                                                .arg(rowTop())
+                                                .arg(desiredTop)));
+        const qreal before = rowTop();
+
+        home->setProperty("unavailableRoots",
+                          QStringList{QStringLiteral("/Volumes/FixtureDisk/Movies"),
+                                      QStringLiteral("/Volumes/FixtureDisk/TV Shows"),
+                                      QStringLiteral("/Volumes/FixtureDisk/Concerts")});
+        QTRY_VERIFY(notice->isVisible());
+        // The shift is more than the placement tolerates, so a row left
+        // where the shift took it is off its anchor.
+        const qreal shift = home->property("noticeBlock").toReal();
+        QVERIFY2(qAbs(before + shift - desiredTop) > tolerance,
+                 qPrintable(QStringLiteral("notice block %1 within tolerance %2")
+                                .arg(shift)
+                                .arg(tolerance)));
+        QTRY_VERIFY2(onAnchor(), qPrintable(QStringLiteral("with the notice: row at %1, anchor %2")
+                                                .arg(rowTop())
+                                                .arg(desiredTop)));
+        QCOMPARE(rows->focus()->row(), focusedRow);
+
+        const qreal withNotice = rowTop();
+        home->setProperty("unavailableRoots", QStringList{});
+        QTRY_VERIFY(!notice->isVisible());
+        QVERIFY(qAbs(withNotice - shift - desiredTop) > tolerance);
+        QTRY_VERIFY2(onAnchor(),
+                     qPrintable(QStringLiteral("without the notice: row at %1, anchor %2")
+                                    .arg(rowTop())
+                                    .arg(desiredTop)));
+        QCOMPARE(rows->focus()->row(), focusedRow);
+    }
+
     void switchingToKidsRecomposesEveryRowFromWhatTheProfileMaySee()
     {
         Shell shell;

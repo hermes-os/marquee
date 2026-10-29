@@ -15,7 +15,8 @@ intermediate version bump.
   artwork and watch state are kept, and they come back with the next scan that
   reads the folder. Home shows a notice for as long as a folder is missing that
   names it and says to plug the drive in and rescan, or to change the library
-  folders, in Settings. A library with nothing to show says "Add your Movies and
+  folders, in Settings. The row the remote is on stays in place when the notice
+  appears or goes away. A library with nothing to show says "Add your Movies and
   TV Shows folders in Settings." in place of "Content will appear once scanning
   completes", which was not true once the scan had ended; the released app has
   neither notice. A Kids profile is refused a loose file at once when a hidden

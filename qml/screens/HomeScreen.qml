@@ -945,6 +945,15 @@ FocusScope {
         }
     }
 
+    // The missing-folder notice coming or going moves the whole page by its
+    // block without changing the column's height, so the focused row is put
+    // back at its anchor here too.
+    onNoticeBlockChanged: {
+        if (root.activeFocus || root.focusState.row > 0) {
+            Qt.callLater(root.placeFocusedRow, false)
+        }
+    }
+
     Connections {
         target: root.focusState
 
