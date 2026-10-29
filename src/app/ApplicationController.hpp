@@ -266,6 +266,9 @@ private:
     /// The projected movie or episode carrying `mediaId`.
     [[nodiscard]] std::optional<MediaItem> projectedItem(const QString &mediaId) const;
     void finishCatalogRefresh();
+    /// The active profile's projection landed, or its reload ended without
+    /// one: refreshes held back for it finish now.
+    void endAwaitingProfileProjection();
     void setScanning(bool value);
     void setActiveProfile(const std::optional<Profile> &profile);
     /// Hands every surface the part of the catalog projection the active
@@ -358,6 +361,12 @@ private:
     // made while one is running keeps the surface scanning until that
     // follow-up finishes too, as `LibraryState.swift:395-419` does.
     int m_outstandingRefreshes{0};
+    // From a profile switch until a projection for the active profile lands
+    // or its reload ends without one. A refresh whose projection was read for
+    // another profile while this is set is counted here rather than finished,
+    // so Home shows the scan, not an empty library, until the reload lands.
+    bool m_awaitingProfileProjection{false};
+    int m_refreshesAwaitingProfile{0};
     bool m_scanning{false};
     QString m_errorTitle;
     QString m_errorMessage;

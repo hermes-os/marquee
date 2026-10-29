@@ -19,7 +19,9 @@ intermediate version bump.
   appears or goes away. A library with nothing to show says "Add your Movies and
   TV Shows folders in Settings." in place of "Content will appear once scanning
   completes", which was not true once the scan had ended; the released app has
-  neither notice. A Kids profile is refused a loose file at once when a hidden
+  neither notice. Choosing a profile while a scan runs keeps Home on the scan
+  until that profile's titles are ready, instead of briefly calling the library
+  empty. A Kids profile is refused a loose file at once when a hidden
   title is on a missing drive, instead of after the wait. No migration.
 - The Home hero ranks and picks as the released builder does now that the
   catalog holds TMDB's facts: the rating counts in a title's score (vote average

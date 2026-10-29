@@ -238,6 +238,8 @@ class UnavailableRootTest final : public QObject
 
         ~Fixture()
         {
+            // A worker held on the drive would never let the controller go.
+            gui_thread_io::release();
             engine.reset();
             controller.reset();
             gui_thread_io::unwatch();
@@ -256,6 +258,13 @@ class UnavailableRootTest final : public QObject
         bool drive = true;
         // The drive is gone when the application starts.
         bool unplugged = true;
+        // The drive hangs rather than answering at once: the scan waits on
+        // it, and the profile is chosen while it does, until `release`.
+        bool hang = false;
+        // The folders are in Settings, as on a real launch, so the first scan
+        // reads every one of them; otherwise they are added one by one on the
+        // command line, each a scan of its own.
+        bool inSettings = false;
     };
 
     [[nodiscard]] bool open(Fixture &f, Setup setup)
@@ -288,19 +297,34 @@ class UnavailableRootTest final : public QObject
             f.seeded.record(f.seeded.idOf(QStringLiteral("Heat")), 600'000, false);
             f.seeded.record(f.seeded.idOf(QStringLiteral("The Wire"), 1), 600'000, false);
         }
+        if (setup.inSettings) {
+            SettingsStore settings;
+            settings.setLibraryRoots(configured.movies);
+            settings.setTvShowsRoots(configured.tvShows);
+        }
         if (setup.drive && setup.unplugged && !f.unplug()) {
             return false;
         }
         // From here on the GUI thread must stay away from the drive.
         gui_thread_io::watch(f.drive.path());
+        if (setup.hang) {
+            gui_thread_io::hold();
+        }
 
         f.controller = std::make_unique<ApplicationController>();
         f.controller->setStartFullscreen(false);
-        for (const QString &path : std::as_const(configured.movies)) {
-            f.controller->setTemporaryLibraryRoot(path);
+        if (!setup.inSettings) {
+            for (const QString &path : std::as_const(configured.movies)) {
+                f.controller->setTemporaryLibraryRoot(path);
+            }
+            for (const QString &path : std::as_const(configured.tvShows)) {
+                f.controller->setTemporaryTvShowsRoot(path);
+            }
         }
-        for (const QString &path : std::as_const(configured.tvShows)) {
-            f.controller->setTemporaryTvShowsRoot(path);
+        if (setup.hang
+            && !QTest::qWaitFor([] { return gui_thread_io::otherThreadHits() > 0; },
+                                kScanTimeoutMs)) {
+            return false;
         }
         if (!f.controller->chooseProfile(f.seeded.profileId)
             || !QTest::qWaitFor([&] { return !f.controller->profileExitInFlight(); })) {
@@ -660,6 +684,60 @@ private slots:
         QTest::qWait(150);
         QVERIFY2(gui_thread_io::mainThreadHits().isEmpty(),
                  qPrintable(describe(gui_thread_io::mainThreadHits())));
+    }
+
+    // Choosing a profile while a scan waits on a hanging drive: the scan's
+    // projection was read for no profile and is dropped, and the one the
+    // choice reloads lands behind it. Home stays on the scan until then; it
+    // never tells a viewer whose library has titles to add folders.
+    void aProfileChosenDuringAHangingScanNeverShowsTheEmptyLibrary()
+    {
+        Fixture f;
+        QVERIFY(open(f, {.hang = true, .inSettings = true}));
+        QQuickItem *empty = itemNamed(f.window, "libraryEmptyState");
+        QQuickItem *notice = itemNamed(f.window, "libraryEmptyNotice");
+        QQuickItem *scanState = itemNamed(f.window, "libraryScanState");
+        QVERIFY(empty != nullptr && notice != nullptr && scanState != nullptr);
+        // Every frame's worth of state is seen, not just the settled ones: a
+        // binding that turns the empty state on and off between two queued
+        // projections never reaches a frame, but it does reach these.
+        QStringList emptyShown;
+        const auto noteEmpty = [&] {
+            if (empty->isVisible() || notice->isVisible()) {
+                emptyShown.push_back(QStringLiteral("empty=%1 notice=%2 scanning=%3 titles=%4")
+                                         .arg(empty->isVisible())
+                                         .arg(notice->isVisible())
+                                         .arg(f.controller->scanning())
+                                         .arg(f.controller->library()->titleCount()));
+            }
+        };
+        const QMetaObject::Connection emptyWatch =
+            connect(empty, &QQuickItem::visibleChanged, this, noteEmpty);
+        const QMetaObject::Connection noticeWatch =
+            connect(notice, &QQuickItem::visibleChanged, this, noteEmpty);
+        // The shell is torn down after the list it writes to.
+        const auto stopWatching = qScopeGuard([&] {
+            disconnect(emptyWatch);
+            disconnect(noticeWatch);
+        });
+        noteEmpty();
+
+        // The drive hangs: the scan is still running and Home says so.
+        QTest::qWait(500);
+        QVERIFY(f.controller->scanning());
+        QVERIFY2(scanState->isVisible(),
+                 qPrintable(QStringLiteral("titles=%1 route=%2 home=%3")
+                                .arg(f.controller->library()->titleCount())
+                                .arg(int(f.controller->navigation()->route()))
+                                .arg(scanState->parentItem()->isVisible())));
+
+        gui_thread_io::release();
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 2, kScanTimeoutMs);
+        QTRY_VERIFY(itemNamed(f.window, "homeRowsViewport")->isVisible());
+        QTest::qWait(200);
+        QVERIFY2(emptyShown.isEmpty(), qPrintable(emptyShown.join(QLatin1Char('\n'))));
+        QVERIFY(!empty->isVisible());
     }
 
     // Opening a title that was on screen when a scan found its root gone must

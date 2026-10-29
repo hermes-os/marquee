@@ -254,7 +254,7 @@ void ApplicationController::startCatalogWorker()
     const auto adoptProjection = [this](const QVector<MediaItem> &items,
                                         const QString &profileId) {
         if (profileId != activeProfileId()) {
-            return;
+            return false;
         }
         m_projection = items;
         m_projectionReceived = true;
@@ -269,8 +269,9 @@ void ApplicationController::startCatalogWorker()
             const ShellDrivesHome shell(m_shellDrivesHome);
             m_homeRows.resetFocus();
         }
+        endAwaitingProfileProjection();
+        return true;
     };
-    connect(worker, &CatalogWorker::projectionReady, this, adoptProjection);
     connect(worker, &CatalogWorker::projectionReloaded, this, adoptProjection);
     // A refresh ends when its projection lands or when it fails. Both are
     // queued onto this thread after the model updates connected above, so the
@@ -279,8 +280,17 @@ void ApplicationController::startCatalogWorker()
     // requested while one was already running is a second completion to wait
     // for, so the surface keeps scanning until the last one is answered, as
     // `ScanRequestGate.swift:31-41` and `LibraryState.swift:395-419` do.
+    // A scan read for a profile the viewer has since left brings nothing to
+    // show. Its end waits for the projection the choice reloaded, so Home
+    // stays on the scan rather than calling a library empty for that moment.
     connect(worker, &CatalogWorker::projectionReady, this,
-            [this] { finishCatalogRefresh(); });
+            [this, adoptProjection](const QVector<MediaItem> &items, const QString &profileId) {
+                if (adoptProjection(items, profileId) || !m_awaitingProfileProjection) {
+                    finishCatalogRefresh();
+                } else {
+                    ++m_refreshesAwaitingProfile;
+                }
+            });
     connect(worker, &CatalogWorker::scanFailed, this, [this](const QString &message) {
         finishCatalogRefresh();
         raiseError(QStringLiteral("Library scan"), message);
@@ -292,6 +302,7 @@ void ApplicationController::startCatalogWorker()
     const auto reloadEnded = [this](const QString &profileId) {
         if (profileId == activeProfileId()) {
             m_homeRestartPending = false;
+            endAwaitingProfileProjection();
         }
     };
     connect(worker, &CatalogWorker::projectionReloadSkipped, this, reloadEnded);
@@ -470,6 +481,15 @@ void ApplicationController::finishCatalogRefresh()
     --m_outstandingRefreshes;
     if (m_outstandingRefreshes == 0) {
         setScanning(false);
+    }
+}
+
+void ApplicationController::endAwaitingProfileProjection()
+{
+    m_awaitingProfileProjection = false;
+    while (m_refreshesAwaitingProfile > 0) {
+        --m_refreshesAwaitingProfile;
+        finishCatalogRefresh();
     }
 }
 
@@ -710,6 +730,7 @@ void ApplicationController::setActiveProfile(const std::optional<Profile> &profi
         publishProjection();
     }
     if (profileSwitched) {
+        m_awaitingProfileProjection = true;
         emit projectionReloadRequested(activeProfileId());
     }
     emit activeProfileChanged();

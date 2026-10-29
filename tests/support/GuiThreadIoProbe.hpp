@@ -17,6 +17,10 @@
 // calls cannot be intercepted (a statically linked Qt) the probe sees nothing,
 // so a test that relies on it first watches a path and stats it itself, as
 // `tst_unavailable_root` does, rather than read silence as a pass.
+//
+// `hold` makes the watched path a drive that hangs: every other thread's call
+// under it waits until `release`, as a scan waits out a missing drive's device
+// timeout, while the GUI thread's calls are only counted.
 
 #include <QString>
 #include <QStringList>
@@ -32,6 +36,7 @@
 
 #include <cstdarg>
 #include <cstdio>
+#include <condition_variable>
 #include <cstdlib>
 #include <mutex>
 #include <string>
@@ -46,6 +51,8 @@ struct State
     std::string prefix;
     std::vector<std::string> mainThreadHits;
     int otherThreadHits{0};
+    bool holding{false};
+    std::condition_variable released;
 };
 
 inline State &state()
@@ -70,7 +77,7 @@ inline void note(const char *call, const char *path)
     inside = true;
     {
         State &s = state();
-        const std::lock_guard<std::mutex> lock(s.mutex);
+        std::unique_lock<std::mutex> lock(s.mutex);
         const std::string &prefix = s.prefix;
         if (!prefix.empty() && std::string_view(path).substr(0, prefix.size()) == prefix
             && (path[prefix.size()] == '\0' || path[prefix.size()] == '/')) {
@@ -78,6 +85,7 @@ inline void note(const char *call, const char *path)
                 s.mainThreadHits.push_back(std::string(call) + " " + path);
             } else {
                 ++s.otherThreadHits;
+                s.released.wait(lock, [&s] { return !s.holding; });
             }
         }
     }
@@ -330,6 +338,25 @@ inline void watch(const QString &path)
     s.prefix = path.toStdString();
     s.mainThreadHits.clear();
     s.otherThreadHits = 0;
+    s.holding = false;
+    s.released.notify_all();
+}
+
+/// Makes every call another thread makes under the watched path wait until
+/// `release` (or the next `watch`): the drive hangs.
+inline void hold()
+{
+    State &s = state();
+    const std::lock_guard<std::mutex> lock(s.mutex);
+    s.holding = true;
+}
+
+inline void release()
+{
+    State &s = state();
+    const std::lock_guard<std::mutex> lock(s.mutex);
+    s.holding = false;
+    s.released.notify_all();
 }
 
 inline void unwatch()
