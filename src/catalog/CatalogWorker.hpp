@@ -66,8 +66,16 @@ public slots:
 
 signals:
     void refreshStarted();
-    /// The end of a `refresh`, with the profile whose progress it carries.
-    void projectionReady(QVector<MediaItem> items, QString profileId);
+    /// The end of a `refresh`, with the profile whose progress it carries and
+    /// the configured roots it could not reach (`unavailablePaths`, and the
+    /// same roots by catalog identity in `unavailableRootIds`). Their rows are
+    /// still in `items`, with their artwork and watch state, but a receiver
+    /// must not show or touch their titles while the root is in this set:
+    /// reaching a path of a missing drive can block for as long as the
+    /// drive's device timeout. Every refresh carries the set, empty included,
+    /// so a root that came back leaves the set the receiver keeps.
+    void projectionReady(QVector<MediaItem> items, QString profileId,
+                         QStringList unavailablePaths, QStringList unavailableRootIds);
     /// A projection that answers no refresh: a profile change or a cleared
     /// history. Kept apart so it never counts as a scan finishing.
     void projectionReloaded(QVector<MediaItem> items, QString profileId);
@@ -86,16 +94,6 @@ signals:
     void watchHistoryCleared();
     /// A background TMDB run ended; carries what it did.
     void metadataRunFinished(MetadataEnrichment::Summary summary);
-
-    /// The configured roots that could not be reached by this refresh. Their
-    /// rows are still projected, with their artwork and watch state, but a
-    /// receiver must not show or touch their titles while the root is in this
-    /// set: reaching a path of a missing drive can block for as long as the
-    /// drive's device timeout. `rootIds` names the same roots by catalog
-    /// identity. It is emitted after every refresh that finishes, empty
-    /// included, so a root that came back leaves the set the receiver keeps, and
-    /// always before that refresh's `projectionReady`.
-    void rootsUnavailable(QStringList paths, QStringList rootIds);
 
 private:
     void startMetadataRun(const LibraryRootPaths &rootPaths);

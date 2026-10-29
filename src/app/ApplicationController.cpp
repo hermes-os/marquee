@@ -280,12 +280,33 @@ void ApplicationController::startCatalogWorker()
     // requested while one was already running is a second completion to wait
     // for, so the surface keeps scanning until the last one is answered, as
     // `ScanRequestGate.swift:31-41` and `LibraryState.swift:395-419` do.
+    // The roots a scan could not read come with its projection, so Home is
+    // composed once per scan, from that projection without their titles.
     // A scan read for a profile the viewer has since left brings nothing to
     // show. Its end waits for the projection the choice reloaded, so Home
     // stays on the scan rather than calling a library empty for that moment.
     connect(worker, &CatalogWorker::projectionReady, this,
-            [this, adoptProjection](const QVector<MediaItem> &items, const QString &profileId) {
-                if (adoptProjection(items, profileId) || !m_awaitingProfileProjection) {
+            [this, adoptProjection](const QVector<MediaItem> &items, const QString &profileId,
+                                    const QStringList &unavailablePaths,
+                                    const QStringList &unavailableRootIds) {
+                const bool noticeChanges = unavailablePaths != m_unavailableRootPaths;
+                const bool rootLost = setUnavailableRoots(
+                    unavailablePaths,
+                    QSet<QString>(unavailableRootIds.cbegin(), unavailableRootIds.cend()));
+                const bool adopted = adoptProjection(items, profileId);
+                // The projection on screen is the left profile's until the
+                // reload lands; a root newly gone still leaves it at once. A
+                // root that came back waits for the reload to bring its rows.
+                if (!adopted && rootLost && m_projectionReceived) {
+                    publishProjection();
+                }
+                // After the titles, so a surface that reacts to the notice
+                // never finds the titles of the roots it names.
+                if (noticeChanges) {
+                    emit unavailableLibraryRootsChanged();
+                }
+                reportUnavailableRoots(unavailablePaths);
+                if (adopted || !m_awaitingProfileProjection) {
                     finishCatalogRefresh();
                 } else {
                     ++m_refreshesAwaitingProfile;
@@ -310,11 +331,6 @@ void ApplicationController::startCatalogWorker()
             [this, reloadEnded](const QString &message, const QString &profileId) {
                 reloadEnded(profileId);
                 raiseError(QStringLiteral("Library scan"), message);
-            });
-    connect(worker, &CatalogWorker::rootsUnavailable, this,
-            [this](const QStringList &paths, const QStringList &rootIds) {
-                setUnavailableRoots(paths, QSet<QString>(rootIds.cbegin(), rootIds.cend()));
-                reportUnavailableRoots(paths);
             });
     connect(this, &ApplicationController::projectionReloadRequested,
             worker, &CatalogWorker::reloadProjection);
@@ -411,21 +427,12 @@ void ApplicationController::publishProjection()
     m_homeRows.replaceItems(visible);
 }
 
-void ApplicationController::setUnavailableRoots(const QStringList &paths, QSet<QString> rootIds)
+bool ApplicationController::setUnavailableRoots(const QStringList &paths, QSet<QString> rootIds)
 {
-    const bool titlesChange = rootIds != m_unavailableRootIds;
-    const bool noticeChanges = paths != m_unavailableRootPaths;
+    const bool rootLost = !m_unavailableRootIds.contains(rootIds);
     m_unavailableRootIds = std::move(rootIds);
     m_unavailableRootPaths = paths;
-    // Before the notice is announced, so a surface that reacts to it never
-    // finds the titles of the roots it names. Until the first projection there
-    // is nothing published to take them out of.
-    if (titlesChange && m_projectionReceived) {
-        publishProjection();
-    }
-    if (noticeChanges) {
-        emit unavailableLibraryRootsChanged();
-    }
+    return rootLost;
 }
 
 QStringList ApplicationController::unavailableLibraryRoots() const

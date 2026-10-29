@@ -740,6 +740,50 @@ private slots:
         QVERIFY(!empty->isVisible());
     }
 
+    // A scan that finds a root gone, or back, changes Home once: the roots it
+    // could not read come with its projection, so Home is not composed from
+    // the old projection first. For a root that came back that old projection
+    // is the rows from before the scan, which would be on screen for a moment.
+    void aScanRecomposesHomeOnceAndARootThatComesBackNeverShowsItsOldRows()
+    {
+        Fixture f;
+        QVERIFY(open(f, {.unplugged = false}));
+        HomeRowsModel *rows = f.controller->homeRows();
+        QTRY_VERIFY_WITH_TIMEOUT(!f.controller->scanning(), kScanTimeoutMs);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 4, kScanTimeoutMs);
+        QTest::qWait(200);
+
+        // The drive goes.
+        QVERIFY(f.unplug());
+        gui_thread_io::watch(f.drive.path());
+        int builds = rows->heroBuildCountForTest();
+        f.controller->requestCatalogRefresh();
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 2, kScanTimeoutMs);
+        QTest::qWait(200);
+        QCOMPARE(rows->heroBuildCountForTest() - builds, 1);
+
+        // A film is added to the drive while it is away, so the rows from
+        // before the next scan are told apart from the rows it reads.
+        QVERIFY(writeFilm(f.shelved() + QStringLiteral("/Movies"), QStringLiteral("Alien (1979)"),
+                          QColor(120, 120, 120)));
+        QList<int> titleCounts;
+        const QMetaObject::Connection countWatch =
+            connect(f.controller->library(), &LibraryModel::titleCountChanged, this,
+                    [&] { titleCounts.push_back(f.controller->library()->titleCount()); });
+        const auto stopWatching = qScopeGuard([&] { disconnect(countWatch); });
+
+        // The drive comes back.
+        builds = rows->heroBuildCountForTest();
+        QVERIFY(f.plugIn());
+        f.controller->requestCatalogRefresh();
+        QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, false), kScanTimeoutMs);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 5, kScanTimeoutMs);
+        QTest::qWait(200);
+        QCOMPARE(titleCounts, QList<int>{5});
+        QCOMPARE(rows->heroBuildCountForTest() - builds, 1);
+    }
+
     // Opening a title that was on screen when a scan found its root gone must
     // not stat it either.
     void aDetailsPageOpenOnATitleWhoseRootGoesMissingStaysOffTheDrive()

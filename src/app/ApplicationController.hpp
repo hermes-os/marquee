@@ -259,10 +259,10 @@ private:
     [[nodiscard]] bool bootstrapCatalog();
     void startCatalogWorker();
     void reportUnavailableRoots(const QStringList &paths);
-    /// Takes the roots a finished scan could not read and republishes the
-    /// projection without their titles (or with them again, for a root that
-    /// came back), before any surface can ask the file system about them.
-    void setUnavailableRoots(const QStringList &paths, QSet<QString> rootIds);
+    /// Keeps the roots a finished scan could not read; the next publish leaves
+    /// their titles out. Publishes and announces nothing itself. True when a
+    /// root is in the set that was not before.
+    bool setUnavailableRoots(const QStringList &paths, QSet<QString> rootIds);
     /// The projected movie or episode carrying `mediaId`.
     [[nodiscard]] std::optional<MediaItem> projectedItem(const QString &mediaId) const;
     void finishCatalogRefresh();
