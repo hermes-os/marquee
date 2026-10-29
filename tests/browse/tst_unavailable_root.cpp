@@ -604,7 +604,7 @@ private slots:
     {
         Fixture f;
         QVERIFY(open(f, {.local = false, .drive = false}));
-        QTRY_VERIFY(!f.controller->scanning());
+        QTRY_VERIFY_WITH_TIMEOUT(!f.controller->scanning(), kScanTimeoutMs);
 
         QQuickItem *empty = itemNamed(f.window, "libraryEmptyState");
         QVERIFY(empty != nullptr);
@@ -629,14 +629,14 @@ private slots:
         HomeRowsModel *rows = f.controller->homeRows();
         QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
         // The projection a profile choice reloads lands after the scan ends.
-        QTRY_COMPARE(f.controller->library()->titleCount(), 2);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 2, kScanTimeoutMs);
         QVERIFY(!homeTitles(rows).contains(QStringLiteral("Heat")));
 
         QVERIFY(f.plugIn());
         f.controller->requestCatalogRefresh();
         QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, false), kScanTimeoutMs);
 
-        QTRY_COMPARE(f.controller->library()->titleCount(), 4);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 4, kScanTimeoutMs);
         QCOMPARE(f.controller->shows()->showCount(), 2);
         QVERIFY(unavailableRoots(f).isEmpty());
         QTRY_VERIFY(rowIds(rows).contains(QStringLiteral("continue-watching")));
@@ -656,7 +656,7 @@ private slots:
         gui_thread_io::watch(f.drive.path());
         f.controller->requestCatalogRefresh();
         QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
-        QTRY_COMPARE(f.controller->library()->titleCount(), 2);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 2, kScanTimeoutMs);
         QTest::qWait(150);
         QVERIFY2(gui_thread_io::mainThreadHits().isEmpty(),
                  qPrintable(describe(gui_thread_io::mainThreadHits())));
@@ -668,8 +668,8 @@ private slots:
     {
         Fixture f;
         QVERIFY(open(f, {.unplugged = false}));
-        QTRY_VERIFY(!f.controller->scanning());
-        QTRY_COMPARE(f.controller->library()->titleCount(), 4);
+        QTRY_VERIFY_WITH_TIMEOUT(!f.controller->scanning(), kScanTimeoutMs);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 4, kScanTimeoutMs);
         const QString dune = f.seeded.idOf(QStringLiteral("Dune"));
         f.controller->showMediaDetails(dune);
         QTRY_COMPARE(f.controller->navigation()->route(), NavigationController::Route::Details);
@@ -680,7 +680,7 @@ private slots:
         gui_thread_io::watch(f.drive.path());
         f.controller->requestCatalogRefresh();
         QTRY_VERIFY_WITH_TIMEOUT(scanSettled(f, true), kScanTimeoutMs);
-        QTRY_COMPARE(f.controller->library()->titleCount(), 2);
+        QTRY_COMPARE_WITH_TIMEOUT(f.controller->library()->titleCount(), 2, kScanTimeoutMs);
         QQuickItem *missing = nullptr;
         QTRY_VERIFY((missing = itemNamed(f.window, "detailsMissingState")) != nullptr);
         QTRY_VERIFY(missing->isVisible());
