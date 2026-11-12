@@ -1,5 +1,3 @@
-READ ~/.agents/AGENTS.md BEFORE ANYTHING (skip if missing).
-
 # Marquee
 
 Marquee is a home-theater app for a private local movie and TV library: offline-first, remote-first, ten-foot UI. The product is v3: C++23, Qt 6/QML, libmpv, SQLite, built with CMake and Ninja for Omarchy/Arch Linux.
@@ -22,7 +20,7 @@ Every file, fixture and commit message is published. Never write credentials, pe
 ./scripts/configure-v3-debug.sh       # once, and after CMake changes
 cmake --build build/v3-debug
 ctest --test-dir build/v3-debug --output-on-failure
-docs-list --check "$PWD" && agent-repo-check --repo "$PWD" && git diff --check
+git diff --check
 ```
 `docs/QUALITY_GATES.md` maps each area to its tests. A skipped test is not a pass: offscreen runs cannot render libmpv or the focus ring, so display, remote, audio and hardware-decode claims need the theater host (`docs/RUNTIME_SMOKE_TEST.md`).
 

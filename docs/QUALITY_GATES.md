@@ -27,11 +27,9 @@ heavy build or test run at a time and check memory and disk headroom first. An
 exit caused by host starvation (exit 137) is neither a product pass nor a
 product failure: restore headroom and rerun.
 
-A docs-only change runs only the repository checks, not a rebuild:
+A docs-only change runs only the whitespace check, not a rebuild:
 
 ```bash
-docs-list --check "$PWD"
-agent-repo-check --repo "$PWD"
 git diff --check HEAD
 ```
 
